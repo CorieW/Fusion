@@ -124,6 +124,7 @@ test("init liveness classification preserves every failing state", () => {
 test("isolated child env strips inherited database and port controls", () => {
   const env = createChildEnv({ DATABASE_URL: "postgres://ambient", FUSION_NO_EMBEDDED_PG: "1", PORT: "4040", KEEP: "yes" }, "/tmp/fusion-home");
   assert.equal(env.HOME, "/tmp/fusion-home");
+  assert.equal(env.USERPROFILE, "/tmp/fusion-home");
   assert.equal(env.FUSION_SKIP_ONBOARDING, "1");
   assert.equal(env.DATABASE_URL, undefined);
   assert.equal(env.FUSION_NO_EMBEDDED_PG, undefined);

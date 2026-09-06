@@ -97,6 +97,8 @@ export function createChildEnv(baseEnv, isolatedHome) {
   return {
     ...baseEnv,
     HOME: isolatedHome,
+    // FNXC:LocalDeployment 2026-09-06-20:59: os.homedir() uses USERPROFILE on Windows; HOME alone can open the operator's live PostgreSQL cluster.
+    USERPROFILE: isolatedHome,
     FUSION_SKIP_ONBOARDING: "1",
     DATABASE_URL: undefined,
     FUSION_NO_EMBEDDED_PG: undefined,

@@ -1,6 +1,7 @@
 import { spawn } from "node:child_process";
 import { dirname, resolve } from "node:path";
-import { existsSync } from "node:fs";
+import { createRequire } from "node:module";
+import { readFileSync } from "node:fs";
 import { cp, mkdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 
@@ -9,25 +10,24 @@ export const packageRoot = resolve(__dirname, "..");
 export const workspaceRoot = resolve(packageRoot, "..", "..");
 
 function resolveBin(command: string, cwd: string): string {
-  const suffix = process.platform === "win32" ? ".cmd" : "";
-  const localBin = resolve(cwd, "node_modules", ".bin", `${command}${suffix}`);
-  if (existsSync(localBin)) {
-    return localBin;
-  }
-
-  return resolve(workspaceRoot, "node_modules", ".bin", `${command}${suffix}`);
+  // FNXC:LocalDeployment 2026-09-06-20:59: Node entrypoints preserve paths and arguments containing spaces on Windows without executing a .cmd shim through a shell.
+  const packages: Record<string, string> = { tsc: "typescript", vite: "vite", vitest: "vitest" };
+  const packageName = packages[command];
+  if (!packageName) throw new Error(`Unsupported workspace tool: ${command}`);
+  const manifestPath = createRequire(resolve(cwd, "package.json")).resolve(`${packageName}/package.json`);
+  const manifest = JSON.parse(readFileSync(manifestPath, "utf8")) as { bin: string | Record<string, string> };
+  const entry = typeof manifest.bin === "string" ? manifest.bin : manifest.bin[command];
+  if (!entry) throw new Error(`Missing ${command} entrypoint in ${manifestPath}`);
+  return resolve(dirname(manifestPath), entry);
 }
 
 export function runWorkspaceBin(command: string, args: string[], cwd: string): Promise<void> {
   return new Promise((resolvePromise, rejectPromise) => {
-    const child = spawn(resolveBin(command, cwd), args, {
+    const child = spawn(process.execPath, [resolveBin(command, cwd), ...args], {
       cwd,
       stdio: "inherit",
       env: process.env,
-      // On Windows the resolved bin is a .cmd shim; Node refuses to spawn
-      // .cmd/.bat without a shell (EINVAL) since CVE-2024-27980. resolveBin
-      // produces an absolute, space-free path, so shell quoting is safe here.
-      shell: process.platform === "win32",
+      shell: false,
     });
 
     child.on("error", rejectPromise);
