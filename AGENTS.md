@@ -251,6 +251,14 @@ Never make a stale test pass by weakening it. The honest resolutions are: update
 
 Never kill processes on port 4040 and never start test servers on 4040. Use `--port 0` or another free port.
 
+### Personal Fork Development Isolation
+
+- Preview changes with `scripts/fusion-dev.ps1 Start` on Windows, or `pnpm dev:hmr` in a terminal. Use the matching `Stop`/`Status` actions for the Windows preview.
+- Development must use its owned profile, synthetic project and separate PostgreSQL cluster. Never point development at production connection strings, registered project directories, credentials or runtime control files.
+- Do not bypass the development proxy identity check, subprocess restrictions or disabled automation to make a preview work. Provider authentication, external agent execution and deployment are deliberately unavailable there.
+- Build candidates separately. Production activation remains an explicit operator handoff outside Fusion-dispatched tasks; source edits and preview restarts must not restart production.
+- See `docs/contributing.md` for the preview commands, storage layout and verification procedure.
+
 ### Never run an unbounded `find` against the system temp directory
 
 Do not issue a recursive `find` (or any unbounded recursive directory walk) rooted at the OS temp directory — `$TMPDIR`, `/tmp`, or macOS `/var/folders/...` (canonical `/private/var/...`). The temp root can hold an enormous number of entries on CI and long-lived dev hosts, so a broad scan can hang for minutes and pin I/O.

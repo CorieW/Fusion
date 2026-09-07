@@ -1,108 +1,74 @@
 #!/usr/bin/env node
-/**
- * Runs the Fusion dashboard API server AND `vite dev` concurrently so the
- * React SPA in packages/dashboard/app hot-reloads while still talking to a
- * live API/WebSocket backend.
- *
- * Two processes:
- *   1. API:  `pnpm dev --prebuild=none dashboard --no-auth --port <API_PORT>`
- *            (source-mode API/engine; Vite serves the browser UI)
- *   2. Vite: `vite dev` in packages/dashboard
- *            (serves app/ with HMR; proxies /api and WS to the API)
- *
- * Open the URL Vite prints (e.g. http://localhost:5173), NOT the API URL.
- * Edits to packages/dashboard/app/** hot-reload in Vite. Runtime source edits
- * gracefully restart the API/engine child while Vite stays available.
- *
- * Env:
- *   FUSION_API_PORT   API port (default 4050). Vite's proxy reads the same
- *                     var so both sides stay in sync.
- *   FUSION_VITE_PORT  Vite dev port (default 5173).
- */
+import { spawn } from 'node:child_process';
+import { createRequire } from 'node:module';
+import { fileURLToPath } from 'node:url';
+import path from 'node:path';
+import fs from 'node:fs/promises';
+import net from 'node:net';
+import { resolveIsolatedDevPaths } from './dev-with-memory-lib.mjs';
+import { devPort, prepareDevIsolation, verifyDevBackend } from './lib/dev-isolation.mjs';
 
-import { spawn } from "node:child_process";
-import { fileURLToPath } from "node:url";
-import { dirname, resolve } from "node:path";
-
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const repoRoot = resolve(__dirname, "..");
-const dashboardDir = resolve(repoRoot, "packages/dashboard");
-
-const API_PORT = globalThis.process.env.FUSION_API_PORT ?? "4050";
-const VITE_PORT = globalThis.process.env.FUSION_VITE_PORT ?? "5173";
-
-const children = [];
-let shuttingDown = false;
-
-function prefix(label, color) {
-  const tag = `\x1b[${color}m[${label}]\x1b[0m`;
-  return (chunk) => {
-    const text = chunk.toString();
-    // Preserve trailing-newline semantics; prefix every non-empty line.
-    const lines = text.split("\n");
-    const last = lines.pop();
-    const prefixed = lines.map((l) => `${tag} ${l}`).join("\n");
-    globalThis.process.stdout.write(prefixed + (prefixed ? "\n" : "") + (last ? `${tag} ${last}` : ""));
-  };
+// FNXC:DevIsolation 2026-09-07-14:11: Both halves of HMR share an owned profile. Never fall back to the production API.
+const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const dashboardDir = path.join(repoRoot, 'packages/dashboard');
+const apiPort = devPort(process.env.FUSION_API_PORT);
+const vitePort = devPort(process.env.FUSION_VITE_PORT, 5184);
+if (apiPort === vitePort) throw new Error('Development API and UI need different ports.');
+const paths = Object.fromEntries(Object.entries(resolveIsolatedDevPaths({
+  repoRoot, home: process.env.HOME || process.env.USERPROFILE,
+  explicitDir: process.env.FUSION_DEV_ISOLATED_DIR,
+})).map(([key, value]) => [key, path.resolve(value)]));
+for (const port of [apiPort, vitePort]) {
+  await new Promise((resolve, reject) => {
+    const probe = net.createServer();
+    probe.once('error', () => reject(new Error(`Development port ${port} is occupied. No existing process was stopped.`)));
+    probe.listen(port, '127.0.0.1', () => probe.close(resolve));
+  });
 }
-
-function launch(name, color, command, args, options) {
-  const child = spawn(command, args, {
-    stdio: ["inherit", "pipe", "pipe"],
-    shell: true,
-    ...options,
-  });
-  child.stdout.on("data", prefix(name, color));
-  child.stderr.on("data", prefix(name, color));
-  child.on("exit", (code, signal) => {
-    if (shuttingDown) return;
-    console.log(`\n[dev-hmr] ${name} exited (code=${code} signal=${signal}) — tearing down`);
-    shutdown(code ?? 1);
-  });
-  children.push({ name, child });
+const env = { ...await prepareDevIsolation(paths, repoRoot), FUSION_API_PORT: String(apiPort), FUSION_VITE_PORT: String(vitePort) };
+const proof = { target: `http://127.0.0.1:${apiPort}`, token: env.FUSION_DEV_TOKEN };
+const stopFile = path.join(paths.base, 'stop-request');
+await fs.rm(stopFile, { force: true });
+const children = [];
+let stopping = false;
+function launch(args, cwd, ipc = false) {
+  // Standalone development supervisor: IPC permits graceful Windows shutdown of this runner's own child.
+  const child = spawn(process.execPath, args, { cwd, env, windowsHide: true, stdio: ipc ? ['inherit', 'inherit', 'inherit', 'ipc'] : 'inherit' });
+  children.push(child);
+  child.on('error', error => { console.error(error.message); shutdown(1); });
+  child.on('exit', code => { if (!stopping) shutdown(code ?? 1); });
   return child;
 }
-
-function shutdown(exitCode = 0) {
-  if (shuttingDown) return;
-  shuttingDown = true;
-  for (const { child } of children) {
-    if (!child.killed) {
-      try { child.kill("SIGINT"); } catch { void 0; }
-    }
+function shutdown(code = 0) {
+  if (stopping) return;
+  stopping = true;
+  clearInterval(stopPoll);
+  for (const child of children) {
+    if (child.exitCode !== null) continue;
+    if (child.connected) child.send({ type: 'fusion:dev-stop' });
+    else child.kill();
   }
-  // Hard kill after 5s if anyone is still alive.
-  setTimeout(() => {
-    for (const { child } of children) {
-      if (!child.killed) {
-        try { child.kill("SIGKILL"); } catch { void 0; }
-      }
-    }
-    globalThis.process.exit(exitCode);
-  }, 5000).unref();
+  process.exitCode = code;
 }
-
-globalThis.process.on("SIGINT", () => shutdown(0));
-globalThis.process.on("SIGTERM", () => shutdown(0));
-
-console.log(`[dev-hmr] starting API on :${API_PORT} + vite on :${VITE_PORT}`);
-console.log(`[dev-hmr] open http://localhost:${VITE_PORT} for HMR (not the API URL)`);
-
-// API: green. Vite owns the browser UI in this mode, so skip the dashboard
-// client prebuild and run the API/engine directly from source.
-launch(
-  "api",
-  "32",
-  "pnpm",
-  ["dev", "--watch", "--prebuild=none", "dashboard", "--no-auth", "--port", API_PORT, "--host", "127.0.0.1"],
-  { cwd: repoRoot, env: { ...globalThis.process.env, FUSION_API_PORT: API_PORT } },
-);
-
-// Vite: cyan. Starts once; proxies /api (including WS) to the API port.
-launch(
-  "vite",
-  "36",
-  "pnpm",
-  ["exec", "vite", "dev", "--port", VITE_PORT],
-  { cwd: dashboardDir, env: { ...globalThis.process.env, FUSION_API_PORT: API_PORT } },
-);
+const stopPoll = setInterval(async () => { if (await fs.stat(stopFile).catch(() => null)) shutdown(); }, 500);
+process.on('SIGINT', () => shutdown());
+process.on('SIGTERM', () => shutdown());
+console.log(`[dev-hmr] Isolated storage: ${paths.base}`);
+launch([path.join(repoRoot, 'scripts/dev-with-memory.mjs'), `--isolated=${paths.base}`, '--watch', '--prebuild=none', 'dashboard', '--no-auth', '--port', String(apiPort)], repoRoot, true);
+let ready = false;
+for (let attempt = 0; attempt < 180 && !stopping; attempt++) {
+  try {
+    await verifyDevBackend(proof);
+    const health = await fetch(`${proof.target}/api/health`, { signal: globalThis.AbortSignal.timeout(2000) });
+    if (!health.ok || (await health.json()).status !== 'ok') throw new Error('API is still starting.');
+    ready = true;
+    break;
+  } catch { await new Promise(resolve => setTimeout(resolve, 1000)); }
+}
+if (!ready) { console.error('[dev-hmr] Isolated API did not become ready. UI was not started.'); shutdown(1); }
+else {
+  const require = createRequire(path.join(dashboardDir, 'package.json'));
+  const vite = path.join(path.dirname(require.resolve('vite/package.json')), 'bin/vite.js');
+  launch([vite, '--host', '127.0.0.1', '--port', String(vitePort), '--strictPort'], dashboardDir);
+  console.log(`[dev-hmr] Open http://127.0.0.1:${vitePort} — development data only; automation disabled.`);
+}

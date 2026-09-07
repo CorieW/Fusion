@@ -67,157 +67,50 @@ If you already cloned without LFS, run `git lfs install` then `git lfs pull` to 
 
 ## Development Workflow
 
-```bash
-pnpm local             # fast local dashboard/API + AI engine startup on a safe localhost port
-pnpm local --no-engine # fast local dashboard/API-only startup
-pnpm local --prebuild <none|client|full>  # local dashboard/API + AI engine startup with an explicit prebuild level
-pnpm dev               # source-mode CLI; dashboard gets a client-only prebuild, other commands skip it
-pnpm dev:watch         # dashboard + engine; gracefully restart runtime source after active agents drain
-FUSION_DEV_PREBUILD=full pnpm dev dashboard  # production-like full workspace prebuild
-pnpm dev:ui            # dashboard dev server only
-pnpm dev:hmr           # dashboard API + Vite UI HMR + graceful runtime source restarts
-pnpm dev --tunnel      # dev server + a public Cloudflare quick-tunnel URL (see below)
-pnpm dev --tunnel=5173 # tunnel a specific port (e.g. a Vite server) instead of the dashboard
-pnpm lint              # lint all packages
-pnpm test              # merge-gate suite + changed-only affected tests (bounded; never full-suite)
-pnpm test:gate         # the merge gate: curated engine-core suite + CI-shape test
-pnpm smoke:boot        # boot smoke: CLI --help + real serve /api/health
-pnpm test:full         # full workspace suite (explicit opt-in; clean-worktree compatible)
-pnpm build             # workspace builds (excludes desktop/mobile)
-pnpm build:all         # full workspace build (includes desktop/mobile)
-pnpm verify:workspace  # deep opt-in verification: lint -> test:full -> build
-pnpm typecheck         # workspace typechecks
+Development launchers use a separate profile, PostgreSQL cluster and synthetic **Development Sandbox** project. Production projects, credentials and working files are not copied. Source changes hot-reload in the preview; deployed releases keep using their own built files.
+
+On Windows:
+
+```powershell
+.\scripts\fusion-dev.ps1 Start
+.\scripts\fusion-dev.ps1 Status
+.\scripts\fusion-dev.ps1 Stop
 ```
 
-## Sharing a dev server (`pnpm dev --tunnel`)
+Open **http://127.0.0.1:5184**. The API uses 4050; production remains on 4040. The Windows helper stores development data in the sibling `<checkout-name> Runtime/development` directory and logs in its parent. Stop sends a graceful request to the owned development runner.
 
-When Fusion runs somewhere other than your laptop — a container, a shared box, a remote host — a dev
-server bound inside it is unreachable from your own browser. `--tunnel` publishes it through a
-**Cloudflare quick tunnel** and prints the URL:
+Cross-platform foreground startup:
 
 ```bash
-pnpm dev --tunnel              # tunnels the dashboard port (PORT, default 4040)
-pnpm dev --tunnel=5173         # tunnels a specific port, e.g. a Vite dev server
-pnpm dev --tunnel dashboard    # tunnel the default port AND run the dashboard
-FUSION_DEV_TUNNEL=1 pnpm dev   # same, from the environment
+pnpm dev:hmr           # isolated API + Vite with source hot reload
+pnpm local             # same isolated preview
+pnpm dev --prebuild=none dashboard # isolated API, no Vite
+pnpm dev:watch         # isolated API with source watch and prebuild
 ```
 
-Tunnelling the dashboard (the default) prints the bearer token and a link that already carries it,
-because a tunnel URL you cannot open is not a shared dev server:
+Foreground commands default to `~/.fusion-dev/<checkout-name>`. Set `FUSION_DEV_ISOLATED_DIR` to use another dedicated directory, or pass `--isolated=<directory>` to `pnpm dev`. Storage persists across restarts. Existing nonempty directories without a matching ownership marker are refused. The Windows helper's `-RuntimeRoot` parameter selects its parent runtime directory.
 
-```
-  ┌ dev server tunnel
-  │ https://mic-relatively-jewelry-belly.trycloudflare.com  →  http://localhost:4040
-  │ token: fn_1a2b3c…
-  │ ready-to-open: https://mic-relatively-jewelry-belly.trycloudflare.com/?token=fn_1a2b3c…
-  └ that link carries the token — share it only with whoever should have access
-```
+- Both `HOME` and `USERPROFILE`, plus Windows AppData and XDG locations, are isolated. Inherited PostgreSQL connection strings, provider credentials and production control variables are removed.
+- Test mode is forced. The task engine and agent heartbeat scheduling are disabled. Definition editing and appearance settings work; execution, project registration, imports, terminals and deployment controls are blocked in this preview.
+- External AI/editor commands and provider probes are blocked. Only Git operations in the development project and management of its own PostgreSQL process are allowed; previewing a UI must not launch installed editors or agent CLIs.
+- The backend blocks outbound TCP/TLS except its own PostgreSQL connection. The browser's development policy restricts network requests to the preview origin and its HMR socket.
+- Vite requires proof that the API belongs to the same development directory, verifies it before forwarding API requests, and fails closed if the backend disappears. It never falls back to production. Bare `pnpm dev:ui` therefore refuses startup; use `pnpm dev:hmr`.
+- Port 4040, public development tunnels and the former `pnpm local --allow-4040` escape are rejected. Duplicate starts fail without stopping another process.
 
-Tunnelling any other port has no Fusion auth to lend it, and says so:
+This separates ordinary development application state; it is not an operating-system sandbox for untrusted code running as your Windows user. Keep production releases outside the editable checkout and activate candidates separately through the existing deployment workflow.
 
-```
-  ┌ dev server tunnel
-  │ https://mic-relatively-jewelry-belly.trycloudflare.com  →  http://localhost:5173
-  └ anyone with this URL can reach that port — Fusion adds no auth to it
-```
-
-### Running against an isolated database (`--isolated`)
-
-Working on Fusion from inside a machine that already runs one — a container, a shared box — a plain
-`pnpm dev` **shares that instance's live database**. Everything durable hangs off `$HOME/.fusion`
-(settings, credentials, central DB, the embedded Postgres data dir), and a second process pointed at
-a data dir whose postmaster is already running attaches to it rather than starting its own.
+### Verification
 
 ```bash
-pnpm dev --isolated --tunnel        # own database, own project dir, own tunnel
-pnpm dev --isolated=/tmp/sandbox    # put the sandbox somewhere specific
-FUSION_DEV_ISOLATED=1 pnpm dev      # same, from the environment
+node --test scripts/__tests__/dev-isolation.test.mjs
+pnpm lint
+pnpm typecheck
+pnpm build
+pnpm smoke:boot
+pnpm test:gate
 ```
 
-`--isolated` gives the dev server its own `HOME` (so its own `.fusion`, credentials and Postgres
-cluster, on its own port) **and** its own project directory. Both matter: `fn dashboard` derives its
-project from the working directory, so isolating `HOME` alone would leave both instances sharing
-`<repo>/.fusion` — including `.fusion/tasks/<id>/`, which self-healing's orphaned-task-dir sweep
-re-imports, so a fresh dev database would adopt the real instance's tasks.
-
-The sandbox defaults to `~/.fusion-dev/<checkout-name>/` — outside the work tree, so it neither shows
-up in `git status` nor dies on a clean checkout, and keyed by checkout so two clones do not collide.
-Its project directory is `git init`-ed on first use, because Fusion projects are git work trees. The
-dev database persists across restarts; delete the directory to start fresh.
-
-Requires `cloudflared` on PATH (the Docker image ships it). Quick tunnels need no account, domain, or
-payment card **because a dev server is HTTP** — the TCP endpoints that something like SSH would need
-require a card (ngrok) or a domain plus Zero Trust (Cloudflare), which is why this flag exists only
-for HTTP.
-
-Behaviour worth knowing:
-
-- **What guards the URL depends on the target.** A tunnel to the DASHBOARD port is still behind the
-  dashboard's bearer token (the banner prints it and a token-bearing link — treat that link as the
-  credential it is). A tunnel to any OTHER port is genuinely open: anyone holding the URL reaches it,
-  so use it for sharing a preview, not for anything sensitive. `--no-auth` opens the dashboard too,
-  and the banner says so.
-- **The token comes from the same place the dashboard's does** — `FUSION_DASHBOARD_TOKEN`,
-  `FUSION_DAEMON_TOKEN`, then `~/.fusion/settings.json`. On a first authenticated run the token may
-  not exist yet when the tunnel comes up; the banner then points at the dashboard's own startup line.
-- **The tunnel waits for the dev server, and never guesses.** It publishes only the port the dev
-  server reports it actually bound. If startup is slow — or stopped on an interactive prompt such as
-  `Run central db now? (Y/n)` — no tunnel appears and the wrapper says so once a minute. It will not
-  fall back to the configured port: on a machine where something else already owns that port (a
-  container whose own Fusion holds 4040) that published a "dev server" URL serving a different
-  instance entirely.
-- **A failed tunnel never takes the dev server down.** If `cloudflared` is missing or no URL is
-  published, it logs and carries on; losing a preview URL must not cost you your dev loop.
-- **Restarts reuse the tunnel.** In `--watch` mode a fresh quick tunnel would hand out a different
-  hostname on every reload, invalidating the link you already shared.
-- **`--tunnel` only consumes a following token when it is numeric**, so `pnpm dev --tunnel dashboard`
-  still forwards `dashboard` to the dev command.
-
-### Fusion inside Fusion: two instances, each with its own engine
-
-Developing Fusion from inside a container that is already running Fusion needs all three flags
-together. The container's own dashboard owns 4040 and its database, so a plain `pnpm dev --tunnel`
-collides with it in two ways that are easy to misread as unrelated breakage:
-
-```bash
-cd /home/node/fusion && pnpm dev dashboard --port 4050 --tunnel=4050 --isolated
-```
-
-- **`--isolated`** — own database, own project directory, and its own engine (it redirects `HOME` and
-  the working directory; the engine still starts normally, so both instances run a real one). Without
-  it the dev server shares the live database, and Command Center's **Restart engine**
-  (`POST /system/engine/restart`) enumerates every project in that shared database, pause/resumes each,
-  and on a failed resume leaves a **compensating pause** behind. That pause is durable: the container's
-  own project is left `status: "paused"`, its dashboard logs `Failed to start engine for project …:
-  Project … is paused`, and remote-access calls fail with `REMOTE_TUNNEL_ENGINE_UNAVAILABLE`. Nothing
-  self-heals it and recreating the container does not clear it — the fix is
-  `POST /projects/:id/resume`.
-- **`--port 4050`** — any free port other than the one the outer instance holds. Otherwise the
-  dashboard hits `EADDRINUSE` and falls back to `listen(0)`, binding a **different random port on
-  every restart**. The tunnel is opened once against whatever port that first start landed on, so the
-  next restart silently strands the URL you were using.
-- **`--tunnel=4050`** — names the target explicitly. `PORT=4050` alone is **not** enough: it only
-  feeds the tunnel's guess, while the dashboard resolves its own bind port separately, so the server
-  still lands on an ephemeral port.
-
-Verify the two are genuinely separate by comparing project lists — they must not match:
-
-```bash
-curl -s -H "Authorization: Bearer $TOKEN" http://127.0.0.1:4050/api/projects   # dev sandbox
-curl -s -H "Authorization: Bearer $TOKEN" http://127.0.0.1:4040/api/projects   # the real instance
-```
-
-Two gotchas when restarting the dev instance:
-
-- **Killing it needs to match the tsx child.** Its command line is
-  `node --conditions=source --require …/tsx…` and contains neither `pnpm dev` nor `dev-with-memory`,
-  so a pattern matching only those leaves it alive holding the port — and the replacement instance
-  then quietly rebinds elsewhere while appearing to run. Confirm the port is free
-  (`curl` returns `000`) before starting a new one.
-- **`kill -9` strands the embedded Postgres.** A hard kill leaves `postmaster.pid` behind, and the
-  next start tries to JOIN that dead cluster instead of starting one, exiting 1 with
-  `joined instance was not yet accepting connections`. Delete
-  `~/.fusion-dev/<checkout-name>/home/.fusion/embedded-postgres/default/postmaster.pid` and start again.
+The isolation regression covers default CLI invocations, inherited production URLs/credentials, Windows paths containing spaces, unsafe existing storage, wrong or unavailable API identity, and blocked execution endpoints. For browser acceptance, create a uniquely named workflow through the preview; verify it appears there and is absent from every production project. Confirm production uptime continues across preview restarts.
 
 ## Deterministic workspace verification bootstrap
 

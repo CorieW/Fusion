@@ -24,6 +24,8 @@ import { spawnSync } from "node:child_process";
 import { join as pathJoin, resolve as pathResolve } from "node:path";
 import { createDevSourceWatcher } from "./lib/dev-source-watch.mjs";
 import { resolveDevTunnelAuth, startDevTunnel } from "./lib/dev-tunnel.mjs";
+import { isolatedDashboardArgs, prepareDevIsolation } from "./lib/dev-isolation.mjs";
+import { pathToFileURL } from 'node:url';
 
 // Set increased heap size (8GB) to prevent OOM during initial build/start
 const MEMORY_MB = process.env.FUSION_DEV_MEMORY_MB || "8192";
@@ -31,6 +33,9 @@ const MEMORY_MB = process.env.FUSION_DEV_MEMORY_MB || "8192";
 // Spawn the actual dev command with all arguments passed through
 const { spawn } = await import("child_process");
 const rawArgs = process.argv.slice(2);
+let startupCancelled = false;
+process.on('message', message => { if (message?.type === 'fusion:dev-stop') startupCancelled = true; });
+process.on('disconnect', () => { startupCancelled = true; });
 let parsedArgs;
 try {
   parsedArgs = parseDevWrapperArgs(rawArgs);
@@ -39,18 +44,16 @@ try {
   process.exit(1);
 }
 const { inspectFlags, args, requestedPrebuild, watchSourceFromFlag, tunnel, tunnelPort, isolated, isolatedDir } = parsedArgs;
+if (tunnel) throw new Error('Development previews are local only; public tunnels are disabled.');
 let { watchSource } = parsedArgs;
 
 // NODE_OPTIONS is shared with every spawned node process (build + run +
 // agents). Heap size belongs here. Inspector flags do NOT — see comment above.
-const nodeOptions = `--max-old-space-size=${MEMORY_MB} ${process.env.NODE_OPTIONS || ""}`.trim();
+const nodeOptions = `--max-old-space-size=${MEMORY_MB}`;
 process.env.NODE_OPTIONS = nodeOptions;
 
-// In dev we bind the dashboard to 0.0.0.0 so the server is reachable from
-// mobile devices and other machines on the LAN for testing. Production
-// builds default to 127.0.0.1; this override only applies when starting
-// the dashboard via `pnpm dev dashboard` and only if no --host was passed.
-const forwardedArgs = buildForwardedDevArgs(args);
+// Canonicalize the CLI spelling too: bin.ts does not recognize --port=VALUE.
+const forwardedArgs = isolatedDashboardArgs(buildForwardedDevArgs(args), process.env);
 
 /*
 FNXC:DevIsolation 2026-08-20-04:10:
@@ -60,6 +63,7 @@ branches and merges all assume one — and an isolated instance that cannot reso
 not usable for the UI work this flag exists to support.
 */
 let isolatedPaths;
+let isolatedEnv;
 if (isolated) {
   const realHome = process.env.HOME || process.env.USERPROFILE;
   isolatedPaths = resolveIsolatedDevPaths({
@@ -67,12 +71,16 @@ if (isolated) {
     home: realHome,
     explicitDir: isolatedDir ? pathResolve(isolatedDir) : undefined,
   });
+  // FNXC:DevIsolation 2026-09-07-14:11: Clear inherited connection strings, credentials and control markers before source code starts; isolate every Windows profile location.
+  isolatedPaths = Object.fromEntries(Object.entries(isolatedPaths).map(([key, value]) => [key, pathResolve(value)]));
+  isolatedEnv = await prepareDevIsolation(isolatedPaths, process.cwd());
   fsMkdirSync(isolatedPaths.home, { recursive: true });
   fsMkdirSync(isolatedPaths.project, { recursive: true });
   if (!fsExistsSync(pathJoin(isolatedPaths.project, ".git"))) {
     // Short, deterministic git plumbing — the engine-wide execSync ban targets user-configured
     // commands, not this.
-    spawnSync("git", ["init", "-q"], { cwd: isolatedPaths.project, stdio: "ignore" });
+    const initialized = spawnSync("git", ["init", "-q"], { cwd: isolatedPaths.project, env: isolatedEnv, stdio: "ignore", windowsHide: true });
+    if (initialized.status !== 0) throw new Error('Could not initialize the development project.');
   }
   console.log(`[fusion:dev] isolated instance — database ${isolatedPaths.home}/.fusion, project ${isolatedPaths.project}`);
 }
@@ -96,6 +104,16 @@ const tsxDir = path.dirname(tsxPkgJson);
 const PRELOAD = path.join(tsxDir, "dist", "preflight.cjs");
 const LOADER = path.join(tsxDir, "dist", "loader.mjs");
 const ENTRY = path.resolve(process.cwd(), "packages/cli/src/bin.ts");
+if (forwardedArgs[0] === 'dashboard' && !fsExistsSync(pathJoin(isolatedPaths.project, '.fusion/project.json'))) {
+  await new Promise((resolve, reject) => {
+    const child = spawn(process.execPath, buildDevNodeArgs({
+      inspectFlags: ['--import', pathToFileURL(pathResolve('scripts/lib/dev-runtime-guard.mjs')).href],
+      preload: PRELOAD, loader: LOADER, entry: pathResolve('scripts/dev-seed.mjs'),
+    }), { cwd: isolatedPaths.project, env: isolatedEnv, stdio: 'inherit', windowsHide: true });
+    child.on('error', reject);
+    child.on('exit', code => code === 0 ? resolve() : reject(new Error('Development project bootstrap failed.')));
+  });
+}
 
 // Spawn node directly (no shell) so the inspector attaches to the real app
 // process and there's no parent/child wrapper consuming --inspect.
@@ -216,8 +234,9 @@ async function openDevTunnel() {
 }
 
 function runApp(extraArgs) {
+  if (startupCancelled) process.exit(0);
   const tsx = spawn(process.execPath, buildDevNodeArgs({
-    inspectFlags,
+    inspectFlags: [...inspectFlags, '--import', pathToFileURL(pathResolve('scripts/lib/dev-runtime-guard.mjs')).href],
     preload: PRELOAD,
     loader: LOADER,
     entry: ENTRY,
@@ -225,7 +244,7 @@ function runApp(extraArgs) {
   }), {
     // FNXC:DevTunnel 2026-08-19-02:05: the tunnel needs the child's IPC channel too, to learn the
     // port it actually bound — not only watch mode.
-    stdio: (watchSource || tunnel) ? ["inherit", "inherit", "inherit", "ipc"] : "inherit",
+    stdio: ["inherit", "inherit", "inherit", "ipc"],
     // FNXC:SystemPanel 2026-07-25-10:05: stamp the supervisor pid alongside the
     // flag so the child can tell a real supervising parent from an inherited
     // copy of the variable (see hasLiveSupervisingParent in commands/dashboard.ts).
@@ -234,7 +253,8 @@ function runApp(extraArgs) {
     // share `.fusion/tasks/`. Absolute PRELOAD/LOADER/ENTRY paths make the cwd change safe.
     ...(isolatedPaths ? { cwd: isolatedPaths.project } : {}),
     env: {
-      ...process.env,
+      ...(isolatedEnv ?? process.env),
+      NODE_OPTIONS: `--max-old-space-size=${MEMORY_MB}`,
       FUSION_RESTART_SUPERVISED: "1",
       FUSION_SUPERVISOR_PID: String(process.pid),
       ...(watchSource ? { FUSION_DEV_WATCH: "1" } : {}),
@@ -281,7 +301,7 @@ function runApp(extraArgs) {
   tsx.on("close", (c) => {
     const sourceRestart = watchRestart.detach(tsx);
     if (appChild === tsx) appChild = undefined;
-    if (c === RESTART_EXIT_CODE) {
+    if (c === RESTART_EXIT_CODE && !shuttingDown && !startupCancelled) {
       console.log("[fusion:dev] restart requested — restarting…");
       if (sourceRestart && prebuildCommand) {
         runPrebuild(() => runApp(extraArgs));
@@ -297,7 +317,7 @@ function runApp(extraArgs) {
 
 function runPrebuild(onSuccess) {
   console.log(`[fusion] Running ${prebuildCommand.label} (${prebuildMode}) before source startup...`);
-  const build = spawn(prebuildCommand.command, prebuildCommand.args, { stdio: "inherit", shell: true });
+  const build = spawn(prebuildCommand.command, prebuildCommand.args, { stdio: "inherit", shell: true, env: isolatedEnv, windowsHide: true });
   build.on("close", (code) => {
     if (code !== 0) process.exit(code ?? 1);
     onSuccess();
@@ -305,7 +325,7 @@ function runPrebuild(onSuccess) {
 }
 
 async function warnIfSourceVersionBehind() {
-  if (process.env.FUSION_SKIP_STARTUP_UPDATE_PREFLIGHT === "1") {
+  if (isolated || process.env.FUSION_SKIP_STARTUP_UPDATE_PREFLIGHT === "1") {
     return;
   }
 
@@ -393,13 +413,16 @@ after the operator believes it is down. Forward the signal, give the child a mom
 own, then leave.
 */
 let shuttingDown = false;
+process.on('message', message => { if (message?.type === 'fusion:dev-stop') process.emit('SIGTERM'); });
+process.on('disconnect', () => process.emit('SIGTERM'));
 for (const signal of ["SIGINT", "SIGTERM", "SIGHUP"]) {
   process.on(signal, () => {
     if (shuttingDown) return;
     shuttingDown = true;
     devTunnel?.stop?.();
     if (appChild && !appChild.killed) {
-      appChild.kill(signal === "SIGHUP" ? "SIGTERM" : signal);
+      if (appChild.connected) appChild.send({ type: 'fusion:dev-stop' });
+      else appChild.kill(signal === "SIGHUP" ? "SIGTERM" : signal);
       // The child owns a graceful shutdown path (draining agents, stopping Postgres); give it room,
       // then stop waiting so a wedged child cannot pin the terminal open.
       const forceExit = setTimeout(() => process.exit(0), 10_000);

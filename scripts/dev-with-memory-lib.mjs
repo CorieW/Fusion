@@ -1,3 +1,5 @@
+import { pathToFileURL } from 'node:url';
+
 export function buildDevNodeArgs({
   inspectFlags = [],
   preload,
@@ -11,7 +13,7 @@ export function buildDevNodeArgs({
     "--require",
     preload,
     "--import",
-    `file://${loader}`,
+    pathToFileURL(loader).href,
     entry,
     ...args,
   ];
@@ -133,7 +135,7 @@ export function parseDevWrapperArgs(rawArgs, env = process.env) {
   `--tunnel=PORT` targets a port other than the dashboard's (e.g. a Vite server on 5173).
   */
   let tunnel = env.FUSION_DEV_TUNNEL === "1";
-  let isolated = env.FUSION_DEV_ISOLATED === "1";
+  let isolated = true;
   let isolatedDir = env.FUSION_DEV_ISOLATED_DIR || undefined;
   let tunnelPort = env.FUSION_DEV_TUNNEL_PORT ? Number(env.FUSION_DEV_TUNNEL_PORT) : undefined;
 

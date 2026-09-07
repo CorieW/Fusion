@@ -1,3 +1,4 @@
+import { pathToFileURL } from 'node:url';
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   buildForwardedDevArgs,
@@ -42,7 +43,7 @@ describe("buildDevNodeArgs", () => {
       "--require",
       "/tmp/preflight.cjs",
       "--import",
-      "file:///tmp/loader.mjs",
+      pathToFileURL("/tmp/loader.mjs").href,
       "/tmp/bin.ts",
       "dashboard",
       "--host",
@@ -66,7 +67,7 @@ describe("dev-with-memory prebuild options", () => {
       watchSourceFromFlag: false,
       tunnel: false,
       tunnelPort: undefined,
-      isolated: false,
+      isolated: true,
       isolatedDir: undefined,
     });
   });
@@ -80,7 +81,7 @@ describe("dev-with-memory prebuild options", () => {
       watchSourceFromFlag: true,
       tunnel: false,
       tunnelPort: undefined,
-      isolated: false,
+      isolated: true,
       isolatedDir: undefined,
     });
   });
@@ -389,7 +390,7 @@ describe("development source restart watcher", () => {
     it("parses --isolated with and without an explicit directory", () => {
       expect(parseDevWrapperArgs(["--isolated"], {})).toMatchObject({ isolated: true, isolatedDir: undefined });
       expect(parseDevWrapperArgs(["--isolated=/tmp/sandbox"], {})).toMatchObject({ isolated: true, isolatedDir: "/tmp/sandbox" });
-      expect(parseDevWrapperArgs(["dashboard"], {})).toMatchObject({ isolated: false });
+      expect(parseDevWrapperArgs(["dashboard"], {})).toMatchObject({ isolated: true });
       expect(parseDevWrapperArgs(["dashboard"], { FUSION_DEV_ISOLATED: "1" })).toMatchObject({ isolated: true });
       expect(() => parseDevWrapperArgs(["--isolated="], {})).toThrow(/Missing directory/);
     });

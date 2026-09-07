@@ -4,6 +4,7 @@ import { dirname, resolve } from "node:path";
 import { mkdirSync, writeFileSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { execSync } from "node:child_process";
 import { createHash } from "node:crypto";
+import { devProxyConfiguration, verifyDevBackend } from "../../scripts/lib/dev-isolation.mjs";
 
 /**
  * Generate a deterministic build version string.
@@ -122,9 +123,26 @@ function ensureThemeDataStylesheetOrder(): Plugin {
   };
 }
 
-export default defineConfig({
+export default defineConfig(({ command }) => {
+  const isolatedApi = command === 'serve' ? devProxyConfiguration(process.env) : undefined;
+  const isolationGuard: Plugin = {
+    name: 'fusion-development-isolation',
+    async configureServer(server) {
+      if (!isolatedApi) throw new Error('Missing isolated development API.');
+      await verifyDevBackend(isolatedApi);
+      server.middlewares.use((req, res, next) => {
+        res.setHeader('Content-Security-Policy', `connect-src 'self' ws://127.0.0.1:${server.config.server.port}; form-action 'self'; object-src 'none'; base-uri 'self'`);
+        if (!/^\/api(?:\/|$)/.test(req.url ?? '')) return next();
+        void verifyDevBackend(isolatedApi).then(() => next(), () => {
+          res.statusCode = 503;
+          res.end('Isolated development API unavailable; request was not forwarded.');
+        });
+      });
+    },
+  };
+  return {
   root: "app",
-  plugins: [react(), ensureThemeDataStylesheetOrder(), emitVersionJson()],
+  plugins: [react(), ensureThemeDataStylesheetOrder(), emitVersionJson(), isolationGuard],
   define: {
     __BUILD_VERSION__: JSON.stringify(buildVersion),
   },
@@ -260,13 +278,16 @@ export default defineConfig({
     },
   },
   server: {
+    host: '127.0.0.1',
+    strictPort: true,
     proxy: {
       // Keep Vite source modules under app/api* on the dev server while proxying real API endpoints.
       "^/api(?!/.*\\.[jt]sx?(?:\\?|$))(/|$)": {
-        target: `http://localhost:${process.env.FUSION_API_PORT ?? "4040"}`,
+        target: isolatedApi?.target,
         changeOrigin: true,
         ws: true,
       },
     },
   },
+  };
 });

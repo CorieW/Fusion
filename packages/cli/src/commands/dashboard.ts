@@ -1042,6 +1042,7 @@ export async function runDashboard(port: number, opts: { paused?: boolean; dev?:
   // overlaps with plugin loading and extension resolution instead of running
   // after them.
   const noEngine = opts.noEngine === true;
+  const isolatedDevPreview = process.env.FUSION_DEV_ISOLATED === "1";
 
   // FNXC:CentralCoreBackendMode 2026-06-26-13:20:
   // CentralCore must receive the same AsyncDataLayer the resolved TaskStore
@@ -1917,7 +1918,7 @@ export async function runDashboard(port: number, opts: { paused?: boolean; dev?:
 
     // Load all enabled extensions: Fusion/Pi filesystem-discovered + package-resolved.
     const extensionsResult = await phaseTime("discoverAndLoadExtensions", () => discoverAndLoadExtensions(
-      [
+      isolatedDevPreview ? [] : [
         ...selfExtensionPaths,
         ...getEnabledPiExtensionPaths(cwd),
         ...packageExtensionPaths,
@@ -2651,6 +2652,8 @@ export async function runDashboard(port: number, opts: { paused?: boolean; dev?:
       logSink.warn(`Failed to initialize mesh networking: ${message}`, "dashboard");
     }
 
+    // FNXC:DevIsolation 2026-09-07-14:11: UI previews must not acquire agent worktrees or run heartbeat automation, even when a synthetic agent is enabled.
+    if (!isolatedDevPreview) {
     try {
       /*
       FNXC:SecretsEnvRuntimeWiring 2026-08-05-21:40:
@@ -2766,6 +2769,7 @@ export async function runDashboard(port: number, opts: { paused?: boolean; dev?:
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       logSink.log(`HeartbeatMonitor initialization failed (continuing without agent monitoring): ${message}`, "engine");
+    }
     }
 
     // Ensure plugin loading has completed before pluginLoader is handed off
