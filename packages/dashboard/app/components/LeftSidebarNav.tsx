@@ -4,7 +4,7 @@ import "./LeftSidebarNav.css";
 FNXC:Navigation 2026-06-19-00:00:
 When the leftSidebarNav experiment is active, this component owns the non-mobile primary navigation destinations that Header previously exposed through inline and overflow view controls. Mobile remains owned by MobileNavBar, so this sidebar keeps the desktop/tablet contract only.
 */
-import { useCallback, useEffect, useId, useState, type ComponentType, type KeyboardEvent as ReactKeyboardEvent } from "react";
+import { useCallback, useEffect, useId, useMemo, useState, type ComponentType, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import { useTranslation } from "react-i18next";
 import {
   Bot,
@@ -15,12 +15,14 @@ import {
   Clock,
   FileText,
   Gauge,
+  History,
   Lightbulb,
   LayoutGrid,
   List,
   Mail,
   MessageSquare,
   Plus,
+  Search,
   Settings,
   Sparkles,
   Target,
@@ -30,6 +32,8 @@ import {
 } from "lucide-react";
 import type { ProjectInfo, PluginDashboardViewEntry } from "../api";
 import type { TaskView } from "../hooks/useViewState";
+import { buildPluginTaskViewId } from "../plugins/pluginViewRegistry";
+import { getPluginDashboardViewNavIcon } from "./pluginNavIcon";
 import { GithubIcon } from "./GithubIcon";
 import { getDashboardViewLabel } from "../../src/shared/dashboard-views";
 
@@ -146,17 +150,43 @@ function formatCount(count: number): string {
   return count > 99 ? "99+" : String(count);
 }
 
+function getPluginEntryView(entry: PluginDashboardViewEntry): TaskView {
+  if (entry.pluginId === "fusion-plugin-dependency-graph" && entry.view.viewId === "graph") {
+    return "graph";
+  }
+  return buildPluginTaskViewId(entry.pluginId, entry.view.viewId);
+}
+
+function isPluginEntryActive(view: TaskView, entry: PluginDashboardViewEntry): boolean {
+  const pluginTaskView = buildPluginTaskViewId(entry.pluginId, entry.view.viewId);
+  return view === pluginTaskView || (view === "graph" && entry.pluginId === "fusion-plugin-dependency-graph" && entry.view.viewId === "graph");
+}
+
+function sortPluginViews(entries: PluginDashboardViewEntry[]): PluginDashboardViewEntry[] {
+  return [...entries].sort((a, b) => (a.view.order ?? Number.MAX_SAFE_INTEGER) - (b.view.order ?? Number.MAX_SAFE_INTEGER));
+}
+
+/*
+FNXC:Navigation 2026-06-20-00:00:
+Experimental sidebar plugin labels must read as plain navigation nouns without an appended "view" suffix. The Compound Engineering plugin is intentionally shortened to "Compound" so its label fits the narrower sidebar.
+*/
+function getSidebarPluginLabel(entry: PluginDashboardViewEntry): string {
+  return entry.pluginId === "fusion-plugin-compound-engineering" ? "Compound Eng" : entry.view.label;
+}
+
 export function LeftSidebarNav({
   view,
   onChangeView,
   onNewTask,
   onOpenSettings,
   mailboxUnreadCount = 0,
+  recommendationUnreadCount = 0,
   artifactUnreadCount = 0,
   mailboxPendingApprovalCount = 0,
   chatHasUnreadResponse = false,
   planningNeedsInput = false,
   experimentalFeatures,
+  pluginDashboardViews = [],
   showAgentsTab = false,
   showSkillsTab = false,
   footerVisible = false,
@@ -238,6 +268,44 @@ export function LeftSidebarNav({
 
   const newTaskLabel = t("nav.newTask", "New Task");
 
+  /* FNXC:SidebarGroups 2026-09-07-03:00: Keep every registered plugin destination, regardless of placement. Group rendering sorts these alongside the remaining destinations in Other. */
+  const sortedPluginViews = useMemo(
+    () => sortPluginViews(pluginDashboardViews),
+    [pluginDashboardViews],
+  );
+
+  const mapPluginEntry = useCallback(
+    (entry: PluginDashboardViewEntry): SidebarNavEntry => {
+      const PluginIcon = getPluginDashboardViewNavIcon(entry);
+      const targetView = getPluginEntryView(entry);
+      return {
+        id: `plugin-${entry.pluginId}-${entry.view.viewId}`,
+        label: getSidebarPluginLabel(entry),
+        view: targetView,
+        isActive: isPluginEntryActive(view, entry),
+        icon: PluginIcon,
+        testId: `sidebar-nav-plugin-${entry.pluginId}-${entry.view.viewId}`,
+        onSelect: () => onChangeView(targetView),
+      };
+    },
+    [view, onChangeView],
+  );
+
+  const graphPluginEntry = sortedPluginViews.find(
+    (entry) => entry.pluginId === "fusion-plugin-dependency-graph" && entry.view.viewId === "graph",
+  );
+  const compoundPluginEntry = sortedPluginViews.find(
+    (entry) => entry.pluginId === "fusion-plugin-compound-engineering",
+  );
+  /*
+  FNXC:RoadmapsNavigation 2026-07-19-12:00:
+  The bundled registry now hosts the manifest-advertised roadmaps view. Keep it in the
+  normal plugin pool so roadmap-item previews have a live callback navigation destination.
+  */
+  const remainingPluginViews = sortedPluginViews.filter(
+    (entry) => entry !== graphPluginEntry && entry !== compoundPluginEntry,
+  );
+
   const navEntries: SidebarNavEntry[] = [
     /*
     FNXC:Navigation 2026-06-22-01:15:
@@ -270,6 +338,16 @@ export function LeftSidebarNav({
       testId: "sidebar-nav-list",
       onSelect: () => onChangeView("list"),
     },
+    {
+      id: "patchnode",
+      label: t("nav.patchnode", getDashboardViewLabel("patchnode")),
+      view: "patchnode",
+      isActive: view === "patchnode",
+      icon: History,
+      testId: "sidebar-nav-patchnode",
+      onSelect: () => onChangeView("patchnode"),
+    },
+    ...(graphPluginEntry ? [mapPluginEntry(graphPluginEntry)] : []),
     {
       id: "planning",
       label: t("nav.planning", getDashboardViewLabel("planning")),
@@ -324,6 +402,19 @@ export function LeftSidebarNav({
       dot: view !== "mailbox" && mailboxPendingApprovalCount > 0 ? "pending" : view !== "mailbox" && mailboxUnreadCount > 0 ? "online" : undefined,
       onSelect: () => onChangeView("mailbox"),
     },
+    {
+      id: "recommendations",
+      label: t("nav.recommendations", getDashboardViewLabel("recommendations")),
+      view: "recommendations",
+      isActive: view === "recommendations",
+      icon: Lightbulb,
+      testId: "sidebar-nav-recommendations",
+      badge: recommendationUnreadCount > 0 ? recommendationUnreadCount : undefined,
+      badgeLabel: t("nav.recommendationsUnreadAriaLabel", "{{count}} new recommendations", { count: recommendationUnreadCount }),
+      dot: view !== "recommendations" && recommendationUnreadCount > 0 ? "online" : undefined,
+      dotLabel: t("nav.recommendationsUnreadDotAriaLabel", "New recommendations"),
+      onSelect: () => onChangeView("recommendations"),
+    },
     ...(showSkillsTab
       ? [{ id: "skills", label: t("nav.sidebarSkills", "Skills"), view: "skills" as TaskView, isActive: view === "skills", icon: Zap, testId: "sidebar-nav-skills", onSelect: () => onChangeView("skills") }]
       : []),
@@ -368,6 +459,7 @@ export function LeftSidebarNav({
       testId: "sidebar-nav-import-tasks",
       onSelect: () => onChangeView("import-tasks"),
     },
+    ...(compoundPluginEntry ? [mapPluginEntry(compoundPluginEntry)] : []),
     {
       id: "workflows",
       label: t("nav.workflows", getDashboardViewLabel("workflows")),
@@ -380,17 +472,28 @@ export function LeftSidebarNav({
     ...(experimentalFeatures?.insights
       ? [{ id: "insights", label: t("header.insightsView", getDashboardViewLabel("insights")), view: "insights" as TaskView, isActive: view === "insights", icon: Sparkles, testId: "sidebar-nav-insights", onSelect: () => onChangeView("insights") }]
       : []),
+    ...(experimentalFeatures?.researchView
+      ? [{ id: "research", label: t("header.researchView", getDashboardViewLabel("research")), view: "research" as TaskView, isActive: view === "research", icon: Search, testId: "sidebar-nav-research", onSelect: () => onChangeView("research") }]
+      : []),
+    ...(experimentalFeatures?.ideationView
+      ? [{ id: "ideation", label: t("nav.ideation", getDashboardViewLabel("ideation")), view: "ideation" as TaskView, isActive: view === "ideation", icon: Lightbulb, testId: "sidebar-nav-ideation", onSelect: () => onChangeView("ideation") }]
+      : []),
+    ...(experimentalFeatures?.evalsView
+      ? [{ id: "evals", label: t("header.evalsView", getDashboardViewLabel("evals")), view: "evals" as TaskView, isActive: view === "evals", icon: Target, testId: "sidebar-nav-evals", onSelect: () => onChangeView("evals") }]
+      : []),
+    ...remainingPluginViews.map(mapPluginEntry),
   ];
 
-  /* FNXC:SidebarGroups 2026-09-07-02:52: Dashboard stands alone. Tasks contains Board/List; AI contains Chat/Agents/Workflows/Memory. Other contains exactly the requested remaining destinations, alphabetized by their displayed labels. Unlisted views stay outside this sidebar. */
+  /* FNXC:SidebarGroups 2026-09-07-03:00: Dashboard stands alone. Tasks contains Board/List; AI contains Chat/Agents/Workflows/Memory. Other also retains History, Recommendations, optional views, and installed plugin views, all alphabetized by their displayed labels. */
   const pickEntries = (ids: string[]) => ids.flatMap(id => {
     const entry = navEntries.find(candidate => candidate.id === id);
     return entry ? [entry] : [];
   });
+  const primaryIds = new Set(["command-center", "board", "list", "chat", "agents", "workflows", "memory"]);
   const groups: { id: SidebarGroupId; label: string; entries: SidebarNavEntry[] }[] = [
     { id: "tasks", label: t("nav.groups.tasks", "Tasks"), entries: pickEntries(["board", "list"]) },
     { id: "ai", label: t("nav.groups.ai", "AI"), entries: pickEntries(["chat", "agents", "workflows", "memory"]) },
-    { id: "other", label: t("nav.groups.other", "Other"), entries: pickEntries(["automations", "mailbox", "skills", "missions", "planning", "documents", "goals", "import-tasks", "insights"]).sort((a, b) => a.label.localeCompare(b.label)) },
+    { id: "other", label: t("nav.groups.other", "Other"), entries: navEntries.filter(entry => !primaryIds.has(entry.id)).sort((a, b) => a.label.localeCompare(b.label)) },
   ];
 
   const renderEntry = (entry: SidebarNavEntry) => {

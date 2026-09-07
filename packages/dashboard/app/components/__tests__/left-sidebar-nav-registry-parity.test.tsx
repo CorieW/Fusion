@@ -52,11 +52,13 @@ const SIDEBAR_REGISTRY_VIEW_IDS = [
   "command-center",
   "board",
   "list",
+  "patchnode",
   "planning",
   "missions",
   "agents",
   "chat",
   "mailbox",
+  "recommendations",
   "skills",
   "memory",
   "documents",
@@ -65,6 +67,9 @@ const SIDEBAR_REGISTRY_VIEW_IDS = [
   "import-tasks",
   "workflows",
   "insights",
+  "research",
+  "ideation",
+  "evals",
   "settings",
 ] as const;
 

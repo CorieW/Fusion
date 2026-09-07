@@ -204,14 +204,23 @@ describe("LeftSidebarNav", () => {
     expect(hoverRule).not.toMatch(/#|rgb\(/i);
   });
 
+  it("opens the dedicated recommendations destination with its unread count", () => {
+    const { onChangeView } = renderSidebar({ recommendationUnreadCount: 5 });
+    const item = screen.getByTestId("sidebar-nav-recommendations");
+
+    expect(item.querySelector(".left-sidebar-nav__badge")).toHaveTextContent("5");
+    fireEvent.click(item);
+    expect(onChangeView).toHaveBeenCalledWith("recommendations");
+  });
+
   it.each([
     { count: 0, expected: null },
     { count: 5, expected: "5" },
     { count: 120, expected: "99+" },
-  ])("renders artifact badge state for count $count", ({ count, expected }) => {
+  ])("renders recommendation and artifact badge state for count $count", ({ count, expected }) => {
     renderSidebar({ recommendationUnreadCount: count, artifactUnreadCount: count });
 
-    for (const testId of ["sidebar-nav-documents"]) {
+    for (const testId of ["sidebar-nav-recommendations", "sidebar-nav-documents"]) {
       const item = screen.getByTestId(testId);
       const badge = item.querySelector(".left-sidebar-nav__badge");
       const dot = item.querySelector(".left-sidebar-nav__dot");
@@ -240,9 +249,9 @@ describe("LeftSidebarNav", () => {
     expect(other).toHaveAttribute("aria-expanded", "true");
     const content = document.getElementById(other.getAttribute("aria-controls")!)!;
     expect(within(content).getAllByRole("button").map(b => b.getAttribute("aria-label"))).toEqual([
-      "Artifacts", "Automations", "Goals", "Import Tasks", "Insights", "Mailbox", "Missions", "Planning", "Skills",
+      "Artifacts", "Automations", "Evals", "Goals", "History", "Ideation", "Import Tasks", "Insights", "Mailbox", "Missions", "Overflow Plugin", "Planning", "Primary Plugin", "Recommendations", "Research", "Skills",
     ]);
-    for (const id of ["patchnode", "recommendations", "research", "ideation", "evals", "plugin-fusion-plugin-primary-primary-view"]) expect(screen.queryByTestId("sidebar-nav-" + id)).toBeNull();
+    for (const id of ["patchnode", "recommendations", "research", "ideation", "evals", "plugin-fusion-plugin-primary-primary-view"]) expect(screen.getByTestId("sidebar-nav-" + id)).toBeVisible();
     expectSettingsLastInFooter();
   });
 
@@ -353,6 +362,35 @@ describe("LeftSidebarNav", () => {
     expect(screen.queryByRole("button", { name: /view$/i })).toBeNull();
   });
 
+  it("keeps plugin destinations in Other and updates them when plugins are removed", () => {
+    const rendered = renderSidebar();
+    fireEvent.click(screen.getByRole("button", { name: "Other", exact: true }));
+    fireEvent.click(screen.getByRole("button", { name: "Overflow Plugin", exact: true }));
+    expect(rendered.onChangeView).toHaveBeenCalledWith("plugin:fusion-plugin-overflow:overflow-view");
+    rendered.rerender(<LeftSidebarNav {...rendered.props} pluginDashboardViews={[]} />);
+    expect(screen.queryByRole("button", { name: "Overflow Plugin", exact: true })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Primary Plugin", exact: true })).toBeNull();
+    expect(screen.getByRole("button", { name: "History", exact: true })).toBeVisible();
+  });
+
+  it("renders the hosted Roadmaps plugin destination when registered", () => {
+    const roadmapView: PluginDashboardViewEntry = {
+      pluginId: "fusion-plugin-roadmap",
+      view: {
+        viewId: "roadmaps",
+        label: "Roadmaps",
+        componentPath: "./RoadmapsView",
+        placement: "primary",
+        order: 99,
+      },
+    };
+    renderSidebar({ pluginDashboardViews: [pluginViews[0], roadmapView, pluginViews[1]] });
+
+    expect(screen.getByTestId("sidebar-nav-plugin-fusion-plugin-roadmap-roadmaps")).toBeInTheDocument();
+    expect(screen.getByTestId("sidebar-nav-plugin-fusion-plugin-primary-primary-view")).toBeInTheDocument();
+    expect(screen.getByTestId("sidebar-nav-plugin-fusion-plugin-overflow-overflow-view")).toBeInTheDocument();
+  });
+
   it("renders mailbox badges without the removed stash recovery destination", () => {
     renderSidebar();
 
@@ -360,6 +398,71 @@ describe("LeftSidebarNav", () => {
 
     expect(mailboxBadge?.textContent).toBe("3");
     expect(screen.queryByTestId("sidebar-nav-stash-recovery")).toBeNull();
+  });
+
+  it("renders zero plugin views and at least one primary and overflow plugin view", () => {
+    const empty = renderSidebar({ pluginDashboardViews: [] });
+    expect(screen.queryByTestId("sidebar-nav-plugin-fusion-plugin-primary-primary-view")).toBeNull();
+    empty.unmount();
+
+    renderSidebar({ pluginDashboardViews: pluginViews });
+    expect(screen.getByTestId("sidebar-nav-plugin-fusion-plugin-primary-primary-view")).toBeDefined();
+    expect(screen.getByTestId("sidebar-nav-plugin-fusion-plugin-overflow-overflow-view")).toBeDefined();
+  });
+
+  it("renders plugin labels without view suffix and pins Compound Engineering to the Boxes sidebar icon", () => {
+    const rendered = renderSidebar({
+      pluginDashboardViews: [
+        ...pluginViews,
+        {
+          pluginId: "fusion-plugin-compound-engineering",
+          view: {
+            viewId: "compound-engineering",
+            label: "Compound Engineering",
+            componentPath: "./CompoundEngineering",
+            icon: "Sparkles",
+            placement: "primary",
+            order: 0,
+          },
+        },
+      ],
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Other", exact: true }));
+    const primaryPlugin = screen.getByTestId("sidebar-nav-plugin-fusion-plugin-primary-primary-view");
+    const compoundPlugin = screen.getByTestId("sidebar-nav-plugin-fusion-plugin-compound-engineering-compound-engineering");
+    expect(primaryPlugin).toHaveAccessibleName("Primary Plugin");
+    expect(primaryPlugin).toHaveAttribute("title", "Primary Plugin");
+    expect(primaryPlugin).toHaveTextContent("Primary Plugin");
+    expect(primaryPlugin).not.toHaveTextContent("view");
+    expect(compoundPlugin).toHaveAccessibleName("Compound Eng");
+    expect(compoundPlugin).toHaveAttribute("title", "Compound Eng");
+    expect(compoundPlugin).toHaveTextContent("Compound Eng");
+    expect(compoundPlugin).not.toHaveTextContent("Compound Engineering");
+    expect(compoundPlugin.querySelector(".lucide-boxes")).not.toBeNull();
+    expect(compoundPlugin.querySelector(".lucide-sparkles")).toBeNull();
+    expect(compoundPlugin.querySelector(".lucide-grid-3x3")).toBeNull();
+
+    /*
+    FNXC:CompoundEngineeringNav 2026-07-19-17:27:
+    Disable and uninstall both remove the shared view entry; neither may leave a dead sidebar shell.
+    */
+    rendered.rerender(<LeftSidebarNav {...rendered.props} pluginDashboardViews={[]} />);
+    expect(screen.queryByTestId("sidebar-nav-plugin-fusion-plugin-compound-engineering-compound-engineering")).toBeNull();
+    rendered.rerender(<LeftSidebarNav {...rendered.props} pluginDashboardViews={[...pluginViews, {
+      pluginId: "fusion-plugin-compound-engineering",
+      view: {
+        viewId: "compound-engineering",
+        label: "Compound Engineering",
+        componentPath: "./CompoundEngineering",
+        icon: "Sparkles",
+        placement: "primary",
+        order: 0,
+      },
+    }]} />);
+    expect(screen.getByTestId("sidebar-nav-plugin-fusion-plugin-compound-engineering-compound-engineering")).toBeInTheDocument();
+    rendered.rerender(<LeftSidebarNav {...rendered.props} pluginDashboardViews={[]} />);
+    expect(screen.queryByTestId("sidebar-nav-plugin-fusion-plugin-compound-engineering-compound-engineering")).toBeNull();
   });
 
   it.each<[TaskView, string]>([
