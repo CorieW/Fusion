@@ -64,6 +64,7 @@ export interface CreateChatStreamHandlersOptions {
 }
 
 export interface ChatStreamHandlers {
+  onAgentStart: () => void;
   onThinking: (delta: string) => void;
   onText: (delta: string) => void;
   onToolStart: (data: { toolName: string; args?: Record<string, unknown> }) => void;
@@ -149,7 +150,22 @@ export function createChatStreamHandlers(
   };
   cancelStreamingFlushesRef.current = cancelFlushes;
 
+  // FNXC:ChatMentionProgress 2026-09-07-15:31:
+  // Both successful replies and new responders reset private accumulators and
+  // pending frames, including when the previous responder failed or skipped.
+  const resetResponder = (): void => {
+    cancelFlushes();
+    capturedText = "";
+    capturedThinking = "";
+    capturedToolCalls = [];
+    capturedFallbackInfo = undefined;
+    setStreamingText("");
+    setStreamingThinking("");
+    setStreamingToolCalls([]);
+  };
+
   const handlers: ChatStreamHandlers = {
+    onAgentStart: resetResponder,
     onThinking: (delta: string) => {
       capturedThinking += delta;
       if (thinkingRaf === null) {
@@ -206,7 +222,10 @@ export function createChatStreamHandlers(
       onFallbackSession?.(data, sessionId);
       addToast?.(`Primary model unavailable. Switched to fallback ${data.fallbackModel}.`, "warning");
     },
-    onAgentMessage,
+    onAgentMessage: (data) => {
+      resetResponder();
+      onAgentMessage?.(data);
+    },
     onDone: (data: { messageId: string; message?: ChatMessage; dispatch?: "agents"; failedAgentNames?: string[] }) => {
       cancelFlushes();
       onDone({

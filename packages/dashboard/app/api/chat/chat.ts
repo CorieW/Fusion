@@ -561,6 +561,7 @@ export interface ChatReplacementIdentity {
 }
 
 export interface ChatStreamHandlers {
+  onAgentStart?: (data: { senderAgentId: string; senderAgentName: string }) => void;
   /** Fires once when the server accepts this new turn after multipart upload and before stream events. */
   onAccepted?: () => void;
   onThinking?: (data: string) => void;
@@ -656,6 +657,14 @@ export function streamChatResponse(
         } catch {
           // skip malformed event
         }
+        break;
+      case "agent_start":
+        try {
+          const parsed = JSON.parse(rawData) as { senderAgentId?: unknown; senderAgentName?: unknown };
+          if (typeof parsed.senderAgentId === "string" && typeof parsed.senderAgentName === "string") {
+            handlers.onAgentStart?.({ senderAgentId: parsed.senderAgentId, senderAgentName: parsed.senderAgentName });
+          }
+        } catch { /* Ignore malformed progress boundaries. */ }
         break;
       case "agent_message":
         try {
@@ -900,6 +909,14 @@ export function attachChatStream(
           // skip malformed event
         }
         break;
+      case "agent_start":
+        try {
+          const parsed = JSON.parse(rawData) as { senderAgentId?: unknown; senderAgentName?: unknown };
+          if (typeof parsed.senderAgentId === "string" && typeof parsed.senderAgentName === "string") {
+            handlers.onAgentStart?.({ senderAgentId: parsed.senderAgentId, senderAgentName: parsed.senderAgentName });
+          }
+        } catch { /* Ignore malformed progress boundaries. */ }
+        break;
       case "agent_message":
         try {
           const parsed = JSON.parse(rawData) as { message?: unknown; senderAgentId?: unknown; senderAgentName?: unknown };
@@ -1065,4 +1082,3 @@ export type {
   InsightsListResponse,
   RunsListResponse,
 } from "../system/insights.js";
-

@@ -1013,6 +1013,15 @@ export function useChat(
       setStreamingToolCalls: updateAttachedStreamingToolCalls,
       cancelStreamingFlushesRef,
       addToast: options?.silent ? undefined : addToast,
+      // FNXC:ChatMentionProgress 2026-09-07-15:31:
+      // Reattached chats must retain each completed agent reply while later
+      // responders are still working, just like a freshly submitted turn.
+      onAgentMessage: ({ message }) => {
+        if (!ownsAttachedSession()) return;
+        const agentMessage = mapChatMessageToInfo(message);
+        setMessages((prev) => prev.some((item) => item.id === agentMessage.id)
+          ? prev : appendChatMessageChronologically(prev, agentMessage));
+      },
       onFallbackSession: (data, fallbackSessionId) => {
         if (!ownsAttachedSession()) return;
         const nextModel = parseModelDescriptor(data.fallbackModel);
@@ -1813,7 +1822,8 @@ export function useChat(
           if (!ownsStream()) return;
           const agentMessage = mapChatMessageToInfo(message);
           streamingMessageIdsRef.current.add(agentMessage.id);
-          setMessages((previous) => appendChatMessageChronologically(previous, agentMessage));
+          setMessages((previous) => previous.some((item) => item.id === agentMessage.id)
+            ? previous : appendChatMessageChronologically(previous, agentMessage));
           setStreamingText("");
           setStreamingThinking("");
           setStreamingToolCalls([]);

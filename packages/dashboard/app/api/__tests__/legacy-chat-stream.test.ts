@@ -14,6 +14,25 @@ function createChunkedStream(chunks: string[]): ReadableStream<Uint8Array> {
 }
 
 describe("streamChatResponse SSE parser", () => {
+  it.each(["send", "reattach"])("forwards responder boundaries and live work on %s", async (mode) => {
+    const events = [
+      ["agent_start", { senderAgentId: "a", senderAgentName: "Avery" }],
+      ["text", "Checking files"],
+      ["tool_start", { toolName: "read", args: { path: "a.ts" } }],
+      ["tool_end", { toolName: "read", isError: false, result: "contents" }],
+      ["done", { messageId: "", dispatch: "agents" }],
+    ];
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(createChunkedStream(events.map(([type, data]) => `event: ${type}\ndata: ${JSON.stringify(data)}\n\n`)), { status: 200 }));
+    const handlers = { onAgentStart: vi.fn(), onText: vi.fn(), onToolStart: vi.fn(), onToolEnd: vi.fn(), onDone: vi.fn() };
+    if (mode === "send") streamChatResponse("s-1", "@Avery help", handlers);
+    else attachChatStream("s-1", handlers);
+    await vi.waitFor(() => expect(handlers.onDone).toHaveBeenCalled());
+    expect(handlers.onAgentStart).toHaveBeenCalledWith({ senderAgentId: "a", senderAgentName: "Avery" });
+    expect(handlers.onText).toHaveBeenCalledWith("Checking files");
+    expect(handlers.onToolStart).toHaveBeenCalledWith({ toolName: "read", args: { path: "a.ts" } });
+    expect(handlers.onToolEnd).toHaveBeenCalledWith({ toolName: "read", isError: false, result: "contents" });
+  });
+
   afterEach(() => {
     vi.restoreAllMocks();
   });

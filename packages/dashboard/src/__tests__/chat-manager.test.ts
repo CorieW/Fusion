@@ -10,7 +10,7 @@ FN-6444 confirmed this ChatManager API-path suite is deterministic under dashboa
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { runWithFusionSessionIdentity, resolveFusionSessionPrincipal, type Settings } from "@fusion/core";
 import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
-import { dirname, join } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { tmpdir } from "node:os";
 import {
   ChatManager,
@@ -674,6 +674,123 @@ describe("ChatManager.sendMessage", () => {
   });
 
   describe("mention parsing and context", () => {
+    it.each(["native", "cli-bridge"])("streams mentioned-agent work before completion and checkpoints it (%s)", async (runtime) => {
+      vi.useFakeTimers();
+      const entered = Promise.withResolvers<void>();
+      const finish = Promise.withResolvers<void>();
+      const events: any[] = [];
+      const unsubscribe = chatStreamManager.subscribe("chat-001", (event) => events.push(event));
+      const create = vi.fn(async (options: any) => ({ session: {
+        prompt: async () => {
+          options.onText("Inspecting ");
+          options.onThinking("Checking the relevant files.");
+          options.onToolStart("read", { path: "app.ts" });
+          entered.resolve();
+          await finish.promise;
+          options.onToolEnd("read", false, "file contents");
+          options.onText("complete.");
+        },
+        dispose: vi.fn(),
+        state: { messages: [] },
+      } }));
+      // Both runtime families must consume the shared resolver's callback contract.
+      if (runtime === "native") __setCreateFnAgent(create);
+      else __setCreateResolvedAgentSession(create);
+      const manager = createChatManager();
+      const send = manager.sendMessage("chat-001", "@Avery inspect this");
+      try {
+        await entered.promise;
+        expect(events.map((event) => event.type)).toEqual(["agent_start", "text", "thinking", "tool_start"]);
+        expect(mockChatStore.addMessage.mock.calls.filter((call) => call[1].role === "assistant")).toHaveLength(0);
+        await vi.runOnlyPendingTimersAsync();
+        expect(mockChatStore.setInFlightGeneration).toHaveBeenLastCalledWith("chat-001", expect.objectContaining({
+          streamingText: "Inspecting ", streamingThinking: "Checking the relevant files.",
+          toolCalls: [{ toolName: "read", args: { path: "app.ts" }, isError: false, status: "running" }],
+          replayFromEventId: expect.any(Number),
+        }));
+        finish.resolve();
+        await send;
+        expect(mockChatStore.addMessage).toHaveBeenLastCalledWith("chat-001", expect.objectContaining({
+          content: "Inspecting complete.", thinkingOutput: "Checking the relevant files.",
+          metadata: expect.objectContaining({ senderAgentId: "agent-001", toolCalls: [
+            { toolName: "read", args: { path: "app.ts" }, isError: false, result: "file contents", status: "completed" },
+          ] }),
+        }));
+        expect(events.map((event) => event.type)).toEqual(["agent_start", "text", "thinking", "tool_start", "tool_end", "text", "agent_message", "done"]);
+        expect(mockChatStore.setInFlightGeneration).toHaveBeenLastCalledWith("chat-001", null);
+      } finally { finish.resolve(); await send; unsubscribe(); }
+    });
+
+    it.each(["success", "prompt-failure", "creation-failure"])("isolates responders and drops late callbacks after %s", async (outcome) => {
+      const agents = [
+        { id: "agent-001", name: "Avery", role: "executor", runtimeConfig: {} },
+        { id: "agent-002", name: "Blair", role: "executor", runtimeConfig: {} },
+      ];
+      mockAgentStore.listAgents.mockResolvedValue(agents);
+      mockAgentStore.getAgent.mockImplementation(async (id) => agents.find((agent) => agent.id === id));
+      let firstOptions: any;
+      let calls = 0;
+      const events: any[] = [];
+      const unsubscribe = chatStreamManager.subscribe("chat-001", (event) => events.push(event));
+      __setCreateResolvedAgentSession(async (options: any) => {
+        const first = calls++ === 0;
+        if (first) firstOptions = options;
+        if (first && outcome === "creation-failure") throw new Error("creation failed");
+        return { session: {
+          prompt: async () => {
+            if (!first) firstOptions.onText("LATE FIRST AGENT");
+            options.onText(first ? "First progress" : "Second progress");
+            if (first && outcome === "prompt-failure") throw new Error("prompt failed");
+          }, dispose: vi.fn(),
+          state: { messages: [{ role: "assistant", content: first ? "First final" : "Second final" }] },
+        } };
+      });
+      try {
+        await createChatManager().sendMessage("chat-001", "@Avery @Blair @Avery help");
+        expect(calls).toBe(2);
+        expect(events.filter((event) => event.type === "agent_start").map((event) => event.data.senderAgentName)).toEqual(["Avery", "Blair"]);
+        expect(events.filter((event) => event.type === "text").map((event) => event.data)).not.toContain("LATE FIRST AGENT");
+        expect(mockChatStore.addMessage).toHaveBeenLastCalledWith("chat-001", expect.objectContaining({
+          content: "Second final", metadata: expect.objectContaining({ senderAgentId: "agent-002" }),
+        }));
+        expect(events.at(-1)).toEqual(expect.objectContaining({ type: "done", data: expect.objectContaining({ dispatch: "agents" }) }));
+      } finally { unsubscribe(); }
+    });
+
+    it("stops mentioned work, preserves its visible prefix, and does not start the next agent", async () => {
+      const entered = Promise.withResolvers<void>();
+      const finish = Promise.withResolvers<void>();
+      const agents = [{ id: "agent-001", name: "Avery", role: "executor", runtimeConfig: {} }, { id: "agent-002", name: "Blair", role: "executor", runtimeConfig: {} }];
+      mockAgentStore.listAgents.mockResolvedValue(agents);
+      mockAgentStore.getAgent.mockImplementation(async (id) => agents.find((agent) => agent.id === id));
+      mockChatStore.addMessage.mockImplementation((_id, input) => ({ ...input, id: "saved", sessionId: "chat-001" }));
+      let callbacks: any;
+      const create = vi.fn(async (options: any) => {
+        callbacks = options;
+        return { session: {
+          prompt: async () => { options.onText("Visible work"); entered.resolve(); await finish.promise; },
+          abort: () => finish.resolve(), dispose: vi.fn(), state: { messages: [] },
+        } };
+      });
+      __setCreateResolvedAgentSession(create);
+      const events: any[] = [];
+      const unsubscribe = chatStreamManager.subscribe("chat-001", (event) => events.push(event));
+      const manager = createChatManager();
+      const send = manager.sendMessage("chat-001", "@Avery @Blair help");
+      try {
+        await entered.promise;
+        expect(await manager.cancelGeneration("chat-001")).toEqual(expect.objectContaining({ success: true, interrupted: true }));
+        await send;
+        callbacks.onText("LATE");
+        expect(create).toHaveBeenCalledTimes(1);
+        expect(mockChatStore.addMessage).toHaveBeenLastCalledWith("chat-001", expect.objectContaining({
+          content: "Visible work", metadata: expect.objectContaining({ interrupted: true, senderAgentId: "agent-001" }),
+        }));
+        expect(events.filter((event) => event.type === "text").map((event) => event.data)).toEqual(["Visible work"]);
+        expect(events.filter((event) => event.type === "done")).toHaveLength(1);
+      } finally { finish.resolve(); await send; unsubscribe(); }
+    });
+
     it("parseMentions extracts known agent names from content", async () => {
       mockAgentStore.listAgents.mockResolvedValue([
         {
@@ -1521,7 +1638,7 @@ describe("ChatManager.sendMessage", () => {
       runtimeConfig: {},
       metadata: { skills: ["agent-debug", "ce-debug"] },
     });
-    const pluginRoot = "/tmp/plugin-chat-skills";
+    const pluginRoot = resolve("/tmp/plugin-chat-skills");
     const pluginSkillDir = join(pluginRoot, "skills", "ce-debug");
     const pluginRunner = {
       getPluginSkills: vi.fn(() => [
@@ -1561,7 +1678,7 @@ describe("ChatManager.sendMessage", () => {
         },
       };
     });
-    const pluginRoot = "/tmp/plugin-quick-chat-skills";
+    const pluginRoot = resolve("/tmp/plugin-quick-chat-skills");
     const pluginSkillDir = join(pluginRoot, "skills", "ce-debug");
     const pluginRunner = {
       getPluginSkills: vi.fn(() => [
@@ -4464,7 +4581,7 @@ describe("ChatManager generation isolation", () => {
         },
       };
     });
-    const pluginRoot = "/tmp/plugin-room-chat-skills";
+    const pluginRoot = resolve("/tmp/plugin-room-chat-skills");
     const pluginSkillDir = join(pluginRoot, "skills", "ce-debug");
     const pluginRunner = {
       getPluginSkills: vi.fn(() => [

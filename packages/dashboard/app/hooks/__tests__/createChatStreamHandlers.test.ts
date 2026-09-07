@@ -3,6 +3,41 @@ import { createChatStreamHandlers } from "../createChatStreamHandlers";
 import type { ToolCallInfo } from "../chatTypes";
 
 describe("createChatStreamHandlers", () => {
+  it.each(["completed", "failed", "reattached"])("clears responder progress and pending frames after %s", (boundary) => {
+    vi.useFakeTimers();
+    try {
+      const text = vi.fn();
+      const thinking = vi.fn();
+      const tools = vi.fn();
+      const done = vi.fn();
+      const agentMessage = vi.fn();
+      const { handlers } = createChatStreamHandlers({
+        sessionId: "s-1", tempUserMessageId: "temp",
+        ...(boundary === "reattached" ? { initialText: "Old snapshot", initialThinking: "Old thinking", initialToolCalls: [{ toolName: "read", isError: false, status: "running" as const }] } : {}),
+        setStreamingText: text, setStreamingThinking: thinking, setStreamingToolCalls: tools,
+        cancelStreamingFlushesRef: { current: null }, onDone: done, onError: vi.fn(), onAgentMessage: agentMessage,
+      });
+      handlers.onText("First agent");
+      handlers.onThinking("First thinking");
+      handlers.onToolStart({ toolName: "read" });
+      if (boundary === "completed") handlers.onAgentMessage?.({ message: {} as any, senderAgentId: "a", senderAgentName: "A" });
+      else handlers.onAgentStart();
+      vi.runOnlyPendingTimers();
+      expect(text).toHaveBeenLastCalledWith("");
+      expect(thinking).toHaveBeenLastCalledWith("");
+      expect(tools).toHaveBeenLastCalledWith([]);
+      handlers.onText("Second agent");
+      handlers.onToolStart({ toolName: "write", args: { path: "b.ts" } });
+      handlers.onToolEnd({ toolName: "write", isError: false, result: "written" });
+      vi.runOnlyPendingTimers();
+      expect(text).toHaveBeenLastCalledWith("Second agent");
+      handlers.onDone({ messageId: "", dispatch: "agents" });
+      expect(done).toHaveBeenCalledWith(expect.objectContaining({ accumulated: expect.objectContaining({
+        text: "Second agent", thinking: "", toolCalls: [{ toolName: "write", args: { path: "b.ts" }, isError: false, result: "written", status: "completed" }],
+      }) }));
+    } finally { vi.useRealTimers(); }
+  });
+
   it.each([
     {
       name: "empty delta sandwiched between spaced chunks",

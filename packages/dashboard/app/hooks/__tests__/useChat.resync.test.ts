@@ -79,9 +79,31 @@ describe("useChat reconnect resync", () => {
     mockFetchChatMessages.mockResolvedValue({ messages: [] } as never);
   });
 
+  it.each(["send", "reattach"])("retains and deduplicates completed mentioned-agent replies during %s", async (mode) => {
+    const { result } = await renderWithAttachedStream(mode === "reattach");
+    const handlers = mode === "reattach" ? mockAttachChatStream.mock.calls.at(-1)![1]
+      : vi.mocked(apiModule.streamChatResponse).mock.calls.at(-1)![2];
+    const message = {
+      id: "mentioned-reply", sessionId: "session-001", role: "assistant" as const,
+      content: "First agent finished", thinkingOutput: "Reviewed files",
+      metadata: { senderAgentId: "agent-001", senderAgentName: "Avery", toolCalls: [{ toolName: "read", isError: false, result: "contents" }] },
+      createdAt: "2026-04-08T00:01:00.000Z",
+    };
+    act(() => {
+      handlers.onAgentMessage?.({ message: message as never, senderAgentId: "agent-001", senderAgentName: "Avery" });
+      handlers.onAgentStart?.({ senderAgentId: "agent-002", senderAgentName: "Blair" });
+      handlers.onToolStart?.({ toolName: "write", args: { path: "next.ts" } });
+    });
+    expect(result.current.isStreaming).toBe(true);
+    expect(result.current.messages.filter((item) => item.role === "assistant")).toEqual([expect.objectContaining({ content: "First agent finished", toolCalls: [expect.objectContaining({ toolName: "read", status: "completed" })] })]);
+    expect(result.current.streamingToolCalls).toEqual([expect.objectContaining({ toolName: "write", status: "running" })]);
+    act(() => handlers.onAgentMessage?.({ message: message as never, senderAgentId: "agent-001", senderAgentName: "Avery" }));
+    expect(result.current.messages.filter((item) => item.role === "assistant")).toHaveLength(1);
+  });
+
   /** Renders the hook with one generating session selected and a stream attached. */
-  async function renderWithAttachedStream() {
-    const generating = { ...makeSession(), isGenerating: true, inFlightGeneration: null };
+  async function renderWithAttachedStream(isGenerating = true) {
+    const generating = { ...makeSession(), isGenerating, inFlightGeneration: null };
     mockFetchChatSessions.mockResolvedValue({ sessions: [generating] } as never);
     mockFetchChatSession.mockResolvedValue({ session: generating } as never);
     const close = vi.fn();
@@ -95,9 +117,13 @@ describe("useChat reconnect resync", () => {
     act(() => {
       rendered.result.current.selectSession("session-001");
     });
-    await waitFor(() => {
-      expect(mockAttachChatStream).toHaveBeenCalled();
-    });
+    if (isGenerating) {
+      await waitFor(() => expect(mockAttachChatStream).toHaveBeenCalled());
+    } else {
+      await waitFor(() => expect(rendered.result.current.activeSession?.id).toBe("session-001"));
+      vi.mocked(apiModule.streamChatResponse).mockReturnValue({ close, isConnected: () => true });
+      await act(async () => { await rendered.result.current.sendMessage("@Avery help"); });
+    }
 
     return { ...rendered, close };
   }
