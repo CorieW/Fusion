@@ -1,3 +1,4 @@
+import { copyProjectConfiguration } from "../lib/duplicate-project.js";
 import * as fsPromises from "node:fs/promises";
 import { dirname, isAbsolute, join } from "node:path";
 import {
@@ -226,6 +227,45 @@ export const registerProjectRoutes: ApiRouteRegistrar = (ctx) => {
    * Body: { path: string }
    * Returns: { repos: string[], isWorkspace: boolean }
    */
+  router.post("/projects/:id/duplicate", async (req, res) => {
+    const { name, path: targetPath } = req.body ?? {};
+    if (typeof name !== "string" || !name.trim()) throw badRequest("A project name is required");
+    if (typeof targetPath !== "string" || !isAbsolute(targetPath) || targetPath.includes("\0")) throw badRequest("An absolute destination folder is required");
+    let createdId: string | undefined;
+    try {
+      const project = await withCentralCore(async central => {
+        const source = await central.getProject(req.params.id);
+        if (!source) throw notFound("Project not found");
+        const { resolve, relative } = await import("node:path");
+        const parent = await fsPromises.realpath(dirname(targetPath));
+        const destination = resolve(parent, (await import("node:path")).basename(targetPath));
+        for (const registered of await central.listProjects()) {
+          const registeredPath = await fsPromises.realpath(registered.path);
+          const rel = relative(registeredPath, destination);
+          if (!rel || (rel.split(/[\\/]/)[0] !== ".." && !isAbsolute(rel))) throw badRequest("Choose a folder outside existing projects");
+        }
+        // FNXC:Duplicate 2026-09-07-04:09: Exclusive creation refuses existing files, junctions and directories; nothing at the destination is overwritten.
+        await mkdir(destination, { recursive: false });
+        const ensured = await central.ensureProjectForPath({ path: destination, name: name.trim(), isolationMode: source.isolationMode });
+        if (ensured.outcome !== "registered") throw badRequest("Destination already belongs to a project");
+        createdId = ensured.project.id;
+        await central.updateProject(createdId, { status: "paused" });
+        const sourceStore = await getOrCreateProjectStore(source.id);
+        const targetStore = await getOrCreateProjectStore(createdId);
+        writeProjectIdentity(join(destination, ".fusion"), { id: createdId, createdAt: ensured.project.createdAt });
+        await copyProjectConfiguration(sourceStore, targetStore);
+        return (await central.getProject(createdId))!;
+      });
+      res.status(201).json(project);
+    } catch (error) {
+      // FNXC:Duplicate 2026-09-07-04:09: Preserve any incomplete destination for inspection, with execution stopped, instead of deleting potentially valuable files.
+      if (createdId) throw new ApiError(500, "Copy incomplete; the new project remains paused. " + (error instanceof Error ? error.message : String(error)), { projectId: createdId });
+      if ((error as NodeJS.ErrnoException).code === "EEXIST") throw badRequest("Destination must be a new folder");
+      if (error instanceof ApiError) throw error;
+      rethrowAsApiError(error);
+    }
+  });
+
   router.post("/projects/detect-workspace", async (req, res) => {
     try {
       const { path } = req.body;

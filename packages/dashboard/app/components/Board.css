@@ -104,3 +104,12 @@ The closed grabbing hand must remain visible across every Board descendant even 
     scroll-snap-align: center;
   }
 }
+
+/* FNXC:EmptyWorkflows 2026-09-07-09:54: Empty boards have no legacy grid tracks or horizontal scrolling. */
+.board.board--empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+  text-align: center;
+}

@@ -163,6 +163,7 @@ export const COLOR_THEMES = [
   // FNXC:DashboardTheming 2026-08-28-07:45: Cozy Cartoon must stay order-synchronized across core, selector metadata, both first-paint validators, token blocks, and swatch CSS so persisted selections survive startup without a fallback flash.
   "cozy-cartoon",
   // FNXC:DashboardTheming 2026-07-31-20:39: Factory Dark must stay order-synchronized across core, selector metadata, and both first-paint validators so saved preferences survive pre-hydration validation.
+  "golden-darkness",
   "factory-dark",
   // FNXC:DashboardTheming 2026-07-31-23:51: Factory Light must stay order-synchronized across core, selector metadata, and both first-paint validators so saved preferences survive pre-hydration validation.
   "factory-light",

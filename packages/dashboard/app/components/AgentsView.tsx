@@ -1,8 +1,9 @@
+import { duplicateAgent } from "../api/agents/agents";
 import "./AgentsView.css";
 import { useTranslation } from "react-i18next";
 import type { TFunction } from "i18next";
 import { useState, useEffect, useCallback, useRef, useMemo, useId, useLayoutEffect, lazy, Suspense, type CSSProperties, type ReactNode, type MutableRefObject, type RefObject, type PointerEvent as ReactPointerEvent, type WheelEvent as ReactWheelEvent, type KeyboardEvent as ReactKeyboardEvent } from "react";
-import { Plus, Play, Pause, Activity, Trash2, RefreshCw, Bot, List, ChevronRight, Filter, Upload, Network, SlidersHorizontal, ZoomIn, ZoomOut, Minimize2, Move, Info } from "lucide-react";
+import { Copy, Plus, Play, Pause, Activity, Trash2, RefreshCw, Bot, List, ChevronRight, Filter, Upload, Network, SlidersHorizontal, ZoomIn, ZoomOut, Minimize2, Move, Info } from "lucide-react";
 import type { Agent, AgentCapability, AgentOnboardingSummary, AgentState, OrgTreeNode } from "../api";
 import { fetchAgents, updateAgent, updateAgentState, deleteAgent, startAgentRun, fetchOrgTree, fetchSettings, updateSettings, isAgentHeartbeatEnabled, withAgentHeartbeatEnabled } from "../api";
 
@@ -1003,6 +1004,25 @@ export function AgentsView({ addToast, projectId, onOpenTaskLogs, agentOnboardin
         next.delete(agentId);
         return next;
       });
+    }
+  };
+
+  const [duplicatingAgent, setDuplicatingAgent] = useState(false);
+  const duplicateAgentPending = useRef(false);
+  const handleDuplicateAgent = async (id: string) => {
+    if (duplicateAgentPending.current) return;
+    duplicateAgentPending.current = true;
+    setDuplicatingAgent(true);
+    try {
+      const copy = await duplicateAgent(id, projectId);
+      addToast(t("agents.duplicated", "Created {{name}} with heartbeats off", { name: copy.name }), "success");
+      await loadAgents();
+      openAgentDetail(copy.id);
+    } catch (error) {
+      addToast(getErrorMessage(error), "error");
+    } finally {
+      duplicateAgentPending.current = false;
+      setDuplicatingAgent(false);
     }
   };
 
@@ -2022,6 +2042,7 @@ export function AgentsView({ addToast, projectId, onOpenTaskLogs, agentOnboardin
                       </div>
                     </div>
                     <div className="agent-board-actions">
+                      {!isEphemeralAgent(agent) && <button className="btn btn-sm" onClick={() => void handleDuplicateAgent(agent.id)} disabled={duplicatingAgent} aria-label={t("common.duplicate", "Duplicate")}><Copy size={14} /> {t("common.duplicate", "Duplicate")}</button>}
                       <HeartbeatToggle agent={agent} pending={isBulkHeartbeatMutationRunning || heartbeatMutationAgentIds.has(agent.id)} onToggle={(target) => void handleHeartbeatEnabledChange(target, !isAgentHeartbeatEnabled(target))} />
                       {(agent.state === "idle" || agent.state === "paused" || agent.state === "error") && (
                         <button
@@ -2386,6 +2407,7 @@ export function AgentsView({ addToast, projectId, onOpenTaskLogs, agentOnboardin
                       )}
                     </div>
                     <div className="agent-card-actions-group agent-card-actions-group--secondary">
+                      {!isEphemeralAgent(agent) && <button className="btn btn-sm" onClick={() => void handleDuplicateAgent(agent.id)} disabled={duplicatingAgent} aria-label={t("common.duplicate", "Duplicate")}><Copy size={14} /> {t("common.duplicate", "Duplicate")}</button>}
                       <button
                         className="btn btn-sm agent-card-details-btn"
                         onClick={() => openAgentDetail(agent.id)}

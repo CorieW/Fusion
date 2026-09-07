@@ -87,6 +87,7 @@ export const COLOR_THEMES: { value: ColorTheme; label: string; className: string
   // FNXC:DashboardTheming 2026-08-27-04:23: Flexoki follows Iceberg in this shared selector source so Settings and Command Center preserve the persisted registry order and swatch mapping.
   { value: "flexoki", label: "Flexoki", className: "theme-swatch-flexoki" },
   { value: "cozy-cartoon", label: "Cozy Cartoon", className: "theme-swatch-cozy-cartoon" },
+  { value: "golden-darkness", label: "Golden Darkness", className: "theme-swatch-golden-darkness" },
   { value: "factory-dark", label: "Factory Dark", className: "theme-swatch-factory-dark" },
   { value: "factory-light", label: "Factory Light", className: "theme-swatch-factory-light" },
   { value: "shadcn", label: "Shadcn", className: "theme-swatch-shadcn" },

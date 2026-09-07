@@ -5,6 +5,7 @@ import type { RegisteredProject, ProjectHealth, ProjectStatus } from "@fusion/co
 
 // Mock lucide-react to avoid SVG rendering issues in test env
 vi.mock("lucide-react", () => ({
+  Copy: () => <span>Copy icon</span>,
   Play: () => <span data-testid="play-icon">▶</span>,
   Pause: () => <span data-testid="status-pause-icon">⏸</span>,
   Square: () => <span data-testid="stop-icon">■</span>,
@@ -49,6 +50,15 @@ afterEach(() => {
 });
 
 describe("ProjectCard", () => {
+  it("duplicates a project without also selecting or removing it", () => {
+    const project = makeProject();
+    const onSelect = vi.fn(), onRemove = vi.fn(), onDuplicate = vi.fn();
+    render(<ProjectCard project={project} health={null} onSelect={onSelect} onPause={noop} onResume={noop} onRemove={onRemove} onDuplicate={onDuplicate} />);
+    fireEvent.click(screen.getByRole("button", { name: "Duplicate" }));
+    expect(onDuplicate).toHaveBeenCalledExactlyOnceWith(project);
+    expect(onSelect).not.toHaveBeenCalled();
+    expect(onRemove).not.toHaveBeenCalled();
+  });
   it("renders project name and path", () => {
     render(
       <ProjectCard

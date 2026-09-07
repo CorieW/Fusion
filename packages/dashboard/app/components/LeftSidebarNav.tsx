@@ -570,7 +570,7 @@ export function LeftSidebarNav({
       <div className="left-sidebar-nav__footer">
         {/*
         FNXC:Navigation 2026-06-23-02:30:
-        New Task now lives in the footer, directly ABOVE Collapse (and Settings), per user request — the primary create action sits with the other persistent footer affordances instead of at the top of the rail.
+        New Task now lives in the footer, above Settings and Collapse, per user request — the primary create action sits with the other persistent footer affordances instead of at the top of the rail.
         */}
         {onNewTask ? (
           <button
@@ -585,9 +585,21 @@ export function LeftSidebarNav({
             <span className="left-sidebar-nav__label">{newTaskLabel}</span>
           </button>
         ) : null}
+        <button
+          type="button"
+          className="btn left-sidebar-nav__item left-sidebar-nav__settings"
+          aria-label={t("header.settings", getDashboardViewLabel("settings"))}
+          title={t("header.settings", getDashboardViewLabel("settings"))}
+          data-testid="sidebar-nav-settings"
+          /* FNXC:Navigation 2026-06-22-12:00: Wrap so React's MouseEvent is not forwarded as onOpenSettings' settingsInitialSection arg. */
+          onClick={() => onOpenSettings?.()}
+        >
+          <Settings size={16} />
+          <span className="left-sidebar-nav__label">{t("header.settings", getDashboardViewLabel("settings"))}</span>
+        </button>
         {/*
-        FNXC:Navigation 2026-06-21-00:00:
-        The sidebar collapse affordance belongs in the footer immediately above Settings, using the same row-item visual language. Expanded mode shows the Collapse label, while rail mode relies on the shared label-hiding rule so the button remains icon-only like Settings.
+        FNXC:Navigation 2026-09-07-04:09:
+        The sidebar collapse affordance belongs in the footer at the bottom, after Settings, using the same row-item visual language. Expanded mode shows the Collapse label, while rail mode relies on the shared label-hiding rule so the button remains icon-only like Settings.
         */}
         <button
           type="button"
@@ -600,18 +612,6 @@ export function LeftSidebarNav({
         >
           {isCollapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
           <span className="left-sidebar-nav__label">{t("nav.collapse", "Collapse")}</span>
-        </button>
-        <button
-          type="button"
-          className="btn left-sidebar-nav__item left-sidebar-nav__settings"
-          aria-label={t("header.settings", getDashboardViewLabel("settings"))}
-          title={t("header.settings", getDashboardViewLabel("settings"))}
-          data-testid="sidebar-nav-settings"
-          /* FNXC:Navigation 2026-06-22-12:00: Wrap so React's MouseEvent is not forwarded as onOpenSettings' settingsInitialSection arg. */
-          onClick={() => onOpenSettings?.()}
-        >
-          <Settings size={16} />
-          <span className="left-sidebar-nav__label">{t("header.settings", getDashboardViewLabel("settings"))}</span>
         </button>
       </div>
 

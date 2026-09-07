@@ -1,3 +1,4 @@
+import { duplicateName } from "../../src/lib/duplicate-name";
 import "@xyflow/react/dist/style.css";
 import "./WorkflowNodeEditor.css";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -18,7 +19,7 @@ import {
 } from "@xyflow/react";
 import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
-import { X, Plus, Trash2, Save, MessageSquare, Terminal, Shield, GitMerge, Loader2, HelpCircle, PauseCircle, Split, Merge, Repeat, ToggleRight, ClipboardCheck, ListChecks, Code2, Bell, LayoutGrid, Workflow, Download, Upload, ChevronDown, ChevronRight, ChevronLeft, Library, Sparkles, Maximize2, Minimize2, DoorOpen } from "lucide-react";
+import { X, Copy, Plus, Trash2, Save, MessageSquare, Terminal, Shield, GitMerge, Loader2, HelpCircle, PauseCircle, Split, Merge, Repeat, ToggleRight, ClipboardCheck, ListChecks, Code2, Bell, LayoutGrid, Workflow, Download, Upload, ChevronDown, ChevronRight, ChevronLeft, Library, Sparkles, Maximize2, Minimize2, DoorOpen } from "lucide-react";
 import type { WorkflowDefinition, WorkflowIrColumn, TraitViolation, WorkflowStepTemplate, WorkflowIrNodeKind } from "@fusion/core";
 import { getErrorMessage, analyzeWorkflowLifecycle } from "@fusion/core";
 import type { WorkflowLifecycleWarning, WorkflowLifecycleWarningCode } from "@fusion/core";
@@ -827,6 +828,8 @@ function InnerEditor({
   const [workflowListStageOpen, setWorkflowListStageOpen] = useState(() => isMobileViewport());
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [duplicating, setDuplicating] = useState(false);
+  const duplicatePending = useRef(false);
   const [validationError, setValidationError] = useState<string | null>(null);
   const [nodes, setNodes, onNodesChange] = useNodesState<FlowNode<WorkflowFlowNodeData>>([]);
   const [edges, setEdges] = useEdgesState<FlowEdge>([]);
@@ -2231,11 +2234,13 @@ function InnerEditor({
   }, [activeWorkflow, projectId, addToast, confirm, t, isMobileMode]);
 
   const handleDuplicate = useCallback(async () => {
-    if (!activeWorkflow) return;
+    if (!activeWorkflow || duplicatePending.current) return;
+    duplicatePending.current = true;
+    setDuplicating(true);
     try {
       const created = await createWorkflow(
         {
-          name: `${activeWorkflow.name} (copy)`,
+          name: duplicateName(activeWorkflow.name, workflows.map(workflow => workflow.name)),
           description: activeWorkflow.description,
           icon: isBuiltinWorkflowId(activeWorkflow.id) || !activeWorkflow.icon ? "✨" : activeWorkflow.icon,
           ir: activeWorkflow.ir,
@@ -2250,7 +2255,11 @@ function InnerEditor({
     } catch (err) {
       addToast(getErrorMessage(err) || t("workflows.duplicateFailed", "Failed to duplicate workflow"), "error");
     }
-  }, [activeWorkflow, projectId, addToast, t]);
+    finally {
+      duplicatePending.current = false;
+      setDuplicating(false);
+    }
+  }, [activeWorkflow, workflows, projectId, addToast, t]);
 
   const handleSave = useCallback(async () => {
     if (!activeWorkflow) return;
@@ -3536,7 +3545,7 @@ function InnerEditor({
                               <button className="wf-editor-action" data-testid="wf-mobile-export" onClick={handleExport}>
                                 <Download size={15} /> {t("workflows.export", "Export")}
                               </button>
-                              <button className="wf-editor-save wf-editor-duplicate-primary" data-testid="wf-mobile-duplicate" onClick={handleDuplicate}>
+                              <button className="wf-editor-save wf-editor-duplicate-primary" data-testid="wf-mobile-duplicate" onClick={handleDuplicate} disabled={duplicating}>
                                 <Plus size={15} /> {t("workflows.duplicateToCustomize", "Duplicate to customize")}
                               </button>
                             </>
@@ -3596,6 +3605,9 @@ function InnerEditor({
                               <button className="wf-editor-action" data-testid="wf-mobile-export" onClick={handleExport} disabled={isDirty}>
                                 <Download size={15} /> {t("workflows.export", "Export")}
                               </button>
+                              <button className="wf-editor-action" onClick={handleDuplicate} disabled={duplicating}>
+                                <Copy size={13} /> {t("common.duplicate", "Duplicate")}
+                              </button>
                               <button className="wf-editor-delete" data-testid="wf-mobile-delete" onClick={handleDeleteWorkflow}>
                                 <Trash2 size={15} /> {t("common.delete", "Delete")}
                               </button>
@@ -3625,7 +3637,7 @@ function InnerEditor({
                     >
                       <Download size={13} /> {t("workflows.export", "Export")}
                     </button>
-                    <button className="wf-editor-save wf-editor-duplicate-primary" onClick={handleDuplicate}>
+                    <button className="wf-editor-save wf-editor-duplicate-primary" onClick={handleDuplicate} disabled={duplicating}>
                       <Plus size={13} /> {t("workflows.duplicateToCustomize", "Duplicate to customize")}
                     </button>
                   </div>
@@ -3710,6 +3722,9 @@ function InnerEditor({
                           </div>
                         )}
                       </div>
+                      <button className="wf-editor-action" onClick={handleDuplicate} disabled={duplicating}>
+                        <Copy size={13} /> {t("common.duplicate", "Duplicate")}
+                      </button>
                       <button className="wf-editor-delete" onClick={handleDeleteWorkflow}>
                         <Trash2 size={13} /> {t("common.delete", "Delete")}
                       </button>
@@ -3826,6 +3841,9 @@ function InnerEditor({
                         }
                       >
                         <Download size={13} /> {t("workflows.export", "Export")}
+                      </button>
+                      <button className="wf-editor-action" onClick={handleDuplicate} disabled={duplicating}>
+                        <Copy size={13} /> {t("common.duplicate", "Duplicate")}
                       </button>
                       <button className="wf-editor-delete" onClick={handleDeleteWorkflow}>
                         <Trash2 size={13} /> {t("common.delete", "Delete")}

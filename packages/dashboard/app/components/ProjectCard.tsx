@@ -1,7 +1,7 @@
 import { memo, useCallback, useState } from "react";
 import type { TFunction } from "i18next";
 import { useTranslation } from "react-i18next";
-import { Play, Square, Trash2, Folder, ArrowRight } from "lucide-react";
+import { Copy, Play, Square, Trash2, Folder, ArrowRight } from "lucide-react";
 import "./ProjectCard.css";
 import type { RegisteredProject, ProjectHealth } from "@fusion/core";
 import type { ProjectNodeAvailability } from "../api";
@@ -15,6 +15,7 @@ export interface ProjectCardProps {
   onPause: (project: RegisteredProject) => void;
   onResume: (project: RegisteredProject) => void;
   onRemove: (project: RegisteredProject) => void;
+  onDuplicate?: (project: RegisteredProject) => void;
   availabilityMappings?: Array<ProjectNodeAvailability & { displayName: string }>;
   /** Health is being fetched, while project navigation and controls remain available. */
   healthLoading?: boolean;
@@ -58,6 +59,7 @@ function truncatePath(path: string, maxLength: number = 40): string {
 }
 
 function areProjectCardPropsEqual(previous: ProjectCardProps, next: ProjectCardProps): boolean {
+  if (previous.onDuplicate !== next.onDuplicate) return false;
   if (previous.project.id !== next.project.id) return false;
   if (previous.project.status !== next.project.status) return false;
   if (previous.project.name !== next.project.name) return false;
@@ -103,6 +105,7 @@ function ProjectCardInner({
   onPause,
   onResume,
   onRemove,
+  onDuplicate,
   availabilityMappings = [],
   healthLoading = false,
   isLoading = false,
@@ -227,6 +230,7 @@ function ProjectCardInner({
         </div>
 
         <div className="project-card-actions">
+          {onDuplicate && <button className="project-card-action" disabled={isLoading || isInitializing} onClick={event => { event.stopPropagation(); onDuplicate(project); }} aria-label={t("common.duplicate", "Duplicate")}><Copy size={14} /><span>{t("common.duplicate", "Duplicate")}</span></button>}
           {/*
            * FNXC:ProjectCardEngineControls 2026-06-27-00:00:
            * ProjectEngineManager.pauseProject already calls engine.stop(), so the card action names the engine-lifecycle action as Stop engine/Start engine while preserving the active/paused project status model and pauseProject/resumeProject wiring.

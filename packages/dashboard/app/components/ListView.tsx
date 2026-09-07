@@ -1,3 +1,5 @@
+import { ViewHeader } from "./ViewHeader";
+import { List as ListViewIcon } from "lucide-react";
 import "./ListView.css";
 import { useState, useCallback, useMemo, Fragment, useEffect, useLayoutEffect, useRef } from "react";
 import { createPortal } from "react-dom";
@@ -2579,9 +2581,14 @@ export function ListView({
   the loaded arm's `flagEnabled === true` conjunct is a server constant. The
   argument distinguishes "loaded but no lane" from "still loading".
   */
-  if (boardWorkflows === null || boardWorkflows.workflows.length === 0) {
-    return renderListWorkflowSkeleton(boardWorkflows !== null);
-  }
+  // FNXC:EmptyWorkflows 2026-09-07-04:09: A loaded empty catalog must stop rendering loading placeholders.
+  if (boardWorkflows === null) return renderListWorkflowSkeleton();
+  if (boardWorkflows.workflows.length === 0) return (
+    <div className="list-view" aria-busy={false} data-testid="list-workflows-empty">
+      <ViewHeader icon={ListViewIcon} title={t("listView.title", "List View")} />
+      <p className="list-empty">{t("listView.noWorkflows", "No workflows yet. Create a workflow to organize tasks.")}</p>
+    </div>
+  );
 
   return (
     /*

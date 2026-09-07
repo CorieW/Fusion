@@ -75,7 +75,7 @@ function expectNoSidebarBrandOrProjectAffordances(container: HTMLElement) {
   expect(container.querySelector(".left-sidebar-nav__wordmark")).toBeNull();
 }
 
-function expectCollapseToggleImmediatelyBeforeSettings() {
+function expectCollapseToggleLast() {
   const footer = screen.getByTestId("sidebar-nav-settings").closest(".left-sidebar-nav__footer");
   const toggle = screen.getByTestId("sidebar-nav-collapse-toggle");
   const settings = screen.getByTestId("sidebar-nav-settings");
@@ -84,13 +84,13 @@ function expectCollapseToggleImmediatelyBeforeSettings() {
   expect(toggle).toHaveClass("left-sidebar-nav__item");
   expect(toggle).toHaveClass("left-sidebar-nav__collapse-toggle");
   expect(toggle).not.toHaveClass(obsoleteCollapseToggleFloatingClass);
-  expect(footer?.children[0]).toBe(toggle);
-  expect(toggle.nextElementSibling).toBe(settings);
-  expect(footer?.lastElementChild).toBe(settings);
+  expect(footer?.children[0]).toBe(settings);
+  expect(settings.nextElementSibling).toBe(toggle);
+  expect(footer?.lastElementChild).toBe(toggle);
 }
 
-function expectSettingsLastInFooter() {
-  expectCollapseToggleImmediatelyBeforeSettings();
+function expectCollapseLastInFooter() {
+  expectCollapseToggleLast();
 }
 
 function renderSidebar(overrides: Partial<ComponentProps<typeof LeftSidebarNav>> = {}) {
@@ -148,7 +148,8 @@ describe("LeftSidebarNav", () => {
 
     // FNXC:Navigation 2026-06-23-02:30: New Task moved into the footer, directly above Collapse.
     expect(footer?.contains(newTaskButton)).toBe(true);
-    expect(newTaskButton.nextElementSibling).toBe(collapseToggle);
+    expect(newTaskButton.nextElementSibling).toBe(screen.getByTestId("sidebar-nav-settings"));
+    expect(footer?.lastElementChild).toBe(collapseToggle);
     expect(newTaskButton).toHaveAccessibleName("New Task");
     expect(newTaskButton).toHaveAttribute("title", "New Task");
     expect(newTaskButton).toHaveTextContent("New Task");
@@ -252,7 +253,7 @@ describe("LeftSidebarNav", () => {
       "Artifacts", "Automations", "Evals", "Goals", "History", "Ideation", "Import Tasks", "Insights", "Mailbox", "Missions", "Overflow Plugin", "Planning", "Primary Plugin", "Recommendations", "Research", "Skills",
     ]);
     for (const id of ["patchnode", "recommendations", "research", "ideation", "evals", "plugin-fusion-plugin-primary-primary-view"]) expect(screen.getByTestId("sidebar-nav-" + id)).toBeVisible();
-    expectSettingsLastInFooter();
+    expectCollapseLastInFooter();
   });
 
   it("persists each group's choice and restores it on remount", () => {
@@ -300,7 +301,7 @@ describe("LeftSidebarNav", () => {
     if (collapsed) {
       expect(sidebarWithFooter).toHaveClass("left-sidebar-nav--collapsed");
     }
-    expectSettingsLastInFooter();
+    expectCollapseLastInFooter();
 
     withFooter.unmount();
     if (collapsed) {
@@ -313,7 +314,7 @@ describe("LeftSidebarNav", () => {
     if (collapsed) {
       expect(sidebarWithoutFooter).toHaveClass("left-sidebar-nav--collapsed");
     }
-    expectSettingsLastInFooter();
+    expectCollapseLastInFooter();
   });
 
   it("gates optional destinations on their matching feature flags and props while preserving bottom settings", () => {
@@ -347,7 +348,7 @@ describe("LeftSidebarNav", () => {
 
     const sidebar = screen.getByTestId("left-sidebar-nav");
     expect(screen.getByTestId("sidebar-nav-settings").closest(".left-sidebar-nav__footer")).not.toBeNull();
-    expect(within(sidebar).getAllByRole("button").at(-1)).toBe(screen.getByTestId("sidebar-nav-settings"));
+    expect(within(sidebar).getAllByRole("button").at(-1)).toBe(screen.getByTestId("sidebar-nav-collapse-toggle"));
   });
 
   it("renders shortened primary labels and default width", () => {
@@ -499,31 +500,31 @@ describe("LeftSidebarNav", () => {
     },
   );
 
-  it("renders the collapse toggle in the footer above Settings in expanded and collapsed states", () => {
+  it("renders the collapse toggle in the footer after Settings in expanded and collapsed states", () => {
     const { container } = renderSidebar();
     const sidebar = screen.getByTestId("left-sidebar-nav");
     const expandedToggle = screen.getByTestId("sidebar-nav-collapse-toggle");
 
     expectNoSidebarBrandOrProjectAffordances(container);
-    expectCollapseToggleImmediatelyBeforeSettings();
+    expectCollapseToggleLast();
     expect(expandedToggle).toHaveAttribute("aria-pressed", "false");
     expect(expandedToggle).toHaveAccessibleName("Collapse sidebar");
     expect(expandedToggle).toHaveAttribute("title", "Collapse sidebar");
     expect(expandedToggle).toHaveTextContent("Collapse");
     expect(expandedToggle.querySelector("svg")).not.toBeNull();
-    expect(within(sidebar).getAllByRole("button").at(-1)).toBe(screen.getByTestId("sidebar-nav-settings"));
+    expect(within(sidebar).getAllByRole("button").at(-1)).toBe(screen.getByTestId("sidebar-nav-collapse-toggle"));
 
     fireEvent.click(expandedToggle);
 
     const collapsedToggle = screen.getByTestId("sidebar-nav-collapse-toggle");
     expect(sidebar.className).toContain("left-sidebar-nav--collapsed");
     expectNoSidebarBrandOrProjectAffordances(container);
-    expectCollapseToggleImmediatelyBeforeSettings();
+    expectCollapseToggleLast();
     expect(collapsedToggle).toHaveAttribute("aria-pressed", "true");
     expect(collapsedToggle).toHaveAccessibleName("Expand sidebar");
     expect(collapsedToggle).toHaveAttribute("title", "Expand sidebar");
     expect(collapsedToggle.querySelector("svg")).not.toBeNull();
-    expect(within(sidebar).getAllByRole("button").at(-1)).toBe(screen.getByTestId("sidebar-nav-settings"));
+    expect(within(sidebar).getAllByRole("button").at(-1)).toBe(screen.getByTestId("sidebar-nav-collapse-toggle"));
   });
 
   it("keeps expanded depth above board content while collapsed and mobile navigation remain flat", () => {
@@ -575,7 +576,7 @@ describe("LeftSidebarNav", () => {
     expect(screen.queryByTestId("sidebar-nav-resize-handle")).toBeNull();
     expect(screen.getByTestId("sidebar-nav-board")).toBeDefined();
     expect(screen.getByTestId("sidebar-nav-settings").closest(".left-sidebar-nav__footer")).not.toBeNull();
-    expect(within(sidebar).getAllByRole("button").at(-1)).toBe(screen.getByTestId("sidebar-nav-settings"));
+    expect(within(sidebar).getAllByRole("button").at(-1)).toBe(screen.getByTestId("sidebar-nav-collapse-toggle"));
 
     firstRender.unmount();
     renderSidebar();

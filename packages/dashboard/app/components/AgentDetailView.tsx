@@ -1,3 +1,4 @@
+import { duplicateAgent } from "../api/agents/agents";
 import "./AgentDetailView.css";
 import "./MailboxModal.css";
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
@@ -864,6 +865,24 @@ export function AgentDetailView({ agentId, projectId, onClose, addToast, onChild
     }
   };
 
+  const [duplicatingAgent, setDuplicatingAgent] = useState(false);
+  const duplicateAgentPending = useRef(false);
+  const handleDuplicateAgent = async (id: string) => {
+    if (duplicateAgentPending.current) return;
+    duplicateAgentPending.current = true;
+    setDuplicatingAgent(true);
+    try {
+      const copy = await duplicateAgent(id, projectId);
+      addToast(t("agents.duplicated", "Created {{name}} with heartbeats off", { name: copy.name }), "success");
+      await notifyMutationSuccess();
+    } catch (error) {
+      addToast(getErrorMessage(error), "error");
+    } finally {
+      duplicateAgentPending.current = false;
+      setDuplicatingAgent(false);
+    }
+  };
+
   const handleDelete = async () => {
     if (!agent) return;
     const shouldDelete = await confirm({
@@ -1024,6 +1043,7 @@ export function AgentDetailView({ agentId, projectId, onClose, addToast, onChild
           <div className="agent-detail-header-actions">
             {/* Lifecycle controls: compact action buttons */}
             <div className="agent-detail-controls">
+              {!isEphemeralAgent(agent) && <button className="btn btn-sm" onClick={() => void handleDuplicateAgent(agentId)} disabled={duplicatingAgent} aria-label={t("common.duplicate", "Duplicate")}><Copy size={14} /> {t("common.duplicate", "Duplicate")}</button>}
               {/* State-dependent action buttons */}
               {agent.state === "idle" && (
                 <>

@@ -1429,3 +1429,17 @@
   --swatch-sample-3: var(--medieval-swatch-sample-3);
   --swatch-sample-4: var(--medieval-swatch-sample-4);
 }
+
+.theme-swatch-golden-darkness {
+  --swatch-sample-1: var(--golden-darkness-swatch-sample-1);
+  --swatch-sample-2: var(--golden-darkness-swatch-sample-2);
+  --swatch-sample-3: var(--golden-darkness-swatch-sample-3);
+  --swatch-sample-4: var(--golden-darkness-swatch-sample-4);
+}
+
+[data-theme="light"] .theme-swatch-golden-darkness {
+  --swatch-sample-1: var(--golden-darkness-swatch-sample-1);
+  --swatch-sample-2: var(--golden-darkness-swatch-sample-2);
+  --swatch-sample-3: var(--golden-darkness-swatch-sample-3);
+  --swatch-sample-4: var(--golden-darkness-swatch-sample-4);
+}

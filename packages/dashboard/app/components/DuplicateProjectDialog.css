@@ -1,0 +1,9 @@
+.duplicate-project-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+  padding: var(--space-lg);
+}
+.duplicate-project-form label { display: flex; flex-direction: column; gap: var(--space-sm); }
+.duplicate-project-actions { display: flex; justify-content: flex-end; gap: var(--space-sm); }
+.duplicate-project-form [role="alert"] { color: var(--color-error); }

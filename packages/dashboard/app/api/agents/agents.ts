@@ -292,3 +292,7 @@ export function stopAgentRun(
   );
 }
 
+
+export function duplicateAgent(agentId: string, projectId?: string): Promise<Agent> {
+  return api<Agent>(withProjectId(`/agents/${encodeURIComponent(agentId)}/duplicate`, projectId), { method: "POST" });
+}

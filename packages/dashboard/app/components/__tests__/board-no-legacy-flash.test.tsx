@@ -157,6 +157,11 @@ function expectWorkflowLayout(surface: Surface) {
 }
 
 function expectSkeleton(surface: Surface, empty = false) {
+  if (empty) {
+    expect(document.querySelectorAll(".board-workflows-skeleton__column, .list-workflow-skeleton__row")).toHaveLength(0);
+    expect(screen.getByText(/No workflows yet/)).toBeVisible();
+    expect(document.querySelector('[aria-busy="true"]')).toBeNull();
+  }
   if (surface === "Board") {
     expect(screen.getByTestId(empty ? "board-workflows-empty" : "board-workflows-skeleton")).toBeInTheDocument();
     expect(document.querySelector(".board-workflow-columns")).toBeNull();
@@ -226,8 +231,8 @@ describe("no legacy-board flash before workflow lanes load (FN-6776)", () => {
     expectWorkflowLayout(surface);
   });
 
-  it.each<Surface>(["Board", "ListView"])("%s keeps legacy hidden when the enabled payload has no workflows", async (surface) => {
-    mockViewport(1024);
+  it.each<[Surface, Breakpoint]>([["Board", "desktop"], ["Board", "mobile"], ["ListView", "desktop"], ["ListView", "mobile"]])("%s at %s shows a loaded empty view when no workflows exist", async (surface, breakpoint) => {
+    mockViewport(breakpoint === "mobile" ? 390 : 1200);
     apiMocks.fetchBoardWorkflows.mockResolvedValue(emptyWorkflowPayload);
 
     renderSurface(surface);

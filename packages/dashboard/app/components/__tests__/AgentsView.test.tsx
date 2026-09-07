@@ -1,3 +1,4 @@
+import { duplicateAgent } from "../../api/agents/agents";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent, waitFor, within } from "@testing-library/react";
 import type { ReactElement } from "react";
@@ -9,6 +10,8 @@ import * as apiModule from "../../api";
 import type { Agent, AgentState, AgentCapability, OrgTreeNode } from "../../api";
 import { scopedKey } from "../../utils/projectStorage";
 import { ORG_CHART_LAYOUT_STORAGE_KEY } from "../agentsOrgChartLayout";
+
+vi.mock("../../api/agents/agents", async importOriginal => ({ ...await importOriginal<typeof import("../../api/agents/agents")>(), duplicateAgent: vi.fn() }));
 
 // Mock the API module
 vi.mock("../../api", async (importOriginal) => {
@@ -1581,6 +1584,17 @@ describe("AgentsView", () => {
       const refreshBtn = await screen.findByTitle("Refresh");
       expect(refreshBtn).toBeTruthy();
     });
+  });
+
+  it.each(["list", "board"])("duplicates an agent from the %s surface", async mode => {
+    vi.mocked(duplicateAgent).mockResolvedValue({ ...mockAgents[0], id: "agent-copy", name: "Copied agent", state: "paused" });
+    renderView(<AgentsView addToast={mockAddToast} projectId={projectId} />);
+    await screen.findAllByText("Test Agent 1");
+    if (mode === "board") fireEvent.click(screen.getByTitle("Board view"));
+    fireEvent.click((await screen.findAllByRole("button", { name: "Duplicate" }))[0]);
+    await waitFor(() => expect(duplicateAgent).toHaveBeenCalledWith(expect.stringMatching(/^agent-/), projectId));
+    expect(mockDeleteAgent).not.toHaveBeenCalled();
+    expect(mockStartAgentRun).not.toHaveBeenCalled();
   });
 
   describe("view toggle (list/board)", () => {

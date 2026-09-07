@@ -146,6 +146,12 @@ type AggregateBoardColumn = BoardWorkflowColumn & { sourceWorkflowIds: string[] 
 type AggregateQuickCreateTarget = { columnId: string; workflowId: string };
 
 function BoardWorkflowSkeleton({ empty = false, t }: { empty?: boolean; t: TFunction<"app"> }) {
+  // FNXC:EmptyWorkflows 2026-09-07-04:09: An empty catalog is a loaded board, not an ongoing request.
+  if (empty) return (
+    <main className="board board--empty" id="board" aria-busy={false} aria-label={t("board.noWorkflowLanes", "No workflow lanes available")} data-testid="board-workflows-empty">
+      <p className="empty-state">{t("board.noWorkflows", "No workflows yet. Create a workflow to add board lanes.")}</p>
+    </main>
+  );
   return (
     <main className="board board-workflows-skeleton" id="board" aria-busy={!empty} aria-label={empty ? t("board.noWorkflowLanes", "No workflow lanes available") : t("board.loadingWorkflowLanes", "Loading workflow lanes")} data-testid={empty ? "board-workflows-empty" : "board-workflows-skeleton"}>
       {[0, 1, 2].map((index) => (

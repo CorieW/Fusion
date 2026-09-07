@@ -10,6 +10,11 @@
 
 /* Aurora, Calm, Dawn, Sage, Midnight, Velvet, Factory Dark, and Factory Light swatches stay globally resolvable while a different theme is active. */
 :root {
+  --golden-darkness-swatch-sample-1: #000000;
+  --golden-darkness-swatch-sample-2: #050505;
+  --golden-darkness-swatch-sample-3: #d4af37;
+  --golden-darkness-swatch-sample-4: #a3a3a3;
+
   --aurora-swatch-sample-1: #0a1022;
   --aurora-swatch-sample-2: #162044;
   --aurora-swatch-sample-3: #65e6c7;
@@ -64,6 +69,11 @@
 }
 
 [data-theme="light"] {
+  --golden-darkness-swatch-sample-1: #f4f0e8;
+  --golden-darkness-swatch-sample-2: #fcfaf6;
+  --golden-darkness-swatch-sample-3: #8b6b16;
+  --golden-darkness-swatch-sample-4: #6d6458;
+
   --aurora-swatch-sample-1: #f4f8ff;
   --aurora-swatch-sample-2: #dfeaf8;
   --aurora-swatch-sample-3: #197d72;
@@ -8411,4 +8421,73 @@ Factory Light is the daylight industrial sibling of Factory and Factory Dark: wa
   --shadow-glow: 0 0 10px color-mix(in srgb, var(--accent) 20%, transparent);
   --focus-ring: 0 0 0 2px color-mix(in srgb, var(--accent) 18%, transparent);
   --focus-ring-strong: 0 0 0 2px color-mix(in srgb, var(--accent) 28%, transparent);
+}
+
+/* FNXC:DashboardTheming 2026-09-07-04:09: Golden Darkness pairs black surfaces and warm gold accents, with matching cream surfaces in light mode. */
+[data-color-theme="golden-darkness"][data-theme="dark"],
+[data-color-theme="golden-darkness"] {
+  --bg: #000000;
+  --surface: #050505;
+  --card: #0a0a0a;
+  --card-hover: #262626;
+  --surface-hover: #171717;
+  --border: #262626;
+  --text: #ffffff;
+  --text-muted: #a3a3a3;
+  --text-dim: #858585;
+  --todo: #a3a3a3;
+  --in-progress: #d4af37;
+  --in-progress-rgb: 212, 175, 55;
+  --in-review: #e5c158;
+  --triage: #d4af37;
+  --done: #4cbb17;
+  --color-success: #4cbb17;
+  --color-warning: #e5c158;
+  --color-error: #f87171;
+  --color-info: #93c5fd;
+  --cta-bg: #d4af37;
+  --cta-border: #d4af37;
+  --cta-text: #000000;
+  --cta-bg-hover: #e5c158;
+  --cta-border-hover: #e5c158;
+  --cta-glow: none;
+  --accent: #d4af37;
+  --accent-text: #000000;
+  --logo-accent: var(--accent);
+  --shadow-glow: none;
+  --focus-ring: 0 0 0 2px #d4af37;
+  --focus-ring-strong: 0 0 0 2px #e5c158;
+}
+[data-color-theme="golden-darkness"][data-theme="light"] {
+  --bg: #f4f0e8;
+  --surface: #fcfaf6;
+  --card: #fcfaf6;
+  --card-hover: #ebe3d6;
+  --surface-hover: #f4efe5;
+  --border: #cbbca7;
+  --text: #171412;
+  --text-muted: #6d6458;
+  --text-dim: #7a7063;
+  --todo: #6d6458;
+  --in-progress: #8b6b16;
+  --in-progress-rgb: 139, 107, 22;
+  --in-review: #9a7622;
+  --triage: #8b6b16;
+  --done: #2f7d0f;
+  --color-success: #2f7d0f;
+  --color-warning: #8b6b16;
+  --color-error: #b91c1c;
+  --color-info: #1d4ed8;
+  --cta-bg: #b58e2e;
+  --cta-border: #9a7622;
+  --cta-text: #18120a;
+  --cta-bg-hover: #c5a047;
+  --cta-border-hover: #8b6b16;
+  --cta-glow: none;
+  --accent: #8b6b16;
+  --accent-text: #ffffff;
+  --logo-accent: var(--accent);
+  --shadow-glow: none;
+  --focus-ring: 0 0 0 2px #b58e2e;
+  --focus-ring-strong: 0 0 0 2px #8b6b16;
 }

@@ -918,3 +918,7 @@ export function updateProject(id: string, updates: Partial<ProjectInfo>): Promis
   });
 }
 
+
+export function duplicateProject(projectId: string, input: { name: string; path: string }): Promise<ProjectInfo> {
+  return api<ProjectInfo>(`/projects/${encodeURIComponent(projectId)}/duplicate`, { method: "POST", body: JSON.stringify(input) });
+}

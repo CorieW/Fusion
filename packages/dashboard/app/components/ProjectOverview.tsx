@@ -1,3 +1,4 @@
+import { DuplicateProjectDialog } from "./DuplicateProjectDialog";
 import { useState, useMemo, useCallback, useEffect } from "react";
 import { Plus, LayoutGrid, Filter, ArrowUpDown, Activity, CheckCircle, AlertCircle, Folder, Inbox, Server } from "lucide-react";
 import { useTranslation } from "react-i18next";
@@ -55,6 +56,7 @@ export function ProjectOverview({
   nodes = [],
 }: ProjectOverviewProps) {
   const { t } = useTranslation("app");
+  const [duplicateSource, setDuplicateSource] = useState<ProjectInfo | null>(null);
   const [activeFilter, setActiveFilter] = useState<FilterTab>("all");
   const [activeNodeFilter, setActiveNodeFilter] = useState<string | null>(null);
   const [sortBy, setSortBy] = useState<SortOption>("activity");
@@ -459,10 +461,13 @@ export function ProjectOverview({
               onPause={onPauseProject}
               onResume={onResumeProject}
               onRemove={onRemoveProject}
+              onDuplicate={setDuplicateSource}
             />
           );
         })}
       </div>
+
+      {duplicateSource && <DuplicateProjectDialog project={duplicateSource} onClose={() => setDuplicateSource(null)} onCreated={copy => { setDuplicateSource(null); onSelectProject(copy); }} />}
 
       {/* No results state */}
       {sortedProjects.length === 0 && (

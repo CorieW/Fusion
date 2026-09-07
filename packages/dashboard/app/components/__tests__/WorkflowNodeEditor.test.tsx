@@ -1892,6 +1892,20 @@ describe("WorkflowNodeEditor — U10 columns/traits/holds", () => {
     );
   });
 
+  it.each(["desktop", "mobile"] as const)("duplicates a custom workflow at %s width with a fresh identity and original graph", async mode => {
+    mockWorkflowEditorViewport(mode);
+    const original = v2Def();
+    vi.mocked(fetchWorkflows).mockResolvedValue([original]);
+    vi.mocked(createWorkflow).mockResolvedValue({ ...original, id: "WF-copy", name: original.name + " (copy)" });
+    render(<WorkflowNodeEditor isOpen onClose={() => {}} addToast={() => {}} projectId="project-copy-test" />);
+    if (mode === "mobile") {
+      fireEvent.click(await screen.findByRole("button", { name: original.name }));
+      fireEvent.click(await screen.findByTestId("wf-mobile-tab-actions"));
+    }
+    fireEvent.click(await screen.findByRole("button", { name: "Duplicate", exact: true }));
+    await waitFor(() => expect(createWorkflow).toHaveBeenCalledWith(expect.objectContaining({ name: original.name + " (copy)", ir: original.ir, layout: original.layout }), "project-copy-test"));
+  });
+
   it("opens a built-in read-only with a Duplicate to customize CTA replacing the toolbar", async () => {
     vi.mocked(fetchWorkflows).mockResolvedValue([builtinDef()]);
     vi.mocked(createWorkflow).mockResolvedValue({ ...v2Def(), id: "WF-copy", name: "Copy" });

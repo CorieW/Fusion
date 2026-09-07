@@ -1,3 +1,5 @@
+import { duplicateAgentConfiguration } from "../lib/duplicate-agent.js";
+import { duplicateName } from "../lib/duplicate-name.js";
 import { mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { preWipColumnsForTask } from "../task-lifecycle-lanes.js";
 import type { WorkflowIr } from "@fusion/core";
@@ -188,6 +190,22 @@ export function registerAgentCoreListCreateRoutes(ctx: ApiRoutesContext, deps: A
    * List all agents with optional filtering.
    * Query params: state, role, includeEphemeral
    */
+  router.post("/agents/:id/duplicate", async (req, res) => {
+    try {
+      const { store } = await getProjectContext(req);
+      const { AgentStore } = await import("@fusion/core");
+      const agents = new AgentStore({ rootDir: store.getFusionDir(), asyncLayer: store.getAsyncLayer() ?? undefined });
+      await agents.init();
+      const source = await agents.getAgent(req.params.id);
+      if (!source) throw notFound("Agent not found");
+      const name = duplicateName(source.name, (await agents.listAgents()).map(agent => agent.name));
+      res.status(201).json(await duplicateAgentConfiguration(source, agents, agents, store.getRootDir(), store.getRootDir(), name));
+    } catch (error) {
+      if (error instanceof ApiError) throw error;
+      rethrowAsApiError(error);
+    }
+  });
+
   router.get("/agents", async (req, res) => {
     try {
       const filter: { state?: string; role?: string; includeEphemeral?: boolean } = {};

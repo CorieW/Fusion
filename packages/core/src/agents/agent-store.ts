@@ -556,8 +556,10 @@ export class AgentStore extends EventEmitter {
    * one-shot SQLite migrations. The PostgreSQL schema baseline already
    * covers these migrations. Only create the agents directory.
    */
-  async init(): Promise<void> {
+  async init(options: { provisionDefaults?: boolean } = {}): Promise<void> {
     await mkdir(this.agentsDir, { recursive: true });
+    // FNXC:Duplicate 2026-09-07-09:54: Configuration copies initialize storage without seeding agents that would collide with the copied roster.
+    if (options.provisionDefaults === false) return;
     /*
     FNXC:WorkflowAgentRouting 2026-08-07-03:12:
     Every upgraded or new project must have the four durable workflow owners

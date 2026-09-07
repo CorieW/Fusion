@@ -35,7 +35,7 @@ The left sidebar is a sibling of project-content, so it does not inherit project
 
 /*
 FNXC:Navigation 2026-06-21-00:00:
-The collapse toggle lives in the footer above Settings instead of floating on the resize border. It reuses the tokenized row-item styling so expanded mode can show the Collapse label and rail mode can hide that label consistently with other sidebar items.
+The collapse toggle lives in the footer after Settings instead of floating on the resize border. It reuses the tokenized row-item styling so expanded mode can show the Collapse label and rail mode can hide that label consistently with other sidebar items.
 */
 .left-sidebar-nav__collapse-toggle {
   flex-shrink: 0;
