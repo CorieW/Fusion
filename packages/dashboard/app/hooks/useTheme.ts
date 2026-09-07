@@ -27,24 +27,25 @@ const THEME_DATA_FILENAME = "theme-data.css";
  * Keep both implementations behaviorally equivalent.
  */
 function getThemeDataUrl(): string {
+  const filename = document.querySelector<HTMLMetaElement>('meta[name="fusion-theme-stylesheet"]')?.content || THEME_DATA_FILENAME;
   const base = document.baseURI || (typeof document.location !== "undefined" ? document.location.href : "");
 
   if (!base) {
-    return `/${THEME_DATA_FILENAME}`;
+    return `/${filename}`;
   }
 
   if (base.startsWith("http://") || base.startsWith("https://")) {
-    return new URL(`/${THEME_DATA_FILENAME}`, base).toString();
+    return new URL(`/${filename}`, base).toString();
   }
 
   if (base.startsWith("file://")) {
     if (base.endsWith("/")) {
-      return base.slice(0, -1) + `/${THEME_DATA_FILENAME}`;
+      return base.slice(0, -1) + `/${filename}`;
     }
-    return base.replace(/\/[^/]+$/, `/${THEME_DATA_FILENAME}`);
+    return base.replace(/\/[^/]+$/, `/${filename}`);
   }
 
-  return `/${THEME_DATA_FILENAME}`;
+  return `/${filename}`;
 }
 
 // Check if we're in a browser environment
@@ -527,6 +528,10 @@ export function getThemeInitScript(): string {
             themeDataUrl = '/theme-data.css';
           }
 
+          var themeAsset = document.querySelector('meta[name="fusion-theme-stylesheet"]');
+          if (themeAsset && themeAsset.content) {
+            themeDataUrl = new URL(base.indexOf('file://') === 0 ? themeAsset.content : '/' + themeAsset.content, base || document.location.href).toString();
+          }
           var existingLink = document.getElementById('theme-data');
           if (existingLink && existingLink.tagName === 'LINK' && existingLink.href !== themeDataUrl) {
             existingLink.href = themeDataUrl;

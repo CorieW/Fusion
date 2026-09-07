@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { readdirSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { beforeAll, describe, expect, test } from "vitest";
@@ -54,6 +55,13 @@ describe("mobile build output chunking", () => {
     expect(themeLinkMatch).toBeTruthy();
     const themeLink = themeLinkMatch![0];
     const themeIndex = head.indexOf(themeLink);
+    const themePath = themeLink.match(/href="\/([^"]+)"/)?.[1];
+    expect(themePath).toMatch(/^assets\/theme-data-[a-f0-9]{16}\.css$/);
+    const css = readFileSync(resolve(dashboardClientDistDir, themePath!), "utf8");
+    const digest = createHash("sha256").update(css).digest("hex").slice(0, 16);
+    expect(themePath).toBe(`assets/theme-data-${digest}.css`);
+    expect(css).toContain('[data-color-theme="golden-darkness"]');
+    expect(head).toContain(`<meta name="fusion-theme-stylesheet" content="${themePath}"`);
 
     const stylesheetRegex = /<link[^>]*rel=["']stylesheet["'][^>]*>/gi;
     const otherStylesheetIndexes: number[] = [];

@@ -226,6 +226,10 @@
             } else {
               themeDataUrl = '/theme-data.css';
             }
+            var themeAsset = document.querySelector('meta[name="fusion-theme-stylesheet"]');
+            if (themeAsset && themeAsset.content) {
+              themeDataUrl = new URL(base.indexOf('file://') === 0 ? themeAsset.content : '/' + themeAsset.content, base || document.location.href).toString();
+            }
             var existingLink = document.getElementById('theme-data');
             if (existingLink && existingLink.tagName === 'LINK' && existingLink.href !== themeDataUrl) {
               existingLink.href = themeDataUrl;

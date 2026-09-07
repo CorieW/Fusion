@@ -920,6 +920,35 @@ describe("useTheme", () => {
   });
 
   describe("dynamic theme-data.css loading", () => {
+    it.each([
+      ["https://dashboard.example.test/tasks/item", "https://dashboard.example.test/assets/theme-data-0123456789abcdef.css"],
+      ["file:///app/client/index.html", "file:///app/client/assets/theme-data-0123456789abcdef.css"],
+    ])("keeps the built theme URL through initialization and selection at %s", (base, expected) => {
+      const meta = document.createElement("meta");
+      meta.name = "fusion-theme-stylesheet";
+      meta.content = "assets/theme-data-0123456789abcdef.css";
+      document.head.appendChild(meta);
+      Object.defineProperty(document, "baseURI", { value: base, configurable: true });
+      try {
+        localStorage.setItem(COLOR_THEME_STORAGE_KEY, "golden-darkness");
+        const html = readFileSync(resolve(PACKAGE_ROOT, "app/index.html"), "utf8");
+        const inline = [...html.matchAll(/<script[^>]*>([\s\S]*?)<\/script>/g)].map(match => match[1]).find(script => script.includes("kb-dashboard-color-theme"))!;
+        for (const script of [getThemeInitScript(), inline]) {
+          window.eval(script);
+          expect((document.getElementById("theme-data") as HTMLLinkElement).href).toBe(expected);
+        }
+        const { result } = renderHook(() => useTheme());
+        for (const theme of ["ocean", "default", "golden-darkness"] as const) {
+          act(() => result.current.setColorTheme(theme));
+          expect((document.getElementById("theme-data") as HTMLLinkElement).href).toBe(expected);
+          expect(document.documentElement.dataset.colorTheme).toBe(theme);
+        }
+      } finally {
+        meta.remove();
+        Object.defineProperty(document, "baseURI", { value: "http://localhost:3000/", configurable: true });
+      }
+    });
+
     it("reuses the static theme-data link when switching to non-default theme", () => {
       const appendChildSpy = vi.spyOn(document.head, "appendChild");
       const { result } = renderHook(() => useTheme());

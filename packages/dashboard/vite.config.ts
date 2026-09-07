@@ -94,8 +94,15 @@ function emitVersionJson(): Plugin {
 }
 
 function ensureThemeDataStylesheetOrder(): Plugin {
+  const themeSource = readFileSync(resolve(__dirname, "app/public/theme-data.css"), "utf8");
+  const themeHash = createHash("sha256").update(themeSource).digest("hex").slice(0, 16);
+  const themeFile = `assets/theme-data-${themeHash}.css`;
   return {
     name: "fusion-theme-data-link-order",
+    // FNXC:ThemeCache 2026-09-07-10:57: New theme bytes require a new URL through caching proxies and service workers.
+    buildStart() {
+      this.emitFile({ type: "asset", fileName: themeFile, source: themeSource });
+    },
     apply: "build",
     enforce: "post",
     transformIndexHtml(html) {
@@ -106,11 +113,11 @@ function ensureThemeDataStylesheetOrder(): Plugin {
       const themeLinkMatch = head.match(/<link[^>]*id=["']theme-data["'][^>]*>/i);
       if (!themeLinkMatch) return html;
 
-      const themeLink = themeLinkMatch[0];
-      const headWithoutThemeLink = head.replace(themeLink, "");
+      const themeLink = themeLinkMatch[0].replace(/href=["'][^"']*["']/, `href="/${themeFile}"`);
+      const headWithoutThemeLink = head.replace(themeLinkMatch[0], "");
       const reorderedHead = headWithoutThemeLink.replace(/<\/head>$/i, `${themeLink}\n  </head>`);
 
-      return html.replace(head, reorderedHead);
+      return html.replace(head, reorderedHead.replace(/<head>/i, `<head>\n    <meta name="fusion-theme-stylesheet" content="${themeFile}" />`));
     },
   };
 }
