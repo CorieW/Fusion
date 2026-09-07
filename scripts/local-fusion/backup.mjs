@@ -1,6 +1,6 @@
 import * as fs from 'node:fs/promises';
 import path from 'node:path';
-import { api, archiveTree, checksums, copyTree, exists, ps, readJson, run, timestamp, verifyChecksums, writeJson } from './common.mjs';
+import { api, checksums, copyTree, exists, ps, readJson, run, timestamp, verifyChecksums, writeJson } from './common.mjs';
 
 // FNXC:LocalDeployment 2026-09-06-20:51: Logical dumps cover every database and role; a cold global snapshot and working-tree copies provide a matching rollback point.
 const ident = name => '"' + name.replaceAll('"', '""') + '"';
@@ -115,8 +115,8 @@ export async function createBackup(config, { cold = false, stop, resume, release
     }
     for (const copy of copies) {
       console.log(`Copying ${copy.source}`);
-      if(copy.kind==='global')await copyTree(copy.source, path.join(folder, copy.destination), !cold ? ['embedded-postgres'] : []);
-      else {copy.archive=`${copy.destination}.tar`;await archiveTree(copy.source,path.join(folder,copy.archive));}
+      // FNXC:LocalDeployment 2026-09-07-00:26: Windows tar follows dependency junctions and repeatedly archives their targets. Use the same bounded robocopy snapshot for every root; existing tar backups remain readable.
+      await copyTree(copy.source, path.join(folder, copy.destination), copy.kind==='global' && !cold ? ['embedded-postgres'] : []);
     }
     const manifest = { format: 2, createdAt: new Date().toISOString(), cold, release, databases, copies, resumeProjects: projects ?? baseline.projects, pauseSettings, baseline: 'inventory.json' };
     await writeJson(path.join(folder, 'backup.json'), manifest);

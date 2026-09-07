@@ -25,7 +25,7 @@ Activation pauses idle projects, disables the startup task temporarily, exports 
 
 The bundled Windows database helper force-stops PostgreSQL when Fusion exits. The command detects this, recovers the stopped cluster offline, and performs a clean PostgreSQL checkpoint and shutdown before taking the filesystem snapshot. No dashboard or project engine runs during that step.
 
-Complete project trees are stored as uncompressed `.tar` archives, including Git metadata, ignored files, credentials, dependencies and uncommitted work. This makes integrity checks sequential instead of reopening hundreds of thousands of tiny files. Global Fusion data remains a directory snapshot. The initial migration backup uses directory snapshots for projects too; restoration supports both formats.
+Project and worktree roots use directory snapshots, including Git metadata, ignored files, credentials and uncommitted work. Parallel copying does not traverse directory junctions, which prevents repeated copies of dependency trees on Windows. Referenced Git worktrees are backed up separately. Restoration supports both directory snapshots and previously created `.tar` archives.
 
 The candidate must pass a restore/migration rehearsal on copies, using an isolated Windows home and database. External connections and subprocess execution are blocked during the rehearsal. The live instance then opens the original data locations; project IDs and paths stay the same. Projects resume only after data checks pass.
 
@@ -59,6 +59,8 @@ When schemas differ, explicitly choose the matching cold backup:
 A data rollback first backs up the current state. Restored directories replace the live paths only after the displaced directories have been renamed and retained. Work done after the target backup remains in those preserved directories; it is not automatically merged into the older database.
 
 The original npm installation and its exported task XML remain available for the initial upgrade rollback. Never point version 0.76.0 at a database already migrated by the fork: restore its matching database and filesystem snapshot together.
+
+Projects can disable every built-in workflow after choosing a custom project default. Before rolling back to a build that requires at least one built-in, re-enable one in each project under General settings (or reset `enabledBuiltinWorkflowIds` to `null` through the settings API). Custom workflows and historical task assignments remain intact.
 
 ## Logs and source updates
 
