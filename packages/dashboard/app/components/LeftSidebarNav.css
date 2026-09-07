@@ -313,3 +313,28 @@ html[data-viewport-mode="mobile"] .left-sidebar-nav {
 html:is([data-viewport-mode="tablet"], [data-viewport-mode="desktop"]) .left-sidebar-nav {
   display: flex;
 }
+
+/* FNXC:SidebarGroups 2026-09-07-02:52: Compact disclosure headings separate the requested navigation groups. Rail mode keeps every destination accessible regardless of its group's expanded state. */
+.left-sidebar-nav__group { margin-top: var(--space-sm); }
+.left-sidebar-nav__group-toggle {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  width: 100%;
+  padding: var(--space-sm);
+  border: none;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+.left-sidebar-nav__group-toggle:hover { background: var(--card); color: var(--text); }
+.left-sidebar-nav__group-toggle:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+.left-sidebar-nav__group-toggle--active { color: var(--accent); }
+.left-sidebar-nav__group-items { display: flex; flex-direction: column; gap: var(--space-xs); }
+.left-sidebar-nav__group-items[hidden] { display: none; }
+.left-sidebar-nav:not(.left-sidebar-nav--collapsed) .left-sidebar-nav__group-items { padding-left: var(--space-sm); }

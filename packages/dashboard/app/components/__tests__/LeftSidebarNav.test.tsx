@@ -204,23 +204,14 @@ describe("LeftSidebarNav", () => {
     expect(hoverRule).not.toMatch(/#|rgb\(/i);
   });
 
-  it("opens the dedicated recommendations destination with its unread count", () => {
-    const { onChangeView } = renderSidebar({ recommendationUnreadCount: 5 });
-    const item = screen.getByTestId("sidebar-nav-recommendations");
-
-    expect(item.querySelector(".left-sidebar-nav__badge")).toHaveTextContent("5");
-    fireEvent.click(item);
-    expect(onChangeView).toHaveBeenCalledWith("recommendations");
-  });
-
   it.each([
     { count: 0, expected: null },
     { count: 5, expected: "5" },
     { count: 120, expected: "99+" },
-  ])("renders recommendation and artifact badge state for count $count", ({ count, expected }) => {
+  ])("renders artifact badge state for count $count", ({ count, expected }) => {
     renderSidebar({ recommendationUnreadCount: count, artifactUnreadCount: count });
 
-    for (const testId of ["sidebar-nav-recommendations", "sidebar-nav-documents"]) {
+    for (const testId of ["sidebar-nav-documents"]) {
       const item = screen.getByTestId(testId);
       const badge = item.querySelector(".left-sidebar-nav__badge");
       const dot = item.querySelector(".left-sidebar-nav__dot");
@@ -234,120 +225,56 @@ describe("LeftSidebarNav", () => {
     }
   });
 
-  it("renders core destinations, enabled overflow destinations, plugins, and bottom settings", () => {
+  it("groups the requested destinations, defaults Other closed, and sorts Other alphabetically", () => {
     const { container } = renderSidebar();
-
     expectNoSidebarBrandOrProjectAffordances(container);
+    const nav = screen.getByRole("navigation", { name: "Primary navigation" });
+    expect(within(nav).getAllByRole("button").map(b => b.textContent?.trim())).toEqual([
+      "Dashboard", "Tasks", "Board", "List", "AI", "Chat", "Agents", "Workflows", "Memory", "Other",
+    ]);
+    for (const name of ["Tasks", "AI"]) expect(screen.getByRole("button", { name, exact: true })).toHaveAttribute("aria-expanded", "true");
+    const other = screen.getByRole("button", { name: "Other", exact: true });
+    expect(other).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByRole("button", { name: "Automations", exact: true })).toBeNull();
+    fireEvent.click(other);
+    expect(other).toHaveAttribute("aria-expanded", "true");
+    const content = document.getElementById(other.getAttribute("aria-controls")!)!;
+    expect(within(content).getAllByRole("button").map(b => b.getAttribute("aria-label"))).toEqual([
+      "Artifacts", "Automations", "Goals", "Import Tasks", "Insights", "Mailbox", "Missions", "Planning", "Skills",
+    ]);
+    for (const id of ["patchnode", "recommendations", "research", "ideation", "evals", "plugin-fusion-plugin-primary-primary-view"]) expect(screen.queryByTestId("sidebar-nav-" + id)).toBeNull();
+    expectSettingsLastInFooter();
+  });
 
-    for (const testId of [
-      "sidebar-nav-board",
-      "sidebar-nav-list",
-      "sidebar-nav-patchnode",
-      "sidebar-nav-command-center",
-      "sidebar-nav-agents",
-      "sidebar-nav-chat",
-      "sidebar-nav-mailbox",
-      "sidebar-nav-recommendations",
-      "sidebar-nav-planning",
-      "sidebar-nav-missions",
-      "sidebar-nav-documents",
-      "sidebar-nav-goals",
-      "sidebar-nav-automations",
-      "sidebar-nav-import-tasks",
-      "sidebar-nav-workflows",
-      "sidebar-nav-insights",
-      "sidebar-nav-research",
-      "sidebar-nav-ideation",
-      "sidebar-nav-skills",
-      "sidebar-nav-memory",
-      "sidebar-nav-evals",
-      "sidebar-nav-plugin-fusion-plugin-primary-primary-view",
-      "sidebar-nav-plugin-fusion-plugin-overflow-overflow-view",
-      "sidebar-nav-settings",
-    ]) {
-      expect(screen.getByTestId(testId)).toBeDefined();
-    }
+  it("persists each group's choice and restores it on remount", () => {
+    const first = renderSidebar();
+    fireEvent.click(screen.getByRole("button", { name: "Tasks", exact: true }));
+    fireEvent.click(screen.getByRole("button", { name: "Other", exact: true }));
+    expect(screen.queryByRole("button", { name: "Board", exact: true })).toBeNull();
+    first.unmount();
+    renderSidebar();
+    expect(screen.getByRole("button", { name: "Tasks", exact: true })).toHaveAttribute("aria-expanded", "false");
+    expect(screen.getByRole("button", { name: "AI", exact: true })).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByRole("button", { name: "Other", exact: true })).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByRole("button", { name: "Automations", exact: true })).toBeVisible();
+  });
 
-    expect(screen.getByTestId("sidebar-nav-skills")).toHaveTextContent("Skills & Snippets");
-    expect(screen.getByTestId("sidebar-nav-documents")).toHaveTextContent("Artifacts");
-    expect(screen.getByTestId("sidebar-nav-planning")).toHaveTextContent("Planning");
-    expect(screen.getByTestId("sidebar-nav-import-tasks")).toHaveTextContent("Import Tasks");
-    expect(screen.queryByTestId("sidebar-nav-stash-recovery")).toBeNull();
+  it("keeps destinations accessible in the icon rail without changing group choices", () => {
+    renderSidebar();
+    fireEvent.click(screen.getByRole("button", { name: "Tasks", exact: true }));
+    fireEvent.click(screen.getByTestId("sidebar-nav-collapse-toggle"));
+    expect(screen.getByRole("button", { name: "Board", exact: true })).toBeVisible();
+    expect(screen.getByRole("button", { name: "Automations", exact: true })).toBeVisible();
+    fireEvent.click(screen.getByTestId("sidebar-nav-collapse-toggle"));
+    expect(screen.queryByRole("button", { name: "Board", exact: true })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Automations", exact: true })).toBeNull();
+  });
 
-    /*
-    FNXC:Navigation 2026-06-22-12:00:
-    Import Tasks renders a custom GitHub octocat SVG (lucide-react has no Github export), not a lucide icon. The octocat path is the discriminator.
-    */
-    const importIconSvg = screen.getByTestId("sidebar-nav-import-tasks").querySelector("svg");
-    expect(importIconSvg).not.toBeNull();
-    expect(importIconSvg?.getAttribute("viewBox")).toBe("0 0 24 24");
-    expect(importIconSvg?.querySelector("path")?.getAttribute("d")).toContain("M12 2C6.477 2 2 6.484 2 12.017");
-
-    /*
-    FNXC:Navigation 2026-06-22-12:00:
-    Dev Server moved to the right dock; the sidebar no longer renders a devserver entry even when the devServerView flag is on.
-    */
-    expect(screen.queryByTestId("sidebar-nav-devserver")).toBeNull();
-
-    const primaryNav = screen.getByRole("navigation", { name: "Primary navigation" });
-
-    /*
-    FNXC:Navigation 2026-06-22-12:00:
-    The sidebar collapsed its two placement sections into ONE explicitly-ordered list; the `--secondary` section is gone.
-    */
-    expect(primaryNav.querySelectorAll(".left-sidebar-nav__section")).toHaveLength(1);
-    expect(primaryNav.querySelector(".left-sidebar-nav__section--secondary")).toBeNull();
-
-    /*
-    FNXC:Navigation 2026-06-22-12:00:
-    Assert the intentional single-list order (top to bottom) for the entries present under the default render flags.
-    command-center precedes agents; recommendations sits immediately after mailbox, then skills/memory (flag-gated) and documents (Artifacts); automations -> import-tasks -> workflows remain contiguous.
-    */
-    const primaryButtons = within(primaryNav).getAllByRole("button");
-    const orderedTestIds = [
-      "sidebar-nav-command-center",
-      "sidebar-nav-board",
-      "sidebar-nav-list",
-      "sidebar-nav-patchnode",
-      "sidebar-nav-planning",
-      "sidebar-nav-missions",
-      "sidebar-nav-agents",
-      "sidebar-nav-chat",
-      "sidebar-nav-mailbox",
-      "sidebar-nav-recommendations",
-      "sidebar-nav-skills",
-      "sidebar-nav-memory",
-      "sidebar-nav-documents",
-      "sidebar-nav-goals",
-      "sidebar-nav-automations",
-      "sidebar-nav-import-tasks",
-      "sidebar-nav-workflows",
-      "sidebar-nav-insights",
-      "sidebar-nav-research",
-      "sidebar-nav-ideation",
-      "sidebar-nav-evals",
-    ];
-    const orderedIndices = orderedTestIds.map((testId) => primaryButtons.indexOf(screen.getByTestId(testId)));
-    expect(orderedIndices).toEqual([...orderedIndices].sort((a, b) => a - b));
-    expect(orderedIndices.every((index) => index >= 0)).toBe(true);
-    expect(primaryButtons.indexOf(screen.getByTestId("sidebar-nav-command-center"))).toBeLessThan(primaryButtons.indexOf(screen.getByTestId("sidebar-nav-agents")));
-    // FNXC:Navigation 2026-09-06-03:16: History sits between List and Planning; Recommendations follows Mailbox, and Documents (Artifacts) follows Memory.
-    expect(primaryButtons.indexOf(screen.getByTestId("sidebar-nav-patchnode"))).toBe(primaryButtons.indexOf(screen.getByTestId("sidebar-nav-list")) + 1);
-    expect(primaryButtons.indexOf(screen.getByTestId("sidebar-nav-planning"))).toBe(primaryButtons.indexOf(screen.getByTestId("sidebar-nav-patchnode")) + 1);
-    expect(primaryButtons.indexOf(screen.getByTestId("sidebar-nav-missions"))).toBe(primaryButtons.indexOf(screen.getByTestId("sidebar-nav-planning")) + 1);
-    expect(primaryButtons.indexOf(screen.getByTestId("sidebar-nav-agents"))).toBe(primaryButtons.indexOf(screen.getByTestId("sidebar-nav-missions")) + 1);
-    expect(primaryButtons.indexOf(screen.getByTestId("sidebar-nav-documents"))).toBe(primaryButtons.indexOf(screen.getByTestId("sidebar-nav-memory")) + 1);
-    expect(primaryButtons.indexOf(screen.getByTestId("sidebar-nav-recommendations"))).toBe(primaryButtons.indexOf(screen.getByTestId("sidebar-nav-mailbox")) + 1);
-    // Skills and Memory follow Recommendations.
-    expect(primaryButtons.indexOf(screen.getByTestId("sidebar-nav-skills"))).toBe(primaryButtons.indexOf(screen.getByTestId("sidebar-nav-recommendations")) + 1);
-    expect(primaryButtons.indexOf(screen.getByTestId("sidebar-nav-memory"))).toBe(primaryButtons.indexOf(screen.getByTestId("sidebar-nav-skills")) + 1);
-
-    const sidebar = screen.getByTestId("left-sidebar-nav");
-    const footer = screen.getByTestId("sidebar-nav-settings").closest(".left-sidebar-nav__footer");
-    expect(footer).not.toBeNull();
-    expect(footer?.parentElement).toBe(sidebar);
-    const sidebarButtons = within(sidebar).getAllByRole("button");
-    expect(sidebarButtons.at(-1)).toBe(screen.getByTestId("sidebar-nav-settings"));
+  it("recovers default group states from invalid persisted settings", () => {
+    window.localStorage.setItem("fusion:left-sidebar-groups", "{invalid");
+    renderSidebar();
+    expect(screen.getByRole("button", { name: "Tasks", exact: true })).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByRole("button", { name: "Other", exact: true })).toHaveAttribute("aria-expanded", "false");
   });
 
   it.each([
@@ -421,26 +348,9 @@ describe("LeftSidebarNav", () => {
     expect(screen.getByTestId("sidebar-nav-board")).toHaveAccessibleName("Board");
     expect(screen.getByTestId("sidebar-nav-list")).toHaveAccessibleName("List");
     expect(screen.getByTestId("sidebar-nav-agents")).toHaveAccessibleName("Agents");
+    fireEvent.click(screen.getByRole("button", { name: "Other", exact: true }));
     expect(screen.getByTestId("sidebar-nav-missions")).toHaveAccessibleName("Missions");
     expect(screen.queryByRole("button", { name: /view$/i })).toBeNull();
-  });
-
-  it("renders the hosted Roadmaps plugin destination when registered", () => {
-    const roadmapView: PluginDashboardViewEntry = {
-      pluginId: "fusion-plugin-roadmap",
-      view: {
-        viewId: "roadmaps",
-        label: "Roadmaps",
-        componentPath: "./RoadmapsView",
-        placement: "primary",
-        order: 99,
-      },
-    };
-    renderSidebar({ pluginDashboardViews: [pluginViews[0], roadmapView, pluginViews[1]] });
-
-    expect(screen.getByTestId("sidebar-nav-plugin-fusion-plugin-roadmap-roadmaps")).toBeInTheDocument();
-    expect(screen.getByTestId("sidebar-nav-plugin-fusion-plugin-primary-primary-view")).toBeInTheDocument();
-    expect(screen.getByTestId("sidebar-nav-plugin-fusion-plugin-overflow-overflow-view")).toBeInTheDocument();
   });
 
   it("renders mailbox badges without the removed stash recovery destination", () => {
@@ -452,77 +362,9 @@ describe("LeftSidebarNav", () => {
     expect(screen.queryByTestId("sidebar-nav-stash-recovery")).toBeNull();
   });
 
-  it("renders zero plugin views and at least one primary and overflow plugin view", () => {
-    const empty = renderSidebar({ pluginDashboardViews: [] });
-    expect(screen.queryByTestId("sidebar-nav-plugin-fusion-plugin-primary-primary-view")).toBeNull();
-    empty.unmount();
-
-    renderSidebar({ pluginDashboardViews: pluginViews });
-    expect(screen.getByTestId("sidebar-nav-plugin-fusion-plugin-primary-primary-view")).toBeDefined();
-    expect(screen.getByTestId("sidebar-nav-plugin-fusion-plugin-overflow-overflow-view")).toBeDefined();
-  });
-
-  it("renders plugin labels without view suffix and pins Compound Engineering to the Boxes sidebar icon", () => {
-    const rendered = renderSidebar({
-      pluginDashboardViews: [
-        ...pluginViews,
-        {
-          pluginId: "fusion-plugin-compound-engineering",
-          view: {
-            viewId: "compound-engineering",
-            label: "Compound Engineering",
-            componentPath: "./CompoundEngineering",
-            icon: "Sparkles",
-            placement: "primary",
-            order: 0,
-          },
-        },
-      ],
-    });
-
-    const primaryPlugin = screen.getByTestId("sidebar-nav-plugin-fusion-plugin-primary-primary-view");
-    const compoundPlugin = screen.getByTestId("sidebar-nav-plugin-fusion-plugin-compound-engineering-compound-engineering");
-    expect(primaryPlugin).toHaveAccessibleName("Primary Plugin");
-    expect(primaryPlugin).toHaveAttribute("title", "Primary Plugin");
-    expect(primaryPlugin).toHaveTextContent("Primary Plugin");
-    expect(primaryPlugin).not.toHaveTextContent("view");
-    expect(compoundPlugin).toHaveAccessibleName("Compound Eng");
-    expect(compoundPlugin).toHaveAttribute("title", "Compound Eng");
-    expect(compoundPlugin).toHaveTextContent("Compound Eng");
-    expect(compoundPlugin).not.toHaveTextContent("Compound Engineering");
-    expect(compoundPlugin.querySelector(".lucide-boxes")).not.toBeNull();
-    expect(compoundPlugin.querySelector(".lucide-sparkles")).toBeNull();
-    expect(compoundPlugin.querySelector(".lucide-grid-3x3")).toBeNull();
-
-    /*
-    FNXC:CompoundEngineeringNav 2026-07-19-17:27:
-    Disable and uninstall both remove the shared view entry; neither may leave a dead sidebar shell.
-    */
-    rendered.rerender(<LeftSidebarNav {...rendered.props} pluginDashboardViews={[]} />);
-    expect(screen.queryByTestId("sidebar-nav-plugin-fusion-plugin-compound-engineering-compound-engineering")).toBeNull();
-    rendered.rerender(<LeftSidebarNav {...rendered.props} pluginDashboardViews={[...pluginViews, {
-      pluginId: "fusion-plugin-compound-engineering",
-      view: {
-        viewId: "compound-engineering",
-        label: "Compound Engineering",
-        componentPath: "./CompoundEngineering",
-        icon: "Sparkles",
-        placement: "primary",
-        order: 0,
-      },
-    }]} />);
-    expect(screen.getByTestId("sidebar-nav-plugin-fusion-plugin-compound-engineering-compound-engineering")).toBeInTheDocument();
-    rendered.rerender(<LeftSidebarNav {...rendered.props} pluginDashboardViews={[]} />);
-    expect(screen.queryByTestId("sidebar-nav-plugin-fusion-plugin-compound-engineering-compound-engineering")).toBeNull();
-  });
-
   it.each<[TaskView, string]>([
     ["board", "sidebar-nav-board"],
-    ["research", "sidebar-nav-research"],
-    ["ideation", "sidebar-nav-ideation"],
     ["planning", "sidebar-nav-planning"],
-    ["plugin:fusion-plugin-primary:primary-view", "sidebar-nav-plugin-fusion-plugin-primary-primary-view"],
-    ["plugin:fusion-plugin-overflow:overflow-view", "sidebar-nav-plugin-fusion-plugin-overflow-overflow-view"],
   ])("highlights active destination %s", (view, testId) => {
     renderSidebar({ view });
     expect(screen.getByTestId(testId).getAttribute("aria-current")).toBe("page");
@@ -707,7 +549,7 @@ describe("LeftSidebarNav", () => {
 
   it("routes clicks to view changes and settings callback without Secrets/Todos shortcuts", () => {
     const onOpenSettings = vi.fn();
-    const { onChangeView } = renderSidebar({ todosEnabled: true, onOpenSettings });
+    const { onChangeView } = renderSidebar({ onOpenSettings });
 
     fireEvent.click(screen.getByTestId("sidebar-nav-list"));
     expect(onChangeView).toHaveBeenCalledWith("list");
@@ -715,8 +557,9 @@ describe("LeftSidebarNav", () => {
     fireEvent.click(screen.getByTestId("sidebar-nav-planning"));
     expect(onChangeView).toHaveBeenCalledWith("planning");
 
-    fireEvent.click(screen.getByTestId("sidebar-nav-plugin-fusion-plugin-overflow-overflow-view"));
-    expect(onChangeView).toHaveBeenCalledWith("plugin:fusion-plugin-overflow:overflow-view");
+    fireEvent.click(screen.getByRole("button", { name: "Other", exact: true }));
+    fireEvent.click(screen.getByTestId("sidebar-nav-mailbox"));
+    expect(onChangeView).toHaveBeenCalledWith("mailbox");
 
     expect(screen.queryByTestId("sidebar-nav-secrets")).toBeNull();
     expect(screen.queryByTestId("sidebar-nav-todos")).toBeNull();

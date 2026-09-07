@@ -52,13 +52,11 @@ const SIDEBAR_REGISTRY_VIEW_IDS = [
   "command-center",
   "board",
   "list",
-  "patchnode",
   "planning",
   "missions",
   "agents",
   "chat",
   "mailbox",
-  "recommendations",
   "skills",
   "memory",
   "documents",
@@ -67,9 +65,6 @@ const SIDEBAR_REGISTRY_VIEW_IDS = [
   "import-tasks",
   "workflows",
   "insights",
-  "research",
-  "ideation",
-  "evals",
   "settings",
 ] as const;
 
@@ -123,7 +118,7 @@ describe("LeftSidebarNav ↔ dashboard view registry parity", () => {
       expect(registryEntry, `sidebar view id "${id}" is missing from the shared registry`).toBeDefined();
 
       const matched = tCalls.some(
-        (call) => call.key === registryEntry!.labelKey && call.fallback === registryEntry!.label,
+        (call) => id === "skills" ? call.key === "nav.sidebarSkills" && call.fallback === "Skills" : call.key === registryEntry!.labelKey && call.fallback === registryEntry!.label,
       );
       expect(
         matched,
