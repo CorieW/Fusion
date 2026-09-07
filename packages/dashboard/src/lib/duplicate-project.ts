@@ -1,4 +1,4 @@
-import { AgentStore, type TaskStore } from "@fusion/core";
+import { AgentStore, resolveEffectiveSettingValues, type TaskStore } from "@fusion/core";
 import { duplicateAgentConfiguration } from "./duplicate-agent.js";
 
 /** FNXC:Duplicate 2026-09-07-04:09: Rebind references recursively while preserving graph structure and custom configuration. */
@@ -31,14 +31,6 @@ export async function copyProjectConfiguration(source: TaskStore, target: TaskSt
     const copy = await duplicateAgentConfiguration({ ...agent, reportsTo: undefined }, sourceAgents, targetAgents, source.getRootDir(), target.getRootDir(), agent.name, true);
     ids.set(agent.id, copy.id);
   }
-  for (const agent of agents) {
-    const copy = (await targetAgents.getAgent(ids.get(agent.id)!))!;
-    await targetAgents.updateAgent(copy.id, {
-      reportsTo: agent.reportsTo ? ids.get(agent.reportsTo) : undefined,
-      runtimeConfig: remapConfiguration(copy.runtimeConfig, ids, source.getRootDir(), target.getRootDir()),
-      metadata: remapConfiguration(copy.metadata, ids, source.getRootDir(), target.getRootDir()),
-    });
-  }
   const workflows = await source.listWorkflowDefinitions();
   for (const workflow of workflows) {
     const copy = await target.createWorkflowDefinition({ name: workflow.name, description: workflow.description, icon: workflow.icon, kind: workflow.kind,
@@ -49,9 +41,20 @@ export async function copyProjectConfiguration(source: TaskStore, target: TaskSt
   for (const workflow of workflows) await target.updateWorkflowDefinition(ids.get(workflow.id)!, {
     ir: remapConfiguration(workflow.ir, ids, source.getRootDir(), target.getRootDir()),
   });
+  for (const agent of agents) {
+    const copy = (await targetAgents.getAgent(ids.get(agent.id)!))!;
+    await targetAgents.updateAgent(copy.id, {
+      reportsTo: agent.reportsTo ? ids.get(agent.reportsTo) : undefined,
+      runtimeConfig: remapConfiguration(copy.runtimeConfig, ids, source.getRootDir(), target.getRootDir()),
+      metadata: remapConfiguration(copy.metadata, ids, source.getRootDir(), target.getRootDir()),
+    });
+  }
   const sourceId = source.getAsyncLayer()?.projectId;
   const targetId = target.getAsyncLayer()?.projectId;
   if (sourceId && targetId) for (const workflow of workflows) {
+    const storedValues = await source.getWorkflowSettingValuesAsync(workflow.id, sourceId);
+    const values = resolveEffectiveSettingValues(workflow.ir.version === "v2" ? workflow.ir.settings ?? [] : [], storedValues);
+    if (Object.keys(values).length) await target.updateWorkflowSettingValues(ids.get(workflow.id)!, targetId, remapConfiguration(values, ids, source.getRootDir(), target.getRootDir()));
     const overrides = await source.getWorkflowPromptOverridesAsync(workflow.id, sourceId);
     if (Object.keys(overrides).length) await target.updateWorkflowPromptOverrides(ids.get(workflow.id)!, targetId, overrides);
   }

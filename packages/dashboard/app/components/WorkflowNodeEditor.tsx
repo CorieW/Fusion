@@ -37,6 +37,8 @@ import {
   fetchDiscoveredSkills,
   fetchWorkflowStepTemplates,
   fetchPluginWorkflowStepTemplates,
+  fetchWorkflowSettingValues,
+  updateWorkflowSettingValues,
   fetchWorkflowPromptOverrides,
   updateWorkflowPromptOverrides,
   fetchSettings,
@@ -2237,7 +2239,13 @@ function InnerEditor({
     if (!activeWorkflow || duplicatePending.current) return;
     duplicatePending.current = true;
     setDuplicating(true);
+    let incompleteCopyId: string | undefined;
     try {
+      // FNXC:Duplicate 2026-09-07-09:54: Saved values and prompt overrides are separate from the graph and must follow the copy.
+      const [values, prompts] = await Promise.all([
+        fetchWorkflowSettingValues(activeWorkflow.id, projectId),
+        fetchWorkflowPromptOverrides(activeWorkflow.id, projectId),
+      ]);
       const created = await createWorkflow(
         {
           name: duplicateName(activeWorkflow.name, workflows.map(workflow => workflow.name)),
@@ -2248,11 +2256,17 @@ function InnerEditor({
         },
         projectId,
       );
+      incompleteCopyId = created.id;
+      if (Object.keys(values.effective).length) await updateWorkflowSettingValues(created.id, values.effective, projectId);
+      const overrides = Object.fromEntries(Object.entries(prompts.stored).filter(([nodeId]) => nodeId in prompts.effective));
+      if (Object.keys(overrides).length) await updateWorkflowPromptOverrides(created.id, overrides, projectId);
       setWorkflows((ws) => [...ws, created]);
       setActiveId(created.id);
       setWorkflowListStageOpen(false);
+      incompleteCopyId = undefined;
       addToast(t("workflows.duplicatedEditable", "Duplicated to \"{{name}}\" — editable", { name: created.name }), "success");
     } catch (err) {
+      if (incompleteCopyId) await deleteWorkflow(incompleteCopyId, projectId).catch(() => undefined);
       addToast(getErrorMessage(err) || t("workflows.duplicateFailed", "Failed to duplicate workflow"), "error");
     }
     finally {

@@ -91,6 +91,8 @@ import {
   fetchAgents,
   fetchConfig,
   fetchSettings,
+  fetchWorkflowSettingValues,
+  updateWorkflowSettingValues,
   fetchWorkflowPromptOverrides,
   updateWorkflowPromptOverrides,
 } from "../../api";
@@ -190,6 +192,7 @@ viBeforeEach(() => {
   vi.mocked(fetchConfig).mockResolvedValue({ maxConcurrent: 2, rootDir: "." });
   vi.mocked(fetchSettings).mockResolvedValue({} as never);
   vi.mocked(fetchAgents).mockResolvedValue([]);
+  vi.mocked(fetchWorkflowSettingValues).mockResolvedValue({ stored: {}, effective: {}, orphaned: [] });
   vi.mocked(fetchWorkflowPromptOverrides).mockResolvedValue({ stored: {}, effective: {}, defaults: {} });
   vi.mocked(updateWorkflowPromptOverrides).mockResolvedValue({ stored: {}, effective: {}, defaults: {} });
 });
@@ -1895,6 +1898,8 @@ describe("WorkflowNodeEditor — U10 columns/traits/holds", () => {
   it.each(["desktop", "mobile"] as const)("duplicates a custom workflow at %s width with a fresh identity and original graph", async mode => {
     mockWorkflowEditorViewport(mode);
     const original = v2Def();
+    vi.mocked(fetchWorkflowSettingValues).mockResolvedValue({ stored: { strict: true }, effective: { strict: true }, orphaned: [] });
+    vi.mocked(fetchWorkflowPromptOverrides).mockResolvedValue({ stored: { step: "Custom prompt" }, effective: { step: "Custom prompt" }, defaults: { step: "do" } });
     vi.mocked(fetchWorkflows).mockResolvedValue([original]);
     vi.mocked(createWorkflow).mockResolvedValue({ ...original, id: "WF-copy", name: original.name + " (copy)" });
     render(<WorkflowNodeEditor isOpen onClose={() => {}} addToast={() => {}} projectId="project-copy-test" />);
@@ -1904,6 +1909,8 @@ describe("WorkflowNodeEditor — U10 columns/traits/holds", () => {
     }
     fireEvent.click(await screen.findByRole("button", { name: "Duplicate", exact: true }));
     await waitFor(() => expect(createWorkflow).toHaveBeenCalledWith(expect.objectContaining({ name: original.name + " (copy)", ir: original.ir, layout: original.layout }), "project-copy-test"));
+    await waitFor(() => expect(updateWorkflowSettingValues).toHaveBeenCalledWith("WF-copy", { strict: true }, "project-copy-test"));
+    expect(updateWorkflowPromptOverrides).toHaveBeenCalledWith("WF-copy", { step: "Custom prompt" }, "project-copy-test");
   });
 
   it("opens a built-in read-only with a Duplicate to customize CTA replacing the toolbar", async () => {
