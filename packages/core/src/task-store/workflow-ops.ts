@@ -9,9 +9,9 @@
 import {TaskStore} from "../store.js";
 import type {Settings} from "../types.js";
 import { parseWorkflowIr, downgradeIrToV1IfPure } from "../workflows/workflow-ir.js";
-import {OccupiedColumnsError, assertRehomeTargetValid, computeRemovedOccupiedColumns, computeIncompatibleFieldChanges, IncompatibleFieldChangeError, resolveEntryColumnId} from "../workflows/workflow-reconciliation.js";
+import {OccupiedColumnsError, assertRehomeTargetValid, computeRemovedOccupiedColumns, computeIncompatibleFieldChanges, IncompatibleFieldChangeError} from "../workflows/workflow-reconciliation.js";
 import type {WorkflowFieldDefinition} from "../workflows/workflow-ir-types.js";
-import {resolveDefaultWorkflowIr, resolveRetiredBuiltinWorkflowId} from "../workflows/builtin-workflows.js";
+import {resolveRetiredBuiltinWorkflowId} from "../workflows/builtin-workflows.js";
 import "../builtin-traits.js";
 import {normalizeWorkflowIcon, type WorkflowDefinition, type WorkflowDefinitionUpdate} from "../workflows/workflow-definition-types.js";
 import {resolveDefaultOnOptionalGroupIds} from "../workflows/workflow-optional-steps.js";
@@ -360,126 +360,30 @@ export async function updateWorkflowDefinitionImpl(store: TaskStore, id: string,
   }
 
 export async function deleteWorkflowDefinitionImpl(store: TaskStore, id: string): Promise<void> {
-    if (isBuiltinWorkflowId(id)) throw new Error("Built-in workflows cannot be deleted");
-    /* FNXC:CustomOnlyWorkflows 2026-09-06-23:33: Preserve the custom-only project's default before any destructive cascade. The operator can choose another default or re-enable built-ins first. */
-    const settings = await store.getSettings();
-    if (settings.enabledBuiltinWorkflowIds?.length === 0 && settings.defaultWorkflowId === id) {
-      throw new Error("Choose another project default workflow before deleting this workflow while all built-in workflows are disabled");
-    }
-    /* FNXC:SqliteDualPathCleanup 2026-07-26-14:08: workflow definition deletes require AsyncDataLayer. */
-    const layer: AsyncDataLayer = store.asyncLayer!;
-    /*
-    U5 (R20): capture the occupant task ids BEFORE the cascade clears their selection
-    rows, so we can re-home them to the DEFAULT workflow's entry column once their
-    selection resolves back to the default (KTD-1).
-
-    FNXC:WorkflowColumns 2026-07-28-00:00 (U12 — R9, USER-VISIBLE):
-    The `flagOn ? … : []` gate is DELETED. Reading the retired raw flag meant the
-    capture returned an empty list for every real project, so the re-home below was
-    dead: deleting a workflow left its cards sitting in that workflow's columns with
-    their selection cleared, resolving to the default workflow which does not declare
-    those columns. The startup sweep `reconcileUndeclaredTaskColumns` would eventually
-    re-home them, but only on the next engine start — until then the cards sat in
-    lanes the board could not draw.
-
-    Operator-visible consequence, deliberate: deleting a workflow now moves its cards
-    to the default workflow's entry column immediately, instead of at next startup.
-    */
-    const occupantTaskIds = await store.listWorkflowOccupantTaskIds(id, false);
-
-    
-    /*
-    FNXC:WorkflowDefinitionProjectPartition 2026-08-12-03:02:
-    Before project ownership predicates, deleting a colliding workflow ID removed a foreign
-    workflow and its settings/prompt overrides under owner connections that bypass RLS. Keep
-    every delete in this transaction on the same bound partition.
-    */
-    const deleted = await layer.db.delete(schema.project.workflows).where(and(
-      eq(schema.project.workflows.id, id),
-      projectScopeFor(schema.project.workflows.projectId, layer.projectId),
+  if (isBuiltinWorkflowId(id)) throw new Error("Historical workflow definitions cannot be deleted");
+  const settings = await store.getSettings();
+  if (settings.defaultWorkflowId === id) throw new Error("Choose another project default workflow or clear the default before deleting this workflow");
+  const layer = store.asyncLayer!;
+  /* FNXC:CustomWorkflows 2026-09-07-01:09: There is no bundled workflow to receive orphaned tasks. Preserve saved selections and their history; workflows in use require explicit reassignment before deletion. */
+  await layer.db.transaction(async (db) => {
+    const references = await db.select({taskId:schema.project.taskWorkflowSelection.taskId})
+      .from(schema.project.taskWorkflowSelection).where(and(
+        eq(schema.project.taskWorkflowSelection.workflowId,id),
+        projectScopeFor(schema.project.taskWorkflowSelection.projectId,layer.projectId),
+      )).limit(1);
+    if (references.length) throw new Error("This workflow is used by saved tasks. Reassign them before deleting it.");
+    const deleted = await db.delete(schema.project.workflows).where(and(
+      eq(schema.project.workflows.id,id),projectScopeFor(schema.project.workflows.projectId,layer.projectId),
     )).returning();
-    if (deleted.length === 0) throw new Error(`Workflow '${id}' not found`);
-    await layer.db.delete(schema.project.workflowSettings).where(and(
-      eq(schema.project.workflowSettings.workflowId, id),
-      projectScopeFor(schema.project.workflowSettings.projectId, layer.projectId),
+    if (!deleted.length) throw new Error(`Workflow '${id}' not found`);
+    await db.delete(schema.project.workflowSettings).where(and(
+      eq(schema.project.workflowSettings.workflowId,id),projectScopeFor(schema.project.workflowSettings.projectId,layer.projectId),
     ));
-    await layer.db.delete(schema.project.workflowPromptOverrides).where(and(
-      eq(schema.project.workflowPromptOverrides.workflowId, id),
-      projectScopeFor(schema.project.workflowPromptOverrides.projectId, layer.projectId),
+    await db.delete(schema.project.workflowPromptOverrides).where(and(
+      eq(schema.project.workflowPromptOverrides.workflowId,id),projectScopeFor(schema.project.workflowPromptOverrides.projectId,layer.projectId),
     ));
-  
-
-    // Cascade: clear the project default when it pointed at this workflow.
-    try {
-      if ((await store.getDefaultWorkflowId()) === id) {
-        await store.setDefaultWorkflowId(null);
-      }
-    } catch {
-      // Best-effort: a dangling default falls back gracefully at task creation.
-    }
-
-    // Cascade: drop selections referencing this workflow, their materialized
-    // step rows, and reset the affected tasks' enabled steps.
-    const selRows = await layer.db.select().from(schema.project.taskWorkflowSelection).where(eq(schema.project.taskWorkflowSelection.workflowId, id));
-    const selections = selRows.map(r => ({ taskId: r.taskId, stepIds: typeof r.stepIds === "string" ? r.stepIds : JSON.stringify(r.stepIds ?? []) }));
-
-    for (const row of selections) {
-      try {
-        const stepIds = JSON.parse(row.stepIds) as unknown;
-        if (Array.isArray(stepIds)) {
-          for (const stepId of stepIds) {
-            if (typeof stepId === "string") {
-               await layer.db.delete(schema.project.workflowSteps).where(and(eq(schema.project.workflowSteps.id, stepId), projectScopeFor(schema.project.workflowSteps.projectId, layer.projectId)));
-            }
-          }
-        }
-      } catch {
-        // Corrupt stepIds list — still remove the selection row below.
-      }
-       await layer.db.delete(schema.project.taskWorkflowSelection).where(eq(schema.project.taskWorkflowSelection.taskId, row.taskId)); 
-      try {
-        await store.updateTask(row.taskId, { enabledWorkflowSteps: [] });
-      } catch {
-        // Task may be deleted or historical-only; dangling step ids resolve to undefined
-        // at execution time and are skipped.
-      }
-    }
-    if (selections.length > 0) store.workflowStepsCache = null;
-    
-    // U5 (R20) delete reconciliation: re-home each occupant to the default
-    // workflow's entry column. Their selection rows are already cleared above,
-    // so they now resolve to the built-in default workflow (KTD-1); the re-home
-    // move preserves task fields (preserveProgress) and emits one audit per card.
-    if (occupantTaskIds.length > 0) {
-      /*
-      FNXC:WorkflowResolvedColumns 2026-07-31-23:59 (the #3178 drift, in the delete path):
-      THE DEFAULT WORKFLOW, NOT THE LEGACY ONE. `BUILTIN_CODING_WORKFLOW_IR` is
-      `builtin:legacy-coding`; the catalog's actual default is `resolveDefaultWorkflowIr()`. Post-U11
-      they differ by exactly the column this line reads:
-
-          default  todo, in-progress, in-review, done
-          legacy   triage, todo, in-progress, in-review, done
-
-      so `resolveEntryColumnId` answered `triage` for the legacy IR and `todo` for the default —
-      measured, not inferred. The comment above already says "re-home each occupant to the DEFAULT
-      workflow's entry column"; the code read the legacy one.
-
-      CONSEQUENCE: deleting a workflow re-homed every occupant into `triage`, a column the default
-      board does not declare. `moveTask` rejects an undeclared target EXCEPT under `recoveryRehome`
-      with a legacy id — and `triage` IS a legacy id — so this slipped through the guard that exists
-      to stop exactly this, and left the card in a lane its workflow has no node for.
-
-      Same drift #3178 fixed in the TUI board and `builtin-workflows.ts` records as already fixed for
-      the move-path resolvers. This is the third door into it.
-      */
-      const defaultEntry = resolveEntryColumnId(resolveDefaultWorkflowIr());
-      if (defaultEntry) {
-        for (const taskId of occupantTaskIds) {
-          await store.rehomeOccupant(taskId, defaultEntry, "workflow-delete", { workflowId: id });
-        }
-      }
-    }
-  }
+  });
+}
 
 export async function setDefaultWorkflowIdImpl(store: TaskStore, requestedWorkflowId: string | null): Promise<void> {
     /*
@@ -490,6 +394,7 @@ export async function setDefaultWorkflowIdImpl(store: TaskStore, requestedWorkfl
       ? null
       : resolveRetiredBuiltinWorkflowId(requestedWorkflowId);
     if (workflowId) {
+      if (isBuiltinWorkflowId(workflowId)) throw new Error("Choose a custom default workflow; bundled workflows have been removed.");
       const exists = await store.getWorkflowDefinition(workflowId);
       if (!exists) throw new Error(`Workflow '${workflowId}' not found`);
       // KTD-1/R6: a fragment is a reusable palette piece, not a selectable
@@ -506,6 +411,7 @@ export async function setDefaultWorkflowIdImpl(store: TaskStore, requestedWorkfl
 
 export async function selectTaskWorkflowImpl(store: TaskStore, taskId: string, requestedWorkflowId: string): Promise<string[]> {
     const workflowId = resolveRetiredBuiltinWorkflowId(requestedWorkflowId);
+    if (isBuiltinWorkflowId(workflowId)) throw new Error("Retired workflows are available only in task history. Choose a custom workflow.");
     /* FNXC:SqliteDualPathCleanup 2026-07-26-14:08: workflow definition deletes require AsyncDataLayer. */
     const layer: AsyncDataLayer = store.asyncLayer!;
     // Hold the task lock across the whole sequence (materialize → owner write →

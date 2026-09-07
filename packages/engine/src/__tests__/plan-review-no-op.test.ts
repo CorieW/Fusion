@@ -1,10 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import type { TaskDetail, WorkflowIr, WorkflowStepResult } from "@fusion/core";
-import {
-  BUILTIN_STEPWISE_FINAL_REVIEW_CODING_WORKFLOW_IR,
-  PLAN_REVIEW_GROUP_ID,
-  upsertWorkflowStepResult,
-} from "@fusion/core";
+import { PLAN_REVIEW_GROUP_ID, upsertWorkflowStepResult } from "@fusion/core";
+import { BUILTIN_STEPWISE_FINAL_REVIEW_CODING_WORKFLOW_IR } from "../../../core/src/__test-utils__/legacy-workflows/builtin-stepwise-final-review-coding-workflow-ir.js";
 import { TaskExecutor } from "../executor.js";
 import { WorkflowGraphExecutor } from "../workflows/workflow-graph-executor.js";
 import { WorkflowGraphTaskRunner } from "../workflows/workflow-graph-task-runner.js";

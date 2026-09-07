@@ -1,11 +1,8 @@
 import { describe, expect, it } from "vitest";
-import {
-  BUILTIN_CODING_WORKFLOW_IR,
-  BUILTIN_STEPWISE_FINAL_REVIEW_CODING_WORKFLOW_IR,
-  getBuiltinWorkflow,
-  parseWorkflowIr,
-  type WorkflowIr,
-} from "@fusion/core";
+import { parseWorkflowIr, type WorkflowIr } from "@fusion/core";
+import { getBuiltinWorkflow } from "../../../core/src/__test-utils__/legacy-workflows/builtin-workflows.js";
+import { BUILTIN_CODING_WORKFLOW_IR } from "../../../core/src/__test-utils__/legacy-workflows/builtin-coding-workflow-ir.js";
+import { BUILTIN_STEPWISE_FINAL_REVIEW_CODING_WORKFLOW_IR } from "../../../core/src/__test-utils__/legacy-workflows/builtin-stepwise-final-review-coding-workflow-ir.js";
 import { resolveColumnResumeNode, WorkflowGraphExecutor } from "../workflows/workflow-graph-executor.js";
 import type { WorkflowRuntimePrimitives } from "../execution/runtime-primitives.js";
 import type { TaskDetail, TaskStep } from "@fusion/core";

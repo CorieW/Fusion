@@ -1,10 +1,10 @@
-import type { WorkflowIr } from "./workflow-ir-types.js";
-import { parseWorkflowIr } from "./workflow-ir.js";
+import type { WorkflowIr } from "../../workflows/workflow-ir-types.js";
+import { parseWorkflowIr } from "../../workflows/workflow-ir.js";
 import { BUILTIN_CODING_IDEAS_WORKFLOW_IR } from "./builtin-coding-ideas-workflow-ir.js";
 
-import { documentationDeliveryOptionalGroupNode } from "./builtin-documentation-delivery-group.js";
-import { stripDocumentationDeliveryStep } from "./builtin-workflow-prompts.js";
-import { codeReviewRemediationStepsNode } from "./builtin-workflow-remediation-nodes.js";
+import { documentationDeliveryOptionalGroupNode } from "../../workflows/builtin-documentation-delivery-group.js";
+import { stripDocumentationDeliveryStep } from "../../workflows/builtin-workflow-prompts.js";
+import { codeReviewRemediationStepsNode } from "../../workflows/builtin-workflow-remediation-nodes.js";
 
 const clone = (ir: WorkflowIr): WorkflowIr => JSON.parse(JSON.stringify(ir)) as WorkflowIr;
 

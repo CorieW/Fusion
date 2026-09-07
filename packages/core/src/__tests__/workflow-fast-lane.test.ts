@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { BUILTIN_CODING_IDEAS_WORKFLOW_IR } from "../workflows/builtin-coding-ideas-workflow-ir.js";
-import { BUILTIN_STEPWISE_CODING_WORKFLOW_IR } from "../workflows/builtin-stepwise-coding-workflow-ir.js";
-import { BUILTIN_WORKFLOWS } from "../workflows/builtin-workflows.js";
+import { BUILTIN_CODING_IDEAS_WORKFLOW_IR } from "../__test-utils__/legacy-workflows/builtin-coding-ideas-workflow-ir.js";
+import { BUILTIN_STEPWISE_CODING_WORKFLOW_IR } from "../__test-utils__/legacy-workflows/builtin-stepwise-coding-workflow-ir.js";
+import { BUILTIN_WORKFLOWS } from "../__test-utils__/legacy-workflows/builtin-workflows.js";
 import {
   FAST_LANE_STEP_REVIEW_ROUTE_VALUE,
   isFastExecutionMode,

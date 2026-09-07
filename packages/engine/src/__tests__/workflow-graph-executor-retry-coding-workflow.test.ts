@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { BUILTIN_CODING_WORKFLOW_IR } from "@fusion/core";
+import { BUILTIN_CODING_WORKFLOW_IR } from "../../../core/src/__test-utils__/legacy-workflows/builtin-coding-workflow-ir.js";
 import type { TaskDetail, WorkflowIr } from "@fusion/core";
 
 import { WorkflowGraphExecutor, type WorkflowNodeHandler } from "../workflows/workflow-graph-executor.js";

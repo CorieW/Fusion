@@ -12,7 +12,7 @@ import * as schema from "../../postgres/schema/index.js";
 import type { TaskStore } from "../../store.js";
 import { writeProjectConfig } from "../../task-store/async/async-settings.js";
 import { nextWorkflowDefinitionIdAsyncImpl } from "../../task-store/workflow-definitions.js";
-import { BUILTIN_CODING_WORKFLOW_IR } from "../../workflows/builtin-coding-workflow-ir.js";
+import { BUILTIN_CODING_WORKFLOW_IR } from "../../__test-utils__/legacy-workflows/builtin-coding-workflow-ir.js";
 
 pgDescribe("workflows project isolation", () => {
   const h: SharedPgTaskStoreHarness = createSharedPgTaskStoreTestHarness({

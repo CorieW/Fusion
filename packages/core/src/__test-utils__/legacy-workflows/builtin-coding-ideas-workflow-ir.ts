@@ -1,7 +1,7 @@
-import type { WorkflowIr, WorkflowIrColumn, WorkflowIrV2 } from "./workflow-ir-types.js";
-import { parseWorkflowIr } from "./workflow-ir.js";
+import type { WorkflowIr, WorkflowIrColumn, WorkflowIrV2 } from "../../workflows/workflow-ir-types.js";
+import { parseWorkflowIr } from "../../workflows/workflow-ir.js";
 import { BUILTIN_STEPWISE_FINAL_REVIEW_CODING_WORKFLOW_IR } from "./builtin-stepwise-final-review-coding-workflow-ir.js";
-import { BUILTIN_WORKFLOW_SETTINGS } from "./builtin-workflow-settings.js";
+import { BUILTIN_WORKFLOW_SETTINGS } from "../../workflows/builtin-workflow-settings.js";
 
 /*
 FNXC:CodingIdeasWorkflow 2026-07-04-09:15:

@@ -23,7 +23,8 @@ adjacency rules exist to prevent. An operator who wants it elsewhere moves it tw
 */
 import { describe, expect, it } from "vitest";
 import { resolveAllowedColumns } from "../workflows/workflow-transitions.js";
-import { getBuiltinWorkflow, parseWorkflowIr, type WorkflowIr } from "../index.js";
+import { parseWorkflowIr, type WorkflowIr } from "../index.js";
+import { getBuiltinWorkflow } from "../__test-utils__/legacy-workflows/builtin-workflows.js";
 
 /** The real default workflow, post-merge: one Planning column (`todo`), no `triage`. */
 const defaultIr: WorkflowIr = parseWorkflowIr(getBuiltinWorkflow("builtin:coding")!.ir as never);

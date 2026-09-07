@@ -4,7 +4,7 @@ import {
   DEFAULT_MERGE_SWEEP_QUIESCENCE_MS,
   type MergeSweepAdmissionInput,
 } from "../merge/merge-sweep-admission.js";
-import { BUILTIN_CODING_WORKFLOW_IR } from "../workflows/builtin-coding-workflow-ir.js";
+import { BUILTIN_CODING_WORKFLOW_IR } from "../__test-utils__/legacy-workflows/builtin-coding-workflow-ir.js";
 import { classifyWorkflowNodeMergeRegion, isMergeRegionNode } from "../workflows/workflow-merge-region.js";
 
 /** A card the graph is holding mid-execution: nothing here may merge. */

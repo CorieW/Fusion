@@ -3,12 +3,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Settings, Task, TaskDetail, TaskStore, WorkflowIr } from "@fusion/core";
-import {
-  BUILTIN_CODING_WORKFLOW_IR,
-  builtinSeamPrompt,
-  renderTriagePolicyPlaceholders,
-  resolvePlanningPromptFromIr,
-} from "@fusion/core";
+import { builtinSeamPrompt, renderTriagePolicyPlaceholders, resolvePlanningPromptFromIr } from "@fusion/core";
+import { BUILTIN_CODING_WORKFLOW_IR } from "../../../core/src/__test-utils__/legacy-workflows/builtin-coding-workflow-ir.js";
 import { TriageProcessor } from "../triage.js";
 
 const { mockReviewStep, mockCreateFnAgent, mockPromptWithFallback } = vi.hoisted(() => ({

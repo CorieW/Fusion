@@ -11,7 +11,7 @@ import {
   TRIAGE_HEARTBEAT_PATROL_DISABLED_INSTRUCTION,
   buildPlanningDuplicatePolicyInstruction,
 } from "../agents/agent-prompts.js";
-import { BUILTIN_CODING_WORKFLOW_IR } from "../workflows/builtin-coding-workflow-ir.js";
+import { BUILTIN_CODING_WORKFLOW_IR } from "../__test-utils__/legacy-workflows/builtin-coding-workflow-ir.js";
 import { BUILTIN_SEAM_PROMPTS, builtinSeamPrompt } from "../workflows/builtin-workflow-prompts.js";
 import { renderTriagePolicyPlaceholders } from "../workflows/builtin-workflow-settings.js";
 import { resolvePlanningPromptFromIr, resolveSeamPromptFromIr } from "../workflows/workflow-ir-resolver.js";

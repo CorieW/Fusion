@@ -793,7 +793,7 @@ function formatTriagePolicyValue(id: string, value: unknown, settings: Partial<S
     const explicitValue = typeof value === "string" ? value.trim() : "";
     if (explicitValue && explicitValue !== "builtin:coding") return explicitValue;
     const projectDefault = typeof settings.defaultWorkflowId === "string" ? settings.defaultWorkflowId.trim() : "";
-    return projectDefault || "builtin:coding";
+    return projectDefault || "";
   }
   if (id === "triageNoCommitsDecisionVerbs") {
     const verbs = Array.isArray(value) ? value : TRIAGE_POLICY_DEFAULTS.get(id);

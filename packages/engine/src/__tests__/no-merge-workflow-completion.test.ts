@@ -2,12 +2,8 @@ import "./executor-test-helpers.js";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { TaskExecutor } from "../executor.js";
 import { resetExecutorMocks } from "./executor-test-helpers.js";
-import {
-  BUILTIN_WORKFLOWS,
-  parseWorkflowIr,
-  resolveCompleteColumn,
-  resolveMergeOrchestrationColumn,
-} from "@fusion/core";
+import { parseWorkflowIr, resolveCompleteColumn, resolveMergeOrchestrationColumn } from "@fusion/core";
+import { BUILTIN_WORKFLOWS } from "../../../core/src/__test-utils__/legacy-workflows/builtin-workflows.js";
 import type { TaskDetail, WorkflowIr } from "@fusion/core";
 
 /*

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { BUILTIN_CODING_WORKFLOW_IR } from "../workflows/builtin-coding-workflow-ir.js";
+import { BUILTIN_CODING_WORKFLOW_IR } from "../__test-utils__/legacy-workflows/builtin-coding-workflow-ir.js";
 import { resolvePreMergeGateForTask, resolveRequiredPreMergeStepIds } from "../merge/required-pre-merge-steps.js";
 
 describe("resolveRequiredPreMergeStepIds", () => {

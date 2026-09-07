@@ -12,7 +12,7 @@
 import { TaskStore } from "../store.js";
 import {resolveEntryColumnId, WorkflowSwitchRehomeFailedError, buildSwitchReconciliation} from "../workflows/workflow-reconciliation.js";
 import { pruneAgentLogFiles as pruneAgentLogFileEntries, readAgentLogEntriesByTimeRange } from "../agents/agent-log-file-store.js";
-import { BUILTIN_WORKFLOWS, DEFAULT_WORKFLOW_ID, resolveDefaultWorkflowIr, getBuiltinWorkflow, getRequiredPluginIdForBuiltinWorkflow, isBuiltinWorkflowDeprecated, isBuiltinWorkflowEnabled, isBuiltinWorkflowId, isBuiltinWorkflowPluginGated, resolveRetiredBuiltinWorkflowId } from "../workflows/builtin-workflows.js";
+import { DEFAULT_WORKFLOW_ID, resolveDefaultWorkflowIr, isBuiltinWorkflowId, resolveRetiredBuiltinWorkflowId } from "../workflows/builtin-workflows.js";
 import { CentralCore } from "../central/central-core.js";
 import { type DistributedTaskIdAllocator } from "../tasks/distributed-task-id.js";
 import { ExperimentSessionStore } from "../eval/experiment-session-store.js";
@@ -231,36 +231,8 @@ export async function listWorkflowDefinitionsImpl(store: TaskStore,
     options?: { kind?: WorkflowDefinition["kind"]; includeDisabledBuiltins?: boolean },
   ): Promise<WorkflowDefinition[]> {
     const all = await store.readAllWorkflowDefinitions();
-    let enabledBuiltinWorkflowIds: readonly string[] | undefined;
-    if (!options?.includeDisabledBuiltins) {
-      try {
-        const settings = await store.getSettings();
-        enabledBuiltinWorkflowIds = Array.isArray(settings.enabledBuiltinWorkflowIds)
-          ? settings.enabledBuiltinWorkflowIds
-          : undefined;
-      } catch {
-        enabledBuiltinWorkflowIds = undefined;
-      }
-    }
-    const enabledVisible = options?.includeDisabledBuiltins
-      ? all
-      : all.filter((wf) => isBuiltinWorkflowEnabled(wf.id, enabledBuiltinWorkflowIds));
-    // FNXC:WorkflowBrainstorming 2026-07-15-15:49:
-    // FN-7970 removes deprecated built-ins only from new-selection listings.
-    // Management listings retain them, and direct id resolution remains unconditional.
-    const selectionVisible = options?.includeDisabledBuiltins
-      ? enabledVisible
-      : enabledVisible.filter((wf) => !isBuiltinWorkflowDeprecated(wf.id));
-    const visible = await Promise.all(
-      selectionVisible.map(async (wf) => {
-        const requiredPluginId = getRequiredPluginIdForBuiltinWorkflow(wf.id);
-        if (!requiredPluginId) return wf;
-        return (await store.isPluginInstalled(requiredPluginId)) ? wf : undefined;
-      }),
-    );
-    const pluginFiltered = visible.filter((wf): wf is WorkflowDefinition => Boolean(wf));
-    if (options?.kind) return pluginFiltered.filter((wf) => wf.kind === options.kind);
-    return pluginFiltered;
+    // FNXC:CustomWorkflows 2026-09-07-01:09: Historical snapshots are addressable by id, never offered as templates, even by former management-list callers.
+    return all.filter(wf => !isBuiltinWorkflowId(wf.id) && (!options?.kind || wf.kind === options.kind));
 }
 
 export async function readAllWorkflowDefinitionsImpl(store: TaskStore): Promise<WorkflowDefinition[]> {
@@ -276,25 +248,13 @@ export async function readAllWorkflowDefinitionsImpl(store: TaskStore): Promise<
       throw new Error("workflow definitions: AsyncDataLayer not initialized in backend mode");
     }
     const rows = await listWorkflowRows(layer);
-    return [...BUILTIN_WORKFLOWS, ...rows.map((row) => store.toWorkflowDefinition(row))];
+    return rows.map((row) => store.toWorkflowDefinition(row));
 }
 
 export async function getWorkflowDefinitionImpl(store: TaskStore,
     id: string,
   ): Promise<WorkflowDefinition | undefined> {
-    const builtin = getBuiltinWorkflow(id);
-    if (builtin) {
-      /*
-      FNXC:WorkflowSuccession 2026-09-06-02:15:
-      A retired alias resolves the successor's plugin policy and prompt overrides under the successor's canonical key. The requested alias must not create a second configuration namespace.
-      */
-      if (isBuiltinWorkflowPluginGated(builtin.id)) {
-        const requiredPluginId = getRequiredPluginIdForBuiltinWorkflow(builtin.id);
-        if (!requiredPluginId || !(await store.isPluginInstalled(requiredPluginId))) return undefined;
-      }
-      const ir = await store.applyBuiltInPromptOverridesAsync(builtin.id, builtin.ir);
-      return { ...builtin, ir };
-    }
+    id = resolveRetiredBuiltinWorkflowId(id);
     // FNXC:WorkflowDefinitions 2026-06-27-06:00: PG backend reads the custom row
     // from project.workflows via the AsyncDataLayer; sync store.db otherwise.
         const layer = store.getAsyncLayer();
@@ -451,15 +411,6 @@ export function resolveTaskWorkflowIrSyncImpl(store: TaskStore, taskId: string):
     const workflowId = selection?.workflowId;
     /* FNXC:WorkflowBuiltins 2026-07-19-10:26: shares resolveDefaultWorkflowIr() with the async move resolver so sync and async paths cannot disagree on the no-selection default. */
     if (!workflowId) return store.applyBuiltInPromptOverridesSync(DEFAULT_WORKFLOW_ID, resolveDefaultWorkflowIr());
-    if (isBuiltinWorkflowId(workflowId)) {
-      const builtin = getBuiltinWorkflow(workflowId);
-      const ir = builtin?.ir;
-      /*
-      FNXC:WorkflowSuccession 2026-09-06-02:15:
-      Sync resolution shares the successor's prompt-override key with async definition reads, preventing a retired request alias from reviving stale configuration.
-      */
-      return store.applyBuiltInPromptOverridesSync(builtin?.id ?? workflowId, ir === undefined ? resolveDefaultWorkflowIr() : typeof ir === "string" ? parseWorkflowIr(ir) : ir);
-    }
     try {
       const row = store.db
         .prepare("SELECT ir FROM workflows WHERE id = ?")
@@ -679,6 +630,7 @@ export async function materializeWorkflowStepsImpl(store: TaskStore,
 export async function materializeExplicitWorkflowStepsImpl(store: TaskStore,
     workflowId: string,
   ): Promise<{ workflowId: string; stepIds: string[]; entryColumnId?: string }> {
+    if (isBuiltinWorkflowId(workflowId)) throw new Error("Retired workflows are available only in task history. Choose a custom workflow.");
     const def = await store.getWorkflowDefinition(workflowId);
     if (!def) throw new Error(`Workflow '${workflowId}' not found`);
     if (def.kind === "fragment") {
@@ -706,6 +658,7 @@ export async function selectTaskWorkflowAndReconcileImpl(store: TaskStore,
     Normalize before preflight so definition lookup, capacity pooling, errors, audit metadata, re-homing and the selection writer all use the successor identity. Retired ids stay requestable but are never persisted.
     */
     const workflowId = resolveRetiredBuiltinWorkflowId(requestedWorkflowId);
+    if (isBuiltinWorkflowId(workflowId)) throw new Error("Retired workflows are available only in task history. Choose a custom workflow.");
     /*
     FNXC:WorkflowColumns 2026-07-28-00:00 (U12 — PR #2512 review, greptile P1):
     PRE-FLIGHT BEFORE COMMITTING. The ordering, not the message, is the fix.

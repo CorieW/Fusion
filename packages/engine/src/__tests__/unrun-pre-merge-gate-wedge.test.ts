@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { getBuiltinWorkflow, type Task, type TaskDetail } from "@fusion/core";
+import { type Task, type TaskDetail } from "@fusion/core";
+import { getBuiltinWorkflow } from "../../../core/src/__test-utils__/legacy-workflows/builtin-workflows.js";
 
 import "./executor-test-helpers.js";
 import { TaskExecutor } from "../executor.js";

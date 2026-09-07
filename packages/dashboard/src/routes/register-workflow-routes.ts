@@ -1,6 +1,6 @@
 import type { WorkflowDefinition, WorkflowDefinitionKind, WorkflowIr, WorkflowIrNode, WorkflowSettingDefinition, TaskStore } from "@fusion/core";
 import { resolveRequestActor } from "../request-actor.js";
-import { ColumnTraitValidationError, OccupiedColumnsError, InvalidRehomeTargetError, WorkflowIrError, ColumnAgentBindingError, WorkflowSettingRejectionError, SCHEMA_VERSION, assertColumnTraitsValid, layoutForIr, listTraits, listStepParsers, parseWorkflowIr, resolvePlanningSettingsModel, stripApprovalBypassFlags, resolveWorkflowIrById, resolveEffectiveSettingValues, findOrphanedSettingValues, isBuiltinWorkflowId, getBuiltinWorkflow, BUILTIN_WORKFLOW_SETTINGS, AgentStore, validateColumnAgentBindings, resolveWorkflowOptionalSteps, enumeratePromptBearingWorkflowNodes, normalizeWorkflowIcon, WorkflowSwitchRehomeFailedError } from "@fusion/core";
+import { ColumnTraitValidationError, OccupiedColumnsError, InvalidRehomeTargetError, WorkflowIrError, ColumnAgentBindingError, WorkflowSettingRejectionError, SCHEMA_VERSION, assertColumnTraitsValid, layoutForIr, listTraits, listStepParsers, parseWorkflowIr, resolvePlanningSettingsModel, stripApprovalBypassFlags, resolveWorkflowIrById, resolveEffectiveSettingValues, findOrphanedSettingValues, isBuiltinWorkflowId, BUILTIN_WORKFLOW_SETTINGS, AgentStore, validateColumnAgentBindings, resolveWorkflowOptionalSteps, enumeratePromptBearingWorkflowNodes, normalizeWorkflowIcon, WorkflowSwitchRehomeFailedError } from "@fusion/core";
 import { buildSessionSkillContextSync, createFnAgent as engineCreateFnAgent, validateCodeNodeSources, validateWorkflowIrDryRun } from "@fusion/engine";
 import { ApiError, badRequest, conflict, notFound, rateLimited } from "../api-error.js";
 // FNXC:TaskLookup404 2026-07-26-11:40: shared task-miss -> 404 mapping seam.
@@ -193,14 +193,12 @@ export function registerWorkflowRoutes(ctx: ApiRoutesContext): void {
    * must surface as `notFound` rather than a silent success.
    */
   async function assertWorkflowExists(store: TaskStore, workflowId: string): Promise<void> {
-    if (isBuiltinWorkflowId(workflowId)) return;
     const def = await store.getWorkflowDefinition(workflowId);
     if (!def) throw notFound(`Workflow '${workflowId}' not found`);
   }
 
   async function resolvePromptOverrideDefaults(store: TaskStore, workflowId: string): Promise<Record<string, string>> {
-    const builtin = isBuiltinWorkflowId(workflowId) ? getBuiltinWorkflow(workflowId) : undefined;
-    const ir = builtin?.ir ?? (await store.getWorkflowDefinition(workflowId))?.ir;
+    const ir = (await store.getWorkflowDefinition(workflowId))?.ir;
     if (!ir) return {};
     const defaults: Record<string, string> = {};
     for (const entry of enumeratePromptBearingWorkflowNodes(ir)) {

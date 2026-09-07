@@ -351,11 +351,7 @@ export type {
   EffectiveAgentInput,
   EffectiveAgentResult,
 } from "./agents/column-agent-resolver.js";
-export { BUILTIN_CODING_WORKFLOW_IR } from "./workflows/builtin-coding-workflow-ir.js";
-export { BUILTIN_CODING_IDEAS_WORKFLOW_IR } from "./workflows/builtin-coding-ideas-workflow-ir.js";
-export { BUILTIN_CODING_IDEAS_V2_WORKFLOW_IR } from "./workflows/builtin-coding-ideas-v2-workflow-ir.js";
 export { PLAN_REVIEW_GROUP_ID } from "./workflows/builtin-plan-review-group.js";
-export { BUILTIN_MARKETING_WORKFLOW_IR } from "./workflows/builtin-marketing-workflow-ir.js";
 export { evaluateForeachMergeProof } from "./workflow-merge-proof.js";
 export type { ForeachMergeProof, ForeachMergeProofInput } from "./workflow-merge-proof.js";
 export {
@@ -406,10 +402,6 @@ export {
   normalizeWorkflowPromptOverrides,
 } from "./workflows/workflow-prompt-overrides.js";
 export type { WorkflowPromptDefault, WorkflowPromptOverrides } from "./workflows/workflow-prompt-overrides.js";
-export { BUILTIN_STEPWISE_CODING_WORKFLOW_IR } from "./workflows/builtin-stepwise-coding-workflow-ir.js";
-export { BUILTIN_STEPWISE_FINAL_REVIEW_CODING_WORKFLOW_IR } from "./workflows/builtin-stepwise-final-review-coding-workflow-ir.js";
-export { BUILTIN_PR_WORKFLOW_IR } from "./workflows/builtin-pr-workflow-ir.js";
-export { BUILTIN_LEAD_GENERATION_WORKFLOW_IR } from "./workflows/builtin-lead-generation-workflow-ir.js";
 export {
   BUILTIN_WORKFLOW_SETTINGS,
   BUILTIN_MOVED_WORKFLOW_SETTINGS,

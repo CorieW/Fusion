@@ -1,3 +1,4 @@
+import { getBuiltinWorkflow } from "../../../core/src/__test-utils__/legacy-workflows/builtin-workflows.js";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { makeTransitionRejection, TransitionRejectionError, buildBootstrapPrompt, type Task, type TaskStore, type WorkflowIr } from "@fusion/core";
 import { existsSync } from "node:fs";
@@ -110,11 +111,11 @@ function storeWith(
       listGoalIdsForMission: () => [],
     })),
     getTaskWorkflowSelection: vi.fn((id: string) => {
-      const workflowId = workflows.selections?.[id];
+      const workflowId = workflows.selections?.[id] ?? "WF-SCHEDULER";
       return workflowId ? { workflowId, stepIds: [] } : undefined;
     }),
     getWorkflowDefinition: vi.fn(async (id: string) => {
-      const ir = workflows.definitions?.[id];
+      const ir = id === "WF-SCHEDULER" ? getBuiltinWorkflow("builtin:coding")!.ir : workflows.definitions?.[id];
       return ir ? { ir } : undefined;
     }),
   } as unknown as TaskStore;

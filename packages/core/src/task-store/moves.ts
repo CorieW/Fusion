@@ -24,7 +24,7 @@ import {VALID_TRANSITIONS, COLUMNS} from "../types.js";
 import {serializeWorkflowIr} from "../workflows/workflow-ir.js";
 import {emitWorkflowLifecycleEvent} from "../workflow-events.js";
 import {resolveAllowedColumns, workflowHasColumn} from "../workflows/workflow-transitions.js";
-import {isBuiltinWorkflowId, getBuiltinWorkflow, resolveDefaultWorkflowIr, resolveRetiredBuiltinWorkflowId, DEFAULT_WORKFLOW_ID} from "../workflows/builtin-workflows.js";
+import {resolveDefaultWorkflowIr, resolveRetiredBuiltinWorkflowId, DEFAULT_WORKFLOW_ID} from "../workflows/builtin-workflows.js";
 import {parseWorkflowIr} from "../workflows/workflow-ir.js";
 import {findWorkflowColumn, resolveColumnPluginGates} from "../plugins/plugin-gate-verdict.js";
 import {getTraitRegistry, resolveColumnFlags} from "../workflows/trait-registry.js";
@@ -98,14 +98,7 @@ async function resolveWorkflowIrForSelectedWorkflowId(store: TaskStore, workflow
   if (!effectiveWorkflowId) {
     return store.applyBuiltInPromptOverridesAsync(DEFAULT_WORKFLOW_ID, resolveDefaultWorkflowIr());
   }
-  if (isBuiltinWorkflowId(effectiveWorkflowId)) {
-    const builtin = getBuiltinWorkflow(effectiveWorkflowId);
-    const ir = builtin?.ir;
-    return store.applyBuiltInPromptOverridesAsync(
-      effectiveWorkflowId,
-      ir === undefined ? resolveDefaultWorkflowIr() : typeof ir === "string" ? parseWorkflowIr(ir) : ir,
-    );
-  }
+
   try {
     const def = await store.getWorkflowDefinition(effectiveWorkflowId);
     return def ? parseWorkflowIr(def.ir) : resolveDefaultWorkflowIr();

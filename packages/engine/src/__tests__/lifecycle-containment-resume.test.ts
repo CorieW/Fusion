@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
-import { getBuiltinWorkflow, type TaskDetail } from "@fusion/core";
+import { type TaskDetail } from "@fusion/core";
+import { getBuiltinWorkflow } from "../../../core/src/__test-utils__/legacy-workflows/builtin-workflows.js";
 
 import { routeGraphFailureToExecutionResume } from "../executor/route-graph-failure-to-execution-resume.js";
 

@@ -6,7 +6,8 @@ revision reaches plan-replan and stops, and a valid no-op reaches terminal compl
 so high-level outcome assertions cannot prove exclusivity; this suite asserts visited nodes and
 durable writes, including the declined-remediation path.
 */
-import { BUILTIN_WORKFLOWS, isPlanReviewSatisfied } from "@fusion/core";
+import { isPlanReviewSatisfied } from "@fusion/core";
+import { BUILTIN_WORKFLOWS } from "../../../core/src/__test-utils__/legacy-workflows/builtin-workflows.js";
 import type { Task, TaskDetail, WorkflowIr, WorkflowIrNode, WorkflowStepResult } from "@fusion/core";
 import { describe, expect, it, vi } from "vitest";
 import { evaluateUnplannedForExecution } from "../execution/hold-release.js";

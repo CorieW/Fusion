@@ -11,7 +11,7 @@ import type {
   WorkflowStepResult,
   WorkflowStepNotRunReason,
 } from "@fusion/core";
-import { BUILTIN_CODING_WORKFLOW_IR, FAST_LANE_SKIP_VALUE, FAST_MODE_BYPASS_ACTOR, PLAN_REVIEW_GROUP_ID, WORKFLOW_STEP_NOT_RUN_REASONS, WorkflowIrError, computeWorkflowIrPin, getWorkflowExtensionRegistry, instanceNodeId, resolveFastLaneRoute, resolveMaxReworkCycles, isExperimentalFeatureEnabled, GRAPH_NATIVE_POST_MERGE_FLAG, isCompletionSummaryNode, classifyReviewLease, isWorkflowOptionalGroupEnabled, isPlanReviewSatisfied, parseNoOpCompletionMarker, requiresContentReviewProof } from "@fusion/core";
+import { FAST_LANE_SKIP_VALUE, FAST_MODE_BYPASS_ACTOR, PLAN_REVIEW_GROUP_ID, WORKFLOW_STEP_NOT_RUN_REASONS, WorkflowIrError, computeWorkflowIrPin, getWorkflowExtensionRegistry, instanceNodeId, resolveFastLaneRoute, resolveMaxReworkCycles, isExperimentalFeatureEnabled, GRAPH_NATIVE_POST_MERGE_FLAG, isCompletionSummaryNode, classifyReviewLease, isWorkflowOptionalGroupEnabled, isPlanReviewSatisfied, parseNoOpCompletionMarker, requiresContentReviewProof } from "@fusion/core";
 import { isNonPlanDefectPlanReviewFailure } from "../errors/transient-error-detector.js";
 import { isSessionContentionError } from "../errors/transient-error-patterns.js";
 import { isRequiredArtifactReadFailedValue, parseRequiredArtifactMissingValue } from "../execution/required-workflow-artifacts.js";
@@ -645,21 +645,8 @@ export class WorkflowGraphExecutor {
   public async run(
     task: TaskDetail,
     settings: (WorkflowNodeSettings & Partial<Pick<Settings, "autoMerge">>) | undefined,
-    /*
-    FNXC:WorkflowBuiltins 2026-07-31-23:59 (LEGACY ON PURPOSE — allow-listed, measured):
-    This default stays the LEGACY IR, and the reason is the parity suite. Both production callers
-    (`workflow-graph-task-runner.ts`, `workflow-task-runtime.ts`) pass `ir` explicitly, so the default
-    is unreachable in production — but `workflow-graph-executor-parity.test.ts` in the `engine-core`
-    GATE suite drives this method without it, asserting the historical seam sequence. Switching to the
-    catalog default rewrites what "parity" means: measured, 6 gate tests fail with
-    `expected 'failure' to be 'success'`.
-
-    I tried the change first and reverted it. The entry in
-    `legacy-workflow-ir-callsite-allowlist.test.ts` records this so the next person does not repeat
-    the experiment — the constant is the right answer HERE, which is the distinction that allow-list
-    exists to preserve.
-    */
-    ir: WorkflowIr = BUILTIN_CODING_WORKFLOW_IR,
+    /* FNXC:CustomWorkflows 2026-09-07-01:09: Execution always receives the project-selected graph, including in tests. There is no implicit bundled pipeline. */
+    ir: WorkflowIr,
     startNodeId?: string,
   ): Promise<WorkflowGraphExecutorResult> {
     const startNode = startNodeId

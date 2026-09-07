@@ -1,10 +1,6 @@
 import { describe, expect, it } from "vitest";
-import {
-  BUILTIN_CODING_IDEAS_WORKFLOW_IR,
-  parseWorkflowIr,
-  serializeWorkflowIr,
-  resolveEntryColumnId,
-} from "../index.js";
+import { parseWorkflowIr, serializeWorkflowIr, resolveEntryColumnId } from "../index.js";
+import { BUILTIN_CODING_IDEAS_WORKFLOW_IR } from "../__test-utils__/legacy-workflows/builtin-coding-ideas-workflow-ir.js";
 import { resolveColumnFlags } from "../workflows/trait-registry.js";
 import type { WorkflowIrV2 } from "../workflows/workflow-ir-types.js";
 

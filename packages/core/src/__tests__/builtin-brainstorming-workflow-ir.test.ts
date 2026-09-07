@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { BUILTIN_BRAINSTORMING_WORKFLOW_IR } from "../workflows/builtin-brainstorming-workflow-ir.js";
+import { BUILTIN_BRAINSTORMING_WORKFLOW_IR } from "../__test-utils__/legacy-workflows/builtin-brainstorming-workflow-ir.js";
 import { parseWorkflowIr, serializeWorkflowIr } from "../workflows/workflow-ir.js";
 import type { WorkflowIrV2 } from "../workflows/workflow-ir-types.js";
 

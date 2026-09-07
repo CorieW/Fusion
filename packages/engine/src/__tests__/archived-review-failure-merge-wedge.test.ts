@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
-import { archiveTerminalWorkflowStepFailures, getBuiltinWorkflow, type Task, type WorkflowStepResult } from "@fusion/core";
+import { archiveTerminalWorkflowStepFailures, type Task, type WorkflowStepResult } from "@fusion/core";
+import { getBuiltinWorkflow } from "../../../core/src/__test-utils__/legacy-workflows/builtin-workflows.js";
 
 import { formatMergeableReviewRecoverySummary, SelfHealingManager } from "../self-healing.js";
 

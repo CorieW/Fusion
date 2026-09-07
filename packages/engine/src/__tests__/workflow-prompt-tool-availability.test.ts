@@ -19,7 +19,7 @@ Scope: an INSTRUCTION to call, written `fn_tool(`. A bare mention in backticks i
 an agent what it may NOT do ("`bash` is denied"), which must stay legal.
 */
 import { describe, expect, it } from "vitest";
-import { BUILTIN_WORKFLOWS } from "@fusion/core";
+import { BUILTIN_WORKFLOWS } from "../../../core/src/__test-utils__/legacy-workflows/builtin-workflows.js";
 
 import { READONLY_ALLOWLIST } from "../workflows/workflow-step-tool-policy.js";
 

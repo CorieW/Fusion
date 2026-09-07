@@ -24,7 +24,8 @@ sends them to a column that board does not declare — strictly worse than refus
 the refusal was at least visible.
 */
 import { describe, expect, it, vi } from "vitest";
-import { BUILTIN_CODING_WORKFLOW_IR, toTaskMoveLanes } from "@fusion/core";
+import { toTaskMoveLanes } from "@fusion/core";
+import { BUILTIN_CODING_WORKFLOW_IR } from "../../../core/src/__test-utils__/legacy-workflows/builtin-coding-workflow-ir.js";
 import "./executor-test-helpers.js";
 import { TaskExecutor } from "../executor.js";
 import { createMockStore } from "./executor-test-helpers.js";

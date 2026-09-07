@@ -209,8 +209,9 @@ async function pollHealth(port, deadline) {
     const abortTimer = setTimeout(() => controller.abort(), 2_000);
     try {
       const res = await fetch(url, { signal: controller.signal });
-      if (res.status === 200) return;
-      lastError = `HTTP ${res.status}`;
+      // The migration holding server also returns 200; require the real dashboard.
+      if (res.status === 200 && (await res.json()).status === "ok") return;
+      lastError = `HTTP ${res.status} (dashboard not ready)`;
     } catch (err) {
       lastError = err?.cause?.code ?? err?.name ?? String(err);
     } finally {
@@ -344,6 +345,7 @@ async function bootAndVerify(attempt, registerCleanup) {
       "127.0.0.1",
       // FNXC:BootSmoke 2026-06-19-12:36: The boot smoke verifies HTTP startup, not autonomous task execution. Run against an isolated throwaway project and use --paused so a developer worktree with an in-progress task or missing task-local artifacts cannot make the merge gate fail before /api/health serves.
       "--paused",
+      "--no-auth",
     ],
     {
       cwd: isolatedProject,
@@ -390,6 +392,17 @@ async function bootAndVerify(attempt, registerCleanup) {
     fail(err.message, stderrBuf);
   }
   console.log(`boot-smoke: GET /api/health 200 on :${port}`);
+  // FNXC:CustomWorkflows 2026-09-07-01:09: The built CLI must create an empty project, not seed templates through a second initialization path.
+  try {
+    const response = await fetch(`http://127.0.0.1:${port}/api/workflows`, { signal: globalThis.AbortSignal.timeout(10_000) });
+    const workflows = await response.json();
+    if (!response.ok || !Array.isArray(workflows) || workflows.length !== 0) throw new Error(`Fresh project workflow catalog: HTTP ${response.status}, ${JSON.stringify(workflows)}`);
+    const defaultsResponse = await fetch(`http://127.0.0.1:${port}/api/project/default-workflow`, { signal: globalThis.AbortSignal.timeout(10_000) });
+    const defaults = await defaultsResponse.json();
+    if (!defaultsResponse.ok || defaults.workflowId) throw new Error("Fresh project unexpectedly has a default workflow");
+    console.log("boot-smoke: fresh project has no workflow catalog or default");
+  } catch (error) { fail(error.message, stderrBuf); }
+
 
   // 3. Clean shutdown of OUR child only. The verdict requires BOTH that
   // SIGTERM was actually delivered (a server that died between the health

@@ -2,12 +2,9 @@ import { createElement } from "react";
 import { render } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import type { WorkflowDefinition, WorkflowIrNodeKind } from "@fusion/core";
-import {
-  BUILTIN_CODING_WORKFLOW_IR,
-  BUILTIN_STEPWISE_CODING_WORKFLOW_IR,
-  parseWorkflowIr,
-  validateColumnTraits,
-} from "@fusion/core";
+import { parseWorkflowIr, validateColumnTraits } from "@fusion/core";
+import { BUILTIN_CODING_WORKFLOW_IR } from "../../../../core/src/__test-utils__/legacy-workflows/builtin-coding-workflow-ir.js";
+import { BUILTIN_STEPWISE_CODING_WORKFLOW_IR } from "../../../../core/src/__test-utils__/legacy-workflows/builtin-stepwise-coding-workflow-ir.js";
 import type { Edge as FlowEdge, Node as FlowNode } from "@xyflow/react";
 import { ReactFlowProvider } from "@xyflow/react";
 import {

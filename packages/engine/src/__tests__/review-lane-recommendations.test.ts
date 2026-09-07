@@ -10,7 +10,8 @@ summary; a trailing JSON payload becomes task recommendations, which an operator
 from the Recommendations tab. An in-review agent proposes; it never creates board rows.
 */
 import { describe, expect, it } from "vitest";
-import { getBuiltinWorkflow, normalizeTaskRecommendations } from "@fusion/core";
+import { normalizeTaskRecommendations } from "@fusion/core";
+import { getBuiltinWorkflow } from "../../../core/src/__test-utils__/legacy-workflows/builtin-workflows.js";
 
 import {
   parseWorkflowStepRecommendations,

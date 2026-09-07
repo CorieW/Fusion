@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import type { Node as FlowNode, Edge as FlowEdge } from "@xyflow/react";
-import { BUILTIN_CODING_WORKFLOW_IR, BUILTIN_STEPWISE_CODING_WORKFLOW_IR } from "@fusion/core";
+import { BUILTIN_CODING_WORKFLOW_IR } from "../../../../core/src/__test-utils__/legacy-workflows/builtin-coding-workflow-ir.js";
+import { BUILTIN_STEPWISE_CODING_WORKFLOW_IR } from "../../../../core/src/__test-utils__/legacy-workflows/builtin-stepwise-coding-workflow-ir.js";
 import type { WorkflowDefinition, WorkflowIrColumn } from "@fusion/core";
 import type { WorkflowFlowNodeData } from "../nodes/WorkflowNodeTypes";
 import { autoLayout, applyAutoLayout, WF_AUTO_LAYOUT_GAP_X } from "../workflow-auto-layout";

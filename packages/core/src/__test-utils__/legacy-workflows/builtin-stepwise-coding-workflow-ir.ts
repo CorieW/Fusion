@@ -1,17 +1,17 @@
-import type { WorkflowIr } from "./workflow-ir-types.js";
-import { parseWorkflowIr } from "./workflow-ir.js";
-import { BUILTIN_WORKFLOW_SETTINGS } from "./builtin-workflow-settings.js";
-import { builtinPromptConfig } from "./builtin-workflow-prompts.js";
-import { browserVerificationOptionalGroupNode } from "./builtin-browser-verification-group.js";
-import { codeReviewOptionalGroupNode } from "./builtin-code-review-group.js";
-import { completionSummaryNode } from "./builtin-completion-summary-node.js";
-import { postMergeVerificationOptionalGroupNode } from "./builtin-post-merge-group.js";
-import { planReviewOptionalGroupNode } from "./builtin-plan-review-group.js";
+import type { WorkflowIr } from "../../workflows/workflow-ir-types.js";
+import { parseWorkflowIr } from "../../workflows/workflow-ir.js";
+import { BUILTIN_WORKFLOW_SETTINGS } from "../../workflows/builtin-workflow-settings.js";
+import { builtinPromptConfig } from "../../workflows/builtin-workflow-prompts.js";
+import { browserVerificationOptionalGroupNode } from "../../workflows/builtin-browser-verification-group.js";
+import { codeReviewOptionalGroupNode } from "../../workflows/builtin-code-review-group.js";
+import { completionSummaryNode } from "../../workflows/builtin-completion-summary-node.js";
+import { postMergeVerificationOptionalGroupNode } from "../../workflows/builtin-post-merge-group.js";
+import { planReviewOptionalGroupNode } from "../../workflows/builtin-plan-review-group.js";
 import {
   browserVerificationRemediationNode,
   codeReviewRemediationNode,
   planReplanNode,
-} from "./builtin-workflow-remediation-nodes.js";
+} from "../../workflows/builtin-workflow-remediation-nodes.js";
 
 /**
  * The built-in **stepwise** coding workflow (KTD-9) — the demonstration of step

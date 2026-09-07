@@ -549,7 +549,7 @@ export const DEFAULT_PROJECT_SETTINGS = {
   // FNXC:TaskRevert 2026-07-05-00:00 (FN-7556): AI-undo tasks reverse
   // already-shipped code, so default them to the stricter review-heavy
   // workflow; empty/unset means inherit the project default workflow.
-  aiUndoTaskWorkflowId: "builtin:review-heavy",
+  aiUndoTaskWorkflowId: "",
   // FNXC:OriginWorkflowSelection 2026-07-26-19:40: unset = "Selected workflow"
   // (board lane mirror, then project default). A concrete id pins the origin.
   taskCreateWorkflowId: undefined,

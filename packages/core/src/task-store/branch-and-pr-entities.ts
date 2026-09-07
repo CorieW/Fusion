@@ -835,15 +835,15 @@ export async function computeMovedSettingsTargetWorkflowIdsImpl(store: TaskStore
       if (row.workflowId && row.workflowId.trim()) targetWorkflowIds.add(row.workflowId);
     }
 
-    let defaultWorkflowId = "builtin:coding";
+    let defaultWorkflowId = "";
     try {
       const resolved = await store.getDefaultWorkflowId();
       if (resolved && resolved.trim()) {
         const exists = isBuiltinWorkflowId(resolved) || (await store.getWorkflowDefinition(resolved));
-        defaultWorkflowId = exists ? resolved : "builtin:coding";
+        defaultWorkflowId = exists ? resolved : "";
       }
     } catch {
-      defaultWorkflowId = "builtin:coding";
+      defaultWorkflowId = "";
     }
     targetWorkflowIds.add(defaultWorkflowId);
     return targetWorkflowIds;

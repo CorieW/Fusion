@@ -520,7 +520,6 @@ export const registerProjectRoutes: ApiRouteRegistrar = (ctx) => {
           const prefix = validPrefix || suggestTaskPrefix(normalizedName);
           await store.updateSettings({
             taskPrefix: prefix,
-            defaultWorkflowId: "builtin:coding",
           });
         } catch {
           // Non-fatal: project registration succeeded; settings can be configured later

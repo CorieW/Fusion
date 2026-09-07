@@ -1,12 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { Settings, Task, TaskDetail, TaskStore, WorkflowIr } from "@fusion/core";
-import {
-  BUILTIN_CODING_WORKFLOW_IR,
-  builtinSeamPrompt,
-  renderTriagePolicyPlaceholders,
-  resolveAgentPrompt,
-  resolvePlanningPromptFromIr,
-} from "@fusion/core";
+import { builtinSeamPrompt, renderTriagePolicyPlaceholders, resolveAgentPrompt, resolvePlanningPromptFromIr } from "@fusion/core";
+import { BUILTIN_CODING_WORKFLOW_IR } from "../../../core/src/__test-utils__/legacy-workflows/builtin-coding-workflow-ir.js";
 import { buildSpecificationPrompt, TriageProcessor } from "../triage.js";
 
 const { mockReviewStep, mockCreateFnAgent } = vi.hoisted(() => ({

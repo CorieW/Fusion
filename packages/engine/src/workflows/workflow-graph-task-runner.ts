@@ -1,7 +1,5 @@
 import type { Settings, TaskDetail, TaskStep, WorkflowDefinition, WorkflowIr } from "@fusion/core";
 import {
-  getBuiltinWorkflow,
-  isBuiltinWorkflowId,
   isFastExecutionMode,
   parseWorkflowIr,
 } from "@fusion/core";
@@ -251,9 +249,7 @@ export class WorkflowGraphTaskRunner {
 
     let definition: WorkflowDefinition | undefined;
     try {
-      definition = isBuiltinWorkflowId(selection.workflowId)
-        ? getBuiltinWorkflow(selection.workflowId)
-        : await this.deps.store.getWorkflowDefinition(selection.workflowId);
+      definition = await this.deps.store.getWorkflowDefinition(selection.workflowId);
     } catch (err) {
       return this.fallBack(task.id, `workflow-load-error: ${err instanceof Error ? err.message : String(err)}`);
     }

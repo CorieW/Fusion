@@ -7,7 +7,8 @@
 // injection surface (fn_review_step is deleted in both modes) vs mandatory fn_task_done.
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import "./executor-test-helpers.js";
-import { FAST_LANE_STEP_NAME, getBuiltinWorkflow } from "@fusion/core";
+import { FAST_LANE_STEP_NAME } from "@fusion/core";
+import { getBuiltinWorkflow } from "../../../core/src/__test-utils__/legacy-workflows/builtin-workflows.js";
 import { TaskExecutor } from "../executor.js";
 import { resolveExternalExecutionCheckoutRoute } from "../execution/external-execution-checkout.js";
 import { WorkflowGraphTaskRunner } from "../workflows/workflow-graph-task-runner.js";

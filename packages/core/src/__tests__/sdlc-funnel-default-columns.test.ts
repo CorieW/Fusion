@@ -24,7 +24,7 @@ import { describe, expect, it } from "vitest";
 
 import { buildColumnStageMap, stageForTraits } from "../board/activity-analytics.js";
 import { resolveDefaultWorkflowIr } from "../workflows/builtin-workflows.js";
-import { BUILTIN_CODING_WORKFLOW_IR } from "../workflows/builtin-coding-workflow-ir.js";
+import { BUILTIN_CODING_WORKFLOW_IR } from "../__test-utils__/legacy-workflows/builtin-coding-workflow-ir.js";
 import type { WorkflowIrColumn } from "../workflows/workflow-ir-types.js";
 
 function columnsOf(ir: unknown): Array<{ id: string; traits: Array<{ trait: string }> }> {
@@ -36,19 +36,7 @@ function columnsOf(ir: unknown): Array<{ id: string; traits: Array<{ trait: stri
 }
 
 describe("the funnel's built-in column fallback tracks the SHIPPED default board", () => {
-  it("maps every FUNNEL column of the current default workflow to a stage, not OTHER", () => {
-    const columns = columnsOf(resolveDefaultWorkflowIr());
-    const stageMap = buildColumnStageMap(columns);
-
-    expect(columns.length).toBeGreaterThan(0);
-    /* The shipped board now consists entirely of SDLC stages. `todo` maps to the `triage` STAGE
-    because it carries the intake trait — the post-U11 merged planning column, which is exactly what
-    the legacy fallback could not express. */
-    expect(columns.length).toBeGreaterThan(0);
-    for (const column of columns) {
-      expect(stageMap.get(column.id)).not.toBe("other");
-    }
-  });
+  it("does not invent a lifecycle mapping for a project without workflows", () => { expect(columnsOf(resolveDefaultWorkflowIr())).toEqual([]); expect(buildColumnStageMap(columnsOf(resolveDefaultWorkflowIr())).size).toBe(0); });
 
   it("covers the post-U11 merged planning column, which the legacy constant predates", () => {
     // The concrete regression: #2515 merged Todo into Planning on the default lineage. A fallback built

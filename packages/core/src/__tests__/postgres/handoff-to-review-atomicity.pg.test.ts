@@ -1,3 +1,4 @@
+import { installTestWorkflow } from "../../__test-utils__/custom-workflow.js";
 /**
  * FNXC:FixPgTestsAndCi 2026-06-26-09:40:
  * PostgreSQL test for the handoff-to-review transactional invariant
@@ -35,6 +36,7 @@ pgTest("handoff-to-review transactional invariant (PostgreSQL)", () => {
   beforeAll(h.beforeAll);
   beforeEach(async () => {
     await h.beforeEach();
+    await installTestWorkflow(h.store());
   });
   afterEach(async () => {
     await h.afterEach();

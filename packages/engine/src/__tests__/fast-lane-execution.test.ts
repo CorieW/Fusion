@@ -1,6 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { describe, expect, it, vi } from "vitest";
-import { BUILTIN_STEPWISE_CODING_WORKFLOW_IR, FAST_LANE_STEP_NAME, type TaskDetail, type WorkflowIr, type WorkflowStepResult } from "@fusion/core";
+import { FAST_LANE_STEP_NAME, type TaskDetail, type WorkflowIr, type WorkflowStepResult } from "@fusion/core";
+import { BUILTIN_STEPWISE_CODING_WORKFLOW_IR } from "../../../core/src/__test-utils__/legacy-workflows/builtin-stepwise-coding-workflow-ir.js";
 
 import { WorkflowGraphExecutor } from "../workflows/workflow-graph-executor.js";
 import { createNoopLegacySeams, FOREACH_ACTIVE_CONTEXT_KEY } from "../workflows/workflow-node-handlers.js";

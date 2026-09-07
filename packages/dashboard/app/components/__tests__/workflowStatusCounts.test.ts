@@ -1,9 +1,6 @@
 import { describe, expect, it } from "vitest";
-import {
-  getBuiltinWorkflow,
-  resolveColumnFlags,
-  type Task,
-} from "@fusion/core";
+import { resolveColumnFlags, type Task } from "@fusion/core";
+import { getBuiltinWorkflow } from "../../../../core/src/__test-utils__/legacy-workflows/builtin-workflows.js";
 import type { BoardWorkflowColumn, BoardWorkflowsPayload } from "../../api";
 import { ALL_WORKFLOWS_BOARD_VIEW_ID } from "../../utils/boardWorkflowSelection";
 import { computeWorkflowStatusCounts } from "../workflowStatusCounts";

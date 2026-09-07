@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { BUILTIN_CODING_WORKFLOW_IR } from "../workflows/builtin-coding-workflow-ir.js";
-import { getBuiltinWorkflow } from "../workflows/builtin-workflows.js";
+import { BUILTIN_CODING_WORKFLOW_IR } from "../__test-utils__/legacy-workflows/builtin-coding-workflow-ir.js";
+import { getBuiltinWorkflow } from "../__test-utils__/legacy-workflows/builtin-workflows.js";
 import {
   applyPromptOverridesToIr,
   enumeratePromptBearingWorkflowNodes,

@@ -49,7 +49,7 @@ the merge is owed work and this is its blocker.
 import { describe, expect, it, vi } from "vitest";
 import { EventEmitter } from "node:events";
 import type { Task, TaskStore, WorkflowIr } from "@fusion/core";
-import { BUILTIN_CODING_IDEAS_WORKFLOW_IR } from "@fusion/core";
+import { BUILTIN_CODING_IDEAS_WORKFLOW_IR } from "../../../core/src/__test-utils__/legacy-workflows/builtin-coding-ideas-workflow-ir.js";
 
 import { TriageProcessor } from "../triage.js";
 

@@ -21,12 +21,9 @@ const severityAuditLog = createLogger("dashboard-board-workflows");
 import {
   resolveDefaultWorkflowIr,
   resolveEffectiveDefaultWorkflowId,
-  getBuiltinWorkflow,
-  isBuiltinWorkflowId,
   parseWorkflowIr,
   resolveAllowedColumns,
   resolveColumnFlags,
-  resolveWorkflowIrById,
   type Settings,
   type TaskStore,
   type TraitFlags,
@@ -42,7 +39,7 @@ import {
 export type BoardWorkflowField = WorkflowFieldDefinition;
 
 /** Stable id the client uses for the implicit default lane (null selection). */
-export const DEFAULT_WORKFLOW_LANE_ID = "builtin:coding";
+export const DEFAULT_WORKFLOW_LANE_ID = "";
 
 /** One column as the board client needs it: id, display name, resolved flags. */
 export interface BoardWorkflowColumn {
@@ -185,12 +182,6 @@ async function describeWorkflow(
 ): Promise<BoardWorkflowDefinition> {
   // The display name comes from the persisted definition when available,
   // otherwise the IR's own name (default workflow).
-  if (isBuiltinWorkflowId(workflowId)) {
-    const ir = await resolveWorkflowIrById(store, workflowId);
-    const name = getBuiltinWorkflow(workflowId)?.name ?? ir.name;
-    const fields = describeFields(ir);
-    return { id: workflowId, name, selectable, columns: describeColumns(ir, true), ...(fields ? { fields } : {}) };
-  }
   // Custom workflow: fetch the definition once and derive both IR and name from
   // it (previously getWorkflowDefinition was called twice per workflow).
   /*
@@ -267,7 +258,7 @@ export async function buildBoardWorkflowsPayload(
 
   const taskWorkflowIds: Record<string, string> = {};
   const referenced = new Set<string>();
-  const selectableWorkflowIds = new Set<string>([defaultWorkflowId]);
+  const selectableWorkflowIds = new Set<string>(defaultWorkflowId ? [defaultWorkflowId] : []);
 
   for (const taskId of taskIds) {
     let workflowId = defaultWorkflowId;
@@ -280,12 +271,12 @@ export async function buildBoardWorkflowsPayload(
       workflowId = defaultWorkflowId;
     }
     taskWorkflowIds[taskId] = workflowId;
-    referenced.add(workflowId);
+    if (workflowId) referenced.add(workflowId);
   }
 
   // The effective default is always describable so a no-task board still
   // resolves it and the client has one authoritative selectable lane.
-  referenced.add(defaultWorkflowId);
+  if (defaultWorkflowId) referenced.add(defaultWorkflowId);
 
   try {
     const definitions = await store.listWorkflowDefinitions();

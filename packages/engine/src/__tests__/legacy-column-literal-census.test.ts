@@ -193,7 +193,7 @@ function productionSources(): string[] {
     .split("\n")
     .map((f) => f.trim())
     .filter(Boolean)
-    .filter((f) => !f.includes("__tests__") && !/\.(test|spec)\.tsx?$/.test(f));
+    .filter((f) => !f.includes("__tests__") && !f.includes("__test-utils__") && !/\.(test|spec)\.tsx?$/.test(f));
 }
 
 /*

@@ -1,4 +1,4 @@
-import { BUILTIN_WORKFLOWS } from "@fusion/core";
+import { BUILTIN_WORKFLOWS } from "../../../../../core/src/__test-utils__/legacy-workflows/builtin-workflows.js";
 import { describe, expect, it } from "vitest";
 import { bareSkillName, nodeConfigSummary, type NodeSummaryCatalogs } from "../node-summary";
 import type { WorkflowFlowNodeData, WorkflowEditorNodeKind } from "../WorkflowNodeTypes";

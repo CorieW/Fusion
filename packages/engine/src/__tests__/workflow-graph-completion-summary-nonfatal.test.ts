@@ -1,12 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
-import {
-  BUILTIN_CODING_WORKFLOW_IR,
-  BUILTIN_MARKETING_WORKFLOW_IR,
-  BUILTIN_STEPWISE_CODING_WORKFLOW_IR,
-  BUILTIN_STEPWISE_FINAL_REVIEW_CODING_WORKFLOW_IR,
-  BUILTIN_LEAD_GENERATION_WORKFLOW_IR,
-  COMPLETION_SUMMARY_NODE_ID,
-} from "@fusion/core";
+import { COMPLETION_SUMMARY_NODE_ID } from "@fusion/core";
+import { BUILTIN_CODING_WORKFLOW_IR } from "../../../core/src/__test-utils__/legacy-workflows/builtin-coding-workflow-ir.js";
+import { BUILTIN_MARKETING_WORKFLOW_IR } from "../../../core/src/__test-utils__/legacy-workflows/builtin-marketing-workflow-ir.js";
+import { BUILTIN_STEPWISE_CODING_WORKFLOW_IR } from "../../../core/src/__test-utils__/legacy-workflows/builtin-stepwise-coding-workflow-ir.js";
+import { BUILTIN_STEPWISE_FINAL_REVIEW_CODING_WORKFLOW_IR } from "../../../core/src/__test-utils__/legacy-workflows/builtin-stepwise-final-review-coding-workflow-ir.js";
+import { BUILTIN_LEAD_GENERATION_WORKFLOW_IR } from "../../../core/src/__test-utils__/legacy-workflows/builtin-lead-generation-workflow-ir.js";
 import type { TaskDetail, WorkflowIr } from "@fusion/core";
 
 import { WorkflowGraphExecutor } from "../workflows/workflow-graph-executor.js";

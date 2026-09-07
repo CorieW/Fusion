@@ -1,13 +1,6 @@
 import { describe, expect, it } from "vitest";
-import {
-  BUILTIN_CODING_IDEAS_V2_WORKFLOW_IR,
-  BUILTIN_STEPWISE_CODING_WORKFLOW_IR,
-  FAST_LANE_STEP_NAME,
-  type TaskDetail,
-  type TaskStep,
-  type WorkflowIr,
-  type WorkflowIrNode,
-} from "@fusion/core";
+import { BUILTIN_CODING_IDEAS_V2_WORKFLOW_IR, FAST_LANE_STEP_NAME, type TaskDetail, type TaskStep, type WorkflowIr, type WorkflowIrNode } from "@fusion/core";
+import { BUILTIN_STEPWISE_CODING_WORKFLOW_IR } from "../../../core/src/__test-utils__/legacy-workflows/builtin-stepwise-coding-workflow-ir.js";
 
 import { runForeach } from "../workflows/workflow-graph-foreach.js";
 import { FOREACH_ACTIVE_CONTEXT_KEY, type ForeachActiveContext } from "../workflows/workflow-node-handlers.js";

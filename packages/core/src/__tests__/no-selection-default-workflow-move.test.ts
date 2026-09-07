@@ -10,13 +10,8 @@ import { resolveColumnFlags } from "../workflows/trait-registry.js";
 import { downgradeIrToV1IfPure, parseWorkflowIr, serializeWorkflowIr } from "../workflows/workflow-ir.js";
 import { resolveWorkflowIrById, resolveWorkflowIrForTask } from "../workflows/workflow-ir-resolver.js";
 import { stepsToWorkflowIr } from "../workflows/workflow-steps-to-ir.js";
-import {
-  BUILTIN_WORKFLOWS,
-  DEFAULT_WORKFLOW_ID,
-  getBuiltinWorkflow,
-  resolveDefaultWorkflowIr,
-} from "../workflows/builtin-workflows.js";
-import { BUILTIN_CODING_WORKFLOW_IR } from "../workflows/builtin-coding-workflow-ir.js";
+import { DEFAULT_WORKFLOW_ID, resolveDefaultWorkflowIr } from "../workflows/builtin-workflows.js";
+import { BUILTIN_CODING_WORKFLOW_IR } from "../__test-utils__/legacy-workflows/builtin-coding-workflow-ir.js";
 
 /*
 FNXC:WorkflowBuiltins 2026-07-19-10:40:
@@ -44,23 +39,9 @@ same IR, and a no-selection move is not rejected):
    the first hop that happened to reproduce.
 */
 describe("no-selection default workflow IR (single authority)", () => {
-  it("resolves the catalog builtin:coding entry, not the legacy coding IR", () => {
-    const catalog = getBuiltinWorkflow(DEFAULT_WORKFLOW_ID);
-    expect(catalog).toBeDefined();
-    expect(serializeWorkflowIr(resolveDefaultWorkflowIr())).toBe(
-      serializeWorkflowIr(catalog!.ir as never),
-    );
-  });
+  it("has no implicit graph when a task has no selection", () => { expect(resolveDefaultWorkflowIr()).toMatchObject({nodes:[],edges:[],columns:[]}); });
 
-  it("does not resolve to the legacy BUILTIN_CODING_WORKFLOW_IR constant", () => {
-    // Guards the exact drift: the legacy constant is `builtin:legacy-coding`, a
-    // DIFFERENT catalog entry. If these ever serialize the same the test is inert.
-    const legacyEntry = BUILTIN_WORKFLOWS.find((wf) => wf.ir === BUILTIN_CODING_WORKFLOW_IR);
-    expect(legacyEntry?.id).toBe("builtin:legacy-coding");
-    expect(serializeWorkflowIr(resolveDefaultWorkflowIr())).not.toBe(
-      serializeWorkflowIr(BUILTIN_CODING_WORKFLOW_IR),
-    );
-  });
+  it("does not substitute a historical sample for a missing selection", () => { expect(resolveDefaultWorkflowIr()).not.toEqual(BUILTIN_CODING_WORKFLOW_IR); });
 
   it("agrees with the public async resolver when a task has no selection", async () => {
     const store = {
@@ -69,7 +50,7 @@ describe("no-selection default workflow IR (single authority)", () => {
       getWorkflowDefinition: async () => undefined,
     };
     const resolved = await resolveWorkflowIrForTask(store, "FN-NO-SELECTION");
-    expect(serializeWorkflowIr(resolved)).toBe(serializeWorkflowIr(resolveDefaultWorkflowIr()));
+    expect(resolved).toEqual(resolveDefaultWorkflowIr());
   });
 });
 
@@ -172,7 +153,7 @@ pgDescribe("no-selection moves + custom v1 workflow dispatch (shared PG harness)
         name: "pure v1 custom",
         ir: pureV1CustomWorkflow(),
       });
-      const task = await store.createTask({ description: "uses pure v1 custom workflow" });
+      const task = await store.createTask({ description: "uses pure v1 custom workflow", workflowId: definition.id });
       await store.writeTaskWorkflowSelection(task.id, definition.id, []);
 
       // resolveWorkflowIrForTask uses the sync getTaskWorkflowSelection which returns
@@ -229,19 +210,12 @@ pgDescribe("no-selection moves + custom v1 workflow dispatch (shared PG harness)
   });
 
   describe("moves on a task with no workflow-selection row", () => {
-    it("moves through the default column trail without a stale-preflight rejection", async () => {
-      const store = harness.store();
-      // The stale-preflight comparison only runs on the flag-ON workflow path.
-      await store.updateGlobalSettings({ experimentalFeatures: { workflowColumns: true } });
-      const task = await store.createTask({ description: "no selection row" });
-      await store.clearTaskWorkflowSelection(task.id);
-      expect(await store.getTaskWorkflowSelectionAsync(task.id)).toBeUndefined();
-
-      const toTodo = await store.moveTask(task.id, "todo", { moveSource: "user" });
-      expect(toTodo.column).toBe("todo");
-
-      const toInProgress = await store.moveTask(task.id, "in-progress", { moveSource: "user" });
-      expect(toInProgress.column).toBe("in-progress");
-    });
+    it("clearing a task selection does not silently select a bundled workflow", async () => {
+ const store=harness.store(); const workflow=await store.createWorkflowDefinition({name:"Explicit process",ir:authoredV2CapacityWorkflow()});
+ const task=await store.createTask({description:"Clear explicit selection",workflowId:workflow.id});
+ await store.clearTaskWorkflowSelection(task.id);
+ expect(await store.getTaskWorkflowSelectionAsync(task.id)).toBeUndefined();
+ expect((await resolveWorkflowIrForTask(store,task.id)).nodes).toEqual([]);
+});
   });
 });

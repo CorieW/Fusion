@@ -1,8 +1,8 @@
-import type { WorkflowIr } from "./workflow-ir-types.js";
-import { parseWorkflowIr } from "./workflow-ir.js";
-import { BUILTIN_WORKFLOW_SETTINGS } from "./builtin-workflow-settings.js";
-import { completionSummaryNode } from "./builtin-completion-summary-node.js";
-import { postMergeVerificationOptionalGroupNode } from "./builtin-post-merge-group.js";
+import type { WorkflowIr } from "../../workflows/workflow-ir-types.js";
+import { parseWorkflowIr } from "../../workflows/workflow-ir.js";
+import { BUILTIN_WORKFLOW_SETTINGS } from "../../workflows/builtin-workflow-settings.js";
+import { completionSummaryNode } from "../../workflows/builtin-completion-summary-node.js";
+import { postMergeVerificationOptionalGroupNode } from "../../workflows/builtin-post-merge-group.js";
 
 /**
  * FNXC:WorkflowMarketing 2026-06-20-00:00:

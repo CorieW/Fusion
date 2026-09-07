@@ -3,7 +3,7 @@ import { resolveProjectColumnsForRoles, type ProjectLaneVocabularyStore } from "
 import { sql } from "drizzle-orm";
 import type { Database } from "../db/db.js";
 import { projectScopeFor, type AsyncDataLayer } from "../postgres/data-layer.js";
-import { BUILTIN_WORKFLOWS, getBuiltinWorkflow, isBuiltinWorkflowId } from "../workflows/builtin-workflows.js";
+import { isBuiltinWorkflowId } from "../workflows/builtin-workflows.js";
 import { costFor, type CostResult, type ModelPricingOverrides } from "../ai/model-pricing.js";
 import type { TokenTotals } from "./token-analytics.js";
 
@@ -203,8 +203,6 @@ function addRangeClauses(column: string, clauses: string[], params: string[], qu
 type WorkflowNameResolver = (workflowId: string) => { workflowName: string; workflowIcon?: string; isBuiltin: boolean };
 
 function resolveWorkflowNameSync(db: Database, workflowId: string): { workflowName: string; workflowIcon?: string; isBuiltin: boolean } {
-  const builtin = getBuiltinWorkflow(workflowId) ?? BUILTIN_WORKFLOWS.find((workflow) => workflow.id === workflowId);
-  if (builtin) return { workflowName: builtin.name, isBuiltin: true };
   const row = db.prepare("SELECT id, name, icon FROM workflows WHERE id = ?").get(workflowId) as WorkflowNameRow | undefined;
   return {
     workflowName: row?.name && row.name.length > 0 ? row.name : workflowId,
@@ -224,8 +222,6 @@ function resolveWorkflowNameFromMap(
   names: Map<string, string>,
   workflowId: string,
 ): { workflowName: string; isBuiltin: boolean } {
-  const builtin = getBuiltinWorkflow(workflowId) ?? BUILTIN_WORKFLOWS.find((workflow) => workflow.id === workflowId);
-  if (builtin) return { workflowName: builtin.name, isBuiltin: true };
   const name = names.get(workflowId);
   return {
     workflowName: name && name.length > 0 ? name : workflowId,
@@ -369,7 +365,7 @@ export async function aggregateWorkflowAnalytics(
   */
   laneStore?: ProjectLaneVocabularyStore,
 ): Promise<WorkflowAnalytics> {
-  const defaultWorkflowId = query.defaultWorkflowId ?? "builtin:coding";
+  const defaultWorkflowId = query.defaultWorkflowId ?? "";
   if ("ping" in dbOrLayer) {
     return aggregateWorkflowAnalyticsAsync(dbOrLayer, query, defaultWorkflowId, laneStore);
   }

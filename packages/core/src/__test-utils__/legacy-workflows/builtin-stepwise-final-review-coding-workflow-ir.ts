@@ -1,8 +1,8 @@
-import type { WorkflowIr } from "./workflow-ir-types.js";
-import { parseWorkflowIr } from "./workflow-ir.js";
+import type { WorkflowIr } from "../../workflows/workflow-ir-types.js";
+import { parseWorkflowIr } from "../../workflows/workflow-ir.js";
 import { BUILTIN_STEPWISE_CODING_WORKFLOW_IR } from "./builtin-stepwise-coding-workflow-ir.js";
-import { planReviewOptionalGroupNode } from "./builtin-plan-review-group.js";
-import { planReplanNode } from "./builtin-workflow-remediation-nodes.js";
+import { planReviewOptionalGroupNode } from "../../workflows/builtin-plan-review-group.js";
+import { planReplanNode } from "../../workflows/builtin-workflow-remediation-nodes.js";
 
 function cloneWorkflowIr(ir: WorkflowIr): WorkflowIr {
   return JSON.parse(JSON.stringify(ir)) as WorkflowIr;

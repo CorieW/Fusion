@@ -235,7 +235,7 @@ describe("register-settings-memory-routes worktrunk gate", () => {
     );
   });
 
-  it("emits one workflow invalidation only after enablement persistence", async () => {
+  it("accepts legacy enablement settings without reviving a catalog or emitting workflow changes", async () => {
     const { app } = createApp();
     const emit = vi.spyOn(sse, "emitWorkflowSseEvent");
 
@@ -244,8 +244,7 @@ describe("register-settings-memory-routes worktrunk gate", () => {
     const res = await patchSettings(app, { enabledBuiltinWorkflowIds: ["builtin:quick-fix"] });
 
     expect(res.status).toBe(200);
-    expect(emit).toHaveBeenCalledTimes(1);
-    expect(emit).toHaveBeenCalledWith("workflow:updated", { reason: "enabledBuiltinWorkflowIds" }, "p1");
+    expect(emit).not.toHaveBeenCalled();
     emit.mockRestore();
   });
 

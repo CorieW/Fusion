@@ -5,8 +5,8 @@ import {
   registerBuiltinTraits,
 } from "../workflows/builtin-traits.js";
 import { TraitRegistry } from "../workflows/trait-registry.js";
-import { BUILTIN_CODING_WORKFLOW_IR } from "../workflows/builtin-coding-workflow-ir.js";
-import { BUILTIN_STEPWISE_CODING_WORKFLOW_IR } from "../workflows/builtin-stepwise-coding-workflow-ir.js";
+import { BUILTIN_CODING_WORKFLOW_IR } from "../__test-utils__/legacy-workflows/builtin-coding-workflow-ir.js";
+import { BUILTIN_STEPWISE_CODING_WORKFLOW_IR } from "../__test-utils__/legacy-workflows/builtin-stepwise-coding-workflow-ir.js";
 import type { WorkflowIrV2 } from "../workflows/workflow-ir-types.js";
 
 function freshRegistry(): TraitRegistry {

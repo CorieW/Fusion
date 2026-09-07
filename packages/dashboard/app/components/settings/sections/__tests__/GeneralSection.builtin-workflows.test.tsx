@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { useState } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { fireEvent, render, screen, waitFor, cleanup } from "@testing-library/react";
+import { render, screen, waitFor, cleanup } from "@testing-library/react";
 import { GeneralSection } from "../GeneralSection";
 import type { SettingsFormState } from "../context";
 import { fetchWorkflows } from "../../../../api";
@@ -17,8 +17,7 @@ vi.mock("../../../../api", async (importOriginal) => ({
 }));
 
 const WORKFLOWS = [
-  { id: "builtin:coding", name: "Coding", ir: {} },
-  { id: "builtin:quick-fix", name: "Quick Fix", ir: {} },
+  { id: "WF-001", name: "My workflow", ir: {} },
 ] as unknown as import("@fusion/core").WorkflowDefinition[];
 
 function GeneralHost({ initialForm }: { initialForm: Partial<SettingsFormState> }) {
@@ -30,9 +29,6 @@ function GeneralHost({ initialForm }: { initialForm: Partial<SettingsFormState> 
       addToast={vi.fn()}
       prefixError={null}
       setPrefixError={vi.fn()}
-      projectTrackingRepoOptions={[]}
-      projectTrackingRepoLoading={false}
-      projectTrackingRepoError={null}
     />
   );
 }
@@ -43,34 +39,20 @@ beforeEach(() => {
 });
 afterEach(() => cleanup());
 
-describe("GeneralSection built-in workflow enablement", () => {
-  it("allows clearing every built-in workflow and enabling one again", async () => {
-    render(<GeneralHost initialForm={{ enabledBuiltinWorkflowIds: ["builtin:coding", "builtin:quick-fix"] }} />);
-
-    const coding = await screen.findByLabelText("Coding") as HTMLInputElement;
-    const quickFix = await screen.findByLabelText("Quick Fix") as HTMLInputElement;
-    expect(coding.disabled).toBe(false);
-    expect(quickFix.disabled).toBe(false);
-
-    fireEvent.click(quickFix);
-    await waitFor(() => expect(quickFix.checked).toBe(false));
-    expect(coding.disabled).toBe(false);
-    expect(quickFix.checked).toBe(false);
-    expect(coding).toHaveAttribute("aria-describedby", "builtin-workflow-enablement-hint");
-
-    fireEvent.click(coding);
-    expect(coding.checked).toBe(false);
-    expect(quickFix.checked).toBe(false);
-    fireEvent.click(coding);
-    expect(coding.checked).toBe(true);
+describe("GeneralSection without bundled workflows", () => {
+  it("offers custom workflow settings without built-in enablement controls", async () => {
+    render(<GeneralHost initialForm={{ enabledBuiltinWorkflowIds: ["builtin:coding"] }} />);
+    await waitFor(() => expect(fetchWorkflows).toHaveBeenCalled());
+    expect(screen.queryByText("Fusion workflows")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Coding")).not.toBeInTheDocument();
+    expect(screen.getByTestId("ai-undo-workflow-select")).toHaveValue("");
+    expect(screen.getAllByRole("option", { name: "My workflow" }).length).toBeGreaterThan(0);
   });
-
-  it("keeps an empty configured set empty and explains the custom default requirement", async () => {
-    render(<GeneralHost initialForm={{ enabledBuiltinWorkflowIds: [] }} />);
-
-    const coding = await screen.findByLabelText("Coding") as HTMLInputElement;
-    expect(coding.checked).toBe(false);
-    expect(coding.disabled).toBe(false);
-    expect(document.getElementById("builtin-workflow-enablement-hint")).toHaveTextContent("Choose a custom project default workflow");
+  it("supports a fresh project with no workflow templates", async () => {
+    vi.mocked(fetchWorkflows).mockResolvedValue([]);
+    render(<GeneralHost initialForm={{}} />);
+    await waitFor(() => expect(fetchWorkflows).toHaveBeenCalled());
+    expect(screen.queryByText("Fusion workflows")).not.toBeInTheDocument();
+    expect(screen.getByTestId("ai-undo-workflow-select")).toHaveValue("");
   });
 });

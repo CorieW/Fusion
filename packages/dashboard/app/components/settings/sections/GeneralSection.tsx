@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
-import { DEPRECATED_BUILTIN_WORKFLOW_IDS, isLocale, SUPPORTED_LOCALES, type ReportActionType, type ReportTarget, type WorkflowDefinition } from "@fusion/core";
+import { useEffect, useState } from "react";
+import { isLocale, SUPPORTED_LOCALES, type ReportActionType, type ReportTarget, type WorkflowDefinition } from "@fusion/core";
 import { DEFAULT_MOBILE_NAV_PRIMARY_ITEMS, MAX_MOBILE_NAV_PRIMARY_ITEMS, MOBILE_NAV_PRIMARY_SELECTABLE_ITEMS, MOBILE_NAV_SELECTABLE_ITEM_LABEL_KEYS } from "../../../../../core/src/board/mobile-nav-primary-items";
 import { SettingsFieldRow } from "../SettingsFieldRow";
 import { SettingsToggleRow } from "../SettingsToggleRow";
@@ -18,7 +18,6 @@ The core helper is the same list the translate banner labels source languages wi
 */
 import { localeDisplayName } from "@fusion/core/detect-content-language";
 import { ProjectDefaultWorkflowField } from "../../WorkflowSelector";
-import { WorkflowIcon } from "../../WorkflowIcon";
 import { fetchWorkflows, listDiscussionCategories, type DiscussionCategoryOption } from "../../../api";
 import { clearAllLocalCache } from "../../../utils/swrCache";
 import type { ToastType } from "../../../hooks/useToast";
@@ -47,7 +46,6 @@ GitHub/GitLab settings are NOT in this section. The tracking block, the tracking
 */
 export function GeneralSection({ form, setForm, projectId, addToast, prefixError, setPrefixError, onQuickChatButtonModeChange, onMobileNavPrimaryItemsChange, }: GeneralSectionProps) {
     const { t } = useTranslation("app");
-    const [builtinWorkflows, setBuiltinWorkflows] = useState<WorkflowDefinition[]>([]);
     const [reportAction, setReportAction] = useState<ReportActionType | null>(null);
     const [discussionCategories, setDiscussionCategories] = useState<DiscussionCategoryOption[]>([]);
     const reportContextRefs = typeof window === "undefined" ? undefined : resolveReportContextRefs(window.location);
@@ -57,38 +55,6 @@ export function GeneralSection({ form, setForm, projectId, addToast, prefixError
         void listDiscussionCategories().then((result) => { if (!cancelled) setDiscussionCategories(Array.isArray(result.categories) ? result.categories : []); }).catch(() => { if (!cancelled) setDiscussionCategories([]); });
         return () => { cancelled = true; };
     }, []);
-    useEffect(() => {
-        let cancelled = false;
-        fetchWorkflows(projectId, { includeDisabledBuiltins: true })
-            .then((workflows) => {
-            if (!cancelled) {
-                // FNXC:WorkflowBrainstorming 2026-07-15-15:49: FN-7970 keeps deprecated built-ins out of Settings toggles, which are a new-selection surface.
-                setBuiltinWorkflows(workflows.filter(
-                    (workflow) => workflow.id.startsWith("builtin:")
-                        && workflow.kind !== "fragment"
-                        && !DEPRECATED_BUILTIN_WORKFLOW_IDS.has(workflow.id),
-                ));
-            }
-        })
-            .catch(() => {
-            if (!cancelled)
-                setBuiltinWorkflows([]);
-        });
-        return () => {
-            cancelled = true;
-        };
-    }, [projectId]);
-    /*
-    FNXC:TaskRevert 2026-07-05-00:00:
-    AI-undo (revert) board tasks default to the stricter builtin:review-heavy workflow
-    (FN-7556) so reversals of already-shipped code get extra review scrutiny. This picker
-    surfaces that choice: the empty-string option means "inherit project default workflow"
-    (the revert route treats blank/whitespace as inherit), an unset form value displays the
-    effective builtin:review-heavy default, and any other value is the concrete workflow id
-    to use for AI-undo tasks. Loaded separately from builtinWorkflows above because this list
-    includes custom workflows too (builtinWorkflows is deliberately builtin-only, used for the
-    enable/disable checkboxes).
-    */
     const [selectableWorkflows, setSelectableWorkflows] = useState<WorkflowDefinition[]>([]);
     useEffect(() => {
         let cancelled = false;
@@ -115,7 +81,7 @@ export function GeneralSection({ form, setForm, projectId, addToast, prefixError
     */
     const isKnownSelectableWorkflow = (workflowId: string) => workflowId === "" ||
         selectableWorkflows.some((workflow) => workflow.id === workflowId);
-    const aiUndoTaskWorkflowValue = form.aiUndoTaskWorkflowId ?? "builtin:review-heavy";
+    const aiUndoTaskWorkflowValue = form.aiUndoTaskWorkflowId ?? "";
     const aiUndoWorkflowHasStoredValue = isKnownSelectableWorkflow(aiUndoTaskWorkflowValue);
     /*
     FNXC:OriginWorkflowSelection 2026-07-26-19:40:
@@ -125,27 +91,6 @@ export function GeneralSection({ form, setForm, projectId, addToast, prefixError
     */
     const taskCreateWorkflowValue = form.taskCreateWorkflowId ?? "";
     const refinementTaskWorkflowValue = form.refinementTaskWorkflowId ?? "";
-    const enabledBuiltinWorkflowIds = useMemo(() => {
-        const configured = Array.isArray(form.enabledBuiltinWorkflowIds) ? form.enabledBuiltinWorkflowIds : undefined;
-        return new Set(configured ?? builtinWorkflows.map((workflow) => workflow.id));
-    }, [builtinWorkflows, form.enabledBuiltinWorkflowIds]);
-    const setBuiltinWorkflowEnabled = (workflowId: string, enabled: boolean) => {
-        setForm((f) => {
-            const allIds = builtinWorkflows.map((workflow) => workflow.id);
-            const current = new Set(Array.isArray(f.enabledBuiltinWorkflowIds) ? f.enabledBuiltinWorkflowIds : allIds);
-            if (enabled) {
-                current.add(workflowId);
-            }
-            else {
-                current.delete(workflowId);
-            }
-            const nextIds = allIds.filter((id) => current.has(id));
-            return {
-                ...f,
-                enabledBuiltinWorkflowIds: nextIds.length === allIds.length ? undefined : nextIds,
-            };
-        });
-    };
     /*
     FNXC:SettingsGeneral 2026-07-02-00:00:
     User-facing escape hatch for localStorage quota exhaustion. The dashboard accumulates per-project
@@ -253,31 +198,13 @@ export function GeneralSection({ form, setForm, projectId, addToast, prefixError
           Inline help moved behind the shared "?" affordance \u2014 operator requirement: no inline description paragraphs in Settings.
           The tip sits AFTER the whole picker widget (not in a `.settings-field-label-row` beside its label) because ProjectDefaultWorkflowField renders its own label inside WorkflowSelector; re-parenting that label is not possible from here, and the tip must stay a sibling of any `<label>`, never nested in one.
         */}
-        <SettingsHelpTip settingKey="projectDefaultWorkflow">{t("settings.general.newTasksInheritThisCustomWorkflowsStepsOverridable", "New tasks inherit this custom workflow's steps (overridable per task). No default \u2014 unset (built-in default workflow).")}</SettingsHelpTip>
+        <SettingsHelpTip settingKey="projectDefaultWorkflow">{t("settings.general.customWorkflowDefaultHelp", "New tasks inherit this custom workflow's steps (overridable per task). No default selected: create or import a workflow and choose one here.")}</SettingsHelpTip>
       </div>
-      {builtinWorkflows.length > 0 && (<div className="form-group">
-          {/* FNXC:SettingsHelp 2026-07-16-12:45: The checkbox group's ONE shared help paragraph moved behind a single "?" beside the group label — operator requirement: no inline description paragraphs in Settings. */}
-          <div className="settings-field-label-row">
-            <label>{t("settings.general.fusionWorkflows", "Fusion workflows")}</label>
-            <SettingsHelpTip settingKey="enabledBuiltinWorkflowIds">{t("settings.general.disabledFusionWorkflowsAreHiddenFromWorkflow", "Disabled Fusion workflows are hidden from workflow pickers. Existing tasks that already use one continue to resolve. Default: all built-in workflows enabled (unset).")}</SettingsHelpTip>
-          </div>
-          <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-sm)" }}>
-            <span id="builtin-workflow-enablement-hint" className="sr-only">{t("settings.general.builtinWorkflowCustomDefault", "Choose a custom project default workflow to disable all built-in workflows.")}</span>
-            {builtinWorkflows.map((workflow) => {
-                const checked = enabledBuiltinWorkflowIds.has(workflow.id);
-                return (<label key={workflow.id} htmlFor={`builtin-workflow-${workflow.id}`} className="checkbox-label">
-                <input id={`builtin-workflow-${workflow.id}`} type="checkbox" checked={checked} aria-describedby="builtin-workflow-enablement-hint" onChange={(e) => setBuiltinWorkflowEnabled(workflow.id, e.target.checked)}/>
-                <WorkflowIcon workflowId={workflow.id} decorative />
-                <span>{workflow.name}</span>
-              </label>);
-            })}
-          </div>
-        </div>)}
       <div className="form-group">
         {/* FNXC:SettingsHelp 2026-07-16-12:45: Inline help moved behind the shared "?" affordance — operator requirement: no inline description paragraphs in Settings. */}
         <div className="settings-field-label-row">
           <label htmlFor="aiUndoTaskWorkflowId">{t("settings.general.aiUndoTaskWorkflow", "AI-undo task workflow")}</label>
-          <SettingsHelpTip settingKey="aiUndoTaskWorkflowId">{t("settings.general.aiUndoTaskWorkflowHelp", "Workflow assigned to AI-undo (revert) tasks, which reverse already-shipped code and warrant stricter review. Choose \"Inherit project default workflow\" to leave them on the project default. Default: review-heavy.")}</SettingsHelpTip>
+          <SettingsHelpTip settingKey="aiUndoTaskWorkflowId">{t("settings.general.customAiUndoTaskWorkflowHelp", "Workflow assigned to AI-undo (revert) tasks, which reverse already-shipped code and warrant stricter review. Choose \"Inherit project default workflow\" to leave them on the project default. Default: inherit the project default workflow.")}</SettingsHelpTip>
         </div>
         <select id="aiUndoTaskWorkflowId" className="select" data-testid="ai-undo-workflow-select" value={aiUndoTaskWorkflowValue} onChange={(e) => setForm((f) => ({ ...f, aiUndoTaskWorkflowId: e.target.value }))}>
           <option value="">{t("settings.general.aiUndoTaskWorkflowInherit", "Inherit project default workflow")}</option>

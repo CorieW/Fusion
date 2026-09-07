@@ -37,7 +37,8 @@ import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { BUILTIN_CODING_WORKFLOW_IR, resolveDefaultWorkflowIr } from "@fusion/core";
+import { resolveDefaultWorkflowIr } from "@fusion/core";
+import { BUILTIN_CODING_WORKFLOW_IR } from "../../../core/src/__test-utils__/legacy-workflows/builtin-coding-workflow-ir.js";
 
 const DASHBOARD_SRC = resolve(fileURLToPath(import.meta.url), "../../commands/dashboard.ts");
 
@@ -54,18 +55,7 @@ function dashboardCode(): string {
 }
 
 describe("the TUI's no-selection workflow fallback", () => {
-  it("the catalog default and the legacy constant genuinely disagree", () => {
-    const def = columnIds(resolveDefaultWorkflowIr());
-    const legacy = columnIds(BUILTIN_CODING_WORKFLOW_IR);
-
-    /* Anti-vacuity: both must actually resolve to v2 column sets, or the comparison below is
-       comparing two empty arrays and passes for the wrong reason. */
-    expect(def.length).toBeGreaterThan(0);
-    expect(legacy.length).toBeGreaterThan(0);
-
-    expect(legacy).toContain("triage");
-    expect(def).not.toContain("triage");
-  });
+  it("an unconfigured project has no implicit board columns", () => { expect(columnIds(resolveDefaultWorkflowIr())).toEqual([]); expect(columnIds(BUILTIN_CODING_WORKFLOW_IR).length).toBeGreaterThan(0); });
 
   it("dashboard.ts does not fall back to the legacy constant", () => {
     /* The bug was `def?.ir ?? BUILTIN_CODING_WORKFLOW_IR` in two places — board columns and card

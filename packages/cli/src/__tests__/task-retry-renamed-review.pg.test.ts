@@ -17,7 +17,7 @@ classification of hydrated state rather than in a pure helper.
 
 import { afterAll, afterEach, beforeAll, beforeEach, expect, it, vi } from "vitest";
 import { pgDescribe } from "../../../core/src/__test-utils__/pg-test-harness.js";
-import { BUILTIN_CODING_WORKFLOW_IR } from "@fusion/core";
+import { BUILTIN_CODING_WORKFLOW_IR } from "../../../core/src/__test-utils__/legacy-workflows/builtin-coding-workflow-ir.js";
 import { createPgExtensionHarness } from "./pg-extension-harness.js";
 
 const resolveProjectMock = vi.hoisted(() => vi.fn());

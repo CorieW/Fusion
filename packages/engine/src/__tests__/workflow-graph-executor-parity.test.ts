@@ -17,7 +17,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import { describe, expect, it, vi } from "vitest";
 import type { TaskDetail, WorkflowIrV2 } from "@fusion/core";
-import { BUILTIN_CODING_WORKFLOW_IR } from "@fusion/core";
+import { BUILTIN_CODING_WORKFLOW_IR } from "../../../core/src/__test-utils__/legacy-workflows/builtin-coding-workflow-ir.js";
 
 import { WorkflowGraphExecutor } from "../workflows/workflow-graph-executor.js";
 import type { WorkflowLegacySeams } from "../workflows/workflow-node-handlers.js";
@@ -63,7 +63,7 @@ describe("WorkflowGraphExecutor interpreter-parity", () => {
   it("runs when workflowGraphExecutor is absent from experimental flags", async () => {
     const prompt = vi.fn(async () => ({ outcome: "success" as const }));
     const executor = new WorkflowGraphExecutor({ handlers: { prompt, script: prompt, gate: prompt } });
-    const result = await executor.run(task, { experimentalFeatures: {} });
+    const result = await executor.run(task, { experimentalFeatures: {} }, BUILTIN_CODING_WORKFLOW_IR);
     expect(result.executed).toBe(true);
     expect(prompt).toHaveBeenCalled();
   });
@@ -91,7 +91,7 @@ describe("WorkflowGraphExecutor interpreter-parity", () => {
       return result;
     } } });
 
-    const result = await executor.run(task, { experimentalFeatures: { workflowGraphExecutor: true } });
+    const result = await executor.run(task, { experimentalFeatures: { workflowGraphExecutor: true } }, BUILTIN_CODING_WORKFLOW_IR);
     expect(result.outcome).toBe("success");
     expect(events).toEqual(legacyEvents);
   });
@@ -107,7 +107,7 @@ describe("WorkflowGraphExecutor interpreter-parity", () => {
     };
     const legacyEvents = await runLegacy(seams)();
     const executor = new WorkflowGraphExecutor({ seams });
-    const result = await executor.run(task, { experimentalFeatures: { workflowGraphExecutor: true } });
+    const result = await executor.run(task, { experimentalFeatures: { workflowGraphExecutor: true } }, BUILTIN_CODING_WORKFLOW_IR);
     expect(result.outcome).toBe("failure");
     expect(legacyEvents).toEqual(["planning:success", "execute:success", "review:success", "merge:failure"]);
   });
@@ -121,7 +121,7 @@ describe("WorkflowGraphExecutor interpreter-parity", () => {
       schedule: async () => ({ outcome: "success" }),
     };
     const executor = new WorkflowGraphExecutor({ seams });
-    const result = await executor.run(task, { experimentalFeatures: { workflowGraphExecutor: true } });
+    const result = await executor.run(task, { experimentalFeatures: { workflowGraphExecutor: true } }, BUILTIN_CODING_WORKFLOW_IR);
     expect(result.outcome).toBe("failure");
     expect(result.visitedNodeIds).not.toContain("merge");
   });
@@ -135,7 +135,7 @@ describe("WorkflowGraphExecutor interpreter-parity", () => {
       schedule: async () => ({ outcome: "success" }),
     };
     const executor = new WorkflowGraphExecutor({ seams });
-    const result = await executor.run(task, { experimentalFeatures: { workflowGraphExecutor: true } });
+    const result = await executor.run(task, { experimentalFeatures: { workflowGraphExecutor: true } }, BUILTIN_CODING_WORKFLOW_IR);
     expect(result.outcome).toBe("failure");
     expect(result.context["node:execute:value"]).toBe("recoverable");
     expect(seams.review).not.toHaveBeenCalled();
@@ -150,7 +150,7 @@ describe("WorkflowGraphExecutor interpreter-parity", () => {
       schedule: async () => ({ outcome: "success" }),
     };
     const executor = new WorkflowGraphExecutor({ seams });
-    const result = await executor.run(task, { experimentalFeatures: { workflowGraphExecutor: true } });
+    const result = await executor.run(task, { experimentalFeatures: { workflowGraphExecutor: true } }, BUILTIN_CODING_WORKFLOW_IR);
     expect(result.outcome).toBe("failure");
     expect(seams.review).not.toHaveBeenCalled();
     expect(seams.merge).not.toHaveBeenCalled();
@@ -211,7 +211,7 @@ describe("column-agent feature is invisible when unbound (U7 / R9)", () => {
 
     const result = await executor.run(task, {
       experimentalFeatures: { workflowGraphExecutor: true },
-    });
+    }, BUILTIN_CODING_WORKFLOW_IR);
     expect(result.outcome).toBe("success");
     // Bind the invariant to actual executor behavior (PR #1432 review): the
     // observation below derives from the run-captured seam sequence, so seam

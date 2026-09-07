@@ -2,7 +2,8 @@ import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import express from "express";
 import { afterEach, beforeEach, expect, it } from "vitest";
-import { BUILTIN_CODING_WORKFLOW_IR, computePlanApprovalFingerprint, isTaskBlockedOnApproval, TaskStore } from "@fusion/core";
+import { computePlanApprovalFingerprint, isTaskBlockedOnApproval, TaskStore } from "@fusion/core";
+import { BUILTIN_CODING_WORKFLOW_IR } from "../../../core/src/__test-utils__/legacy-workflows/builtin-coding-workflow-ir.js";
 import {
   createTaskStoreForTest,
   pgDescribe,

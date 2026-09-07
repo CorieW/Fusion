@@ -1,3 +1,4 @@
+import { resolveRetiredBuiltinWorkflowId } from "../workflows/builtin-workflows.js";
 import { describe, expect, it, vi } from "vitest";
 
 const { readTaskRow } = vi.hoisted(() => ({
@@ -13,7 +14,6 @@ import type { TaskStore } from "../store.js";
 import {
   getTaskWorkflowSelectionAsyncImpl,
   getTaskWorkflowSelectionsAsyncImpl,
-  getWorkflowDefinitionImpl,
   materializeExplicitWorkflowStepsImpl,
   selectTaskWorkflowAndReconcileImpl,
 } from "../task-store/workflow-definitions.js";
@@ -22,7 +22,7 @@ import {
   countActiveInCapacitySlotAsyncImpl,
   countActiveInCapacitySlotSyncImpl,
 } from "../task-store/project-store-ops.js";
-import { getBuiltinWorkflow } from "../workflows/builtin-workflows.js";
+import { getBuiltinWorkflow } from "../__test-utils__/legacy-workflows/builtin-workflows.js";
 import { resolveCapacityPoolId } from "../workflows/workflow-capacity.js";
 import type { WorkflowDefinition } from "../workflows/workflow-definition-types.js";
 
@@ -84,27 +84,13 @@ function asyncLayerWithRows(rows: Array<{ taskId?: string; workflowId: string; s
 }
 
 describe("retired built-in workflow succession", () => {
-  it("materializes the canonical successor identity (m1)", async () => {
-    await expect(materializeExplicitWorkflowStepsImpl(definitionStore(), RETIRED_ID))
-      .resolves.toMatchObject({ workflowId: SUCCESSOR_ID });
-  });
+  it("refuses to materialize a retired template for new tasks",async()=>{await expect(materializeExplicitWorkflowStepsImpl(definitionStore(),RETIRED_ID)).rejects.toThrow("history");});
 
-  it("normalizes direct task selection before writing (m2)", async () => {
-    const { store, writeTaskWorkflowSelection } = selectionWriterStore();
+  it("rejects retired task selection before writing",async()=>{const {store,writeTaskWorkflowSelection}=selectionWriterStore();await expect(selectTaskWorkflowImpl(store,"FN-1",RETIRED_ID)).rejects.toThrow("history");expect(writeTaskWorkflowSelection).not.toHaveBeenCalled();});
 
-    await selectTaskWorkflowImpl(store, "FN-1", RETIRED_ID);
+  it("rejects retired switching before reconciliation",async()=>{const {store,selectTaskWorkflow}=workflowSwitchStore();await expect(selectTaskWorkflowAndReconcileImpl(store,"FN-1",RETIRED_ID)).rejects.toThrow("history");expect(selectTaskWorkflow).not.toHaveBeenCalled();});
 
-    expect(writeTaskWorkflowSelection).toHaveBeenCalledWith("FN-1", SUCCESSOR_ID, expect.any(Array));
-  });
-
-  it("accepts a retired switch request and reconciles through the successor (m3)", async () => {
-    const { store, selectTaskWorkflow } = workflowSwitchStore();
-
-    await expect(selectTaskWorkflowAndReconcileImpl(store, "FN-1", RETIRED_ID)).resolves.toBeDefined();
-    expect(selectTaskWorkflow).toHaveBeenCalledWith("FN-1", SUCCESSOR_ID);
-  });
-
-  it.each([SUCCESSOR_ID, "builtin:coding", CUSTOM_ID])(
+  it.each([CUSTOM_ID])(
     "leaves supported identity %s unchanged across write paths (m4)",
     async (workflowId) => {
       const materialized = await materializeExplicitWorkflowStepsImpl(definitionStore(), workflowId);
@@ -120,17 +106,7 @@ describe("retired built-in workflow succession", () => {
     },
   );
 
-  it("normalizes a retired project default before persistence (m5)", async () => {
-    const updateSettings = vi.fn(async () => undefined);
-    const store = {
-      getWorkflowDefinition: vi.fn(async (id: string) => definition(id)),
-      updateSettings,
-    } as unknown as TaskStore;
-
-    await setDefaultWorkflowIdImpl(store, RETIRED_ID);
-
-    expect(updateSettings).toHaveBeenCalledWith({ defaultWorkflowId: SUCCESSOR_ID });
-  });
+  it("rejects a retired project default before persistence",async()=>{const updateSettings=vi.fn();await expect(setDefaultWorkflowIdImpl({updateSettings} as never,RETIRED_ID)).rejects.toThrow("custom");expect(updateSettings).not.toHaveBeenCalled();});
 
   it("canonicalizes the authoritative per-task selection and preserves steps (r1)", async () => {
     const stepIds = ["plan-review", "code-review"];
@@ -166,18 +142,7 @@ describe("retired built-in workflow succession", () => {
     },
   );
 
-  it("uses the successor configuration key for a retired definition request", async () => {
-    const applyBuiltInPromptOverridesAsync = vi.fn(async (_id: string, ir: unknown) => ir);
-    const store = {
-      applyBuiltInPromptOverridesAsync,
-      isPluginInstalled: vi.fn(async () => true),
-    } as unknown as TaskStore;
-
-    const resolved = await getWorkflowDefinitionImpl(store, RETIRED_ID);
-
-    expect(resolved?.id).toBe(SUCCESSOR_ID);
-    expect(applyBuiltInPromptOverridesAsync).toHaveBeenCalledWith(SUCCESSOR_ID, expect.any(Object));
-  });
+  it("keeps historical aliases addressable without adding catalog entries",()=>{expect(resolveRetiredBuiltinWorkflowId(RETIRED_ID)).toBe(SUCCESSOR_ID);});
 
   it.each([
     { holderWorkflowId: RETIRED_ID, candidateWorkflowId: SUCCESSOR_ID },

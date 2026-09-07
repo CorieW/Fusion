@@ -13,7 +13,7 @@ import type {
   WorkflowIrNode,
   WorkflowIrEdge,
 } from "../workflows/workflow-ir-types.js";
-import { BUILTIN_WORKFLOWS } from "../workflows/builtin-workflows.js";
+import { BUILTIN_WORKFLOWS } from "../__test-utils__/legacy-workflows/builtin-workflows.js";
 
 function v2(
   columns: WorkflowIrV2["columns"],

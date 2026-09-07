@@ -9,7 +9,7 @@ import {
   type WorkflowColumnBoundaryAuditEvent,
 } from "../workflows/workflow-column-boundary.js";
 import { isUnplannedForExecution } from "../execution/hold-release.js";
-import { BUILTIN_CODING_WORKFLOW_IR } from "@fusion/core";
+import { BUILTIN_CODING_WORKFLOW_IR } from "../../../core/src/__test-utils__/legacy-workflows/builtin-coding-workflow-ir.js";
 import type { WorkflowRuntimePrimitives } from "../execution/runtime-primitives.js";
 import {
   BENCHMARK_CODE_REVIEW_CYCLES,

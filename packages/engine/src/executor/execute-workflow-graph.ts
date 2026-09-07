@@ -22,7 +22,6 @@ import {
   computePlanApprovalFingerprint,
   isPlanReviewSatisfied,
   PLAN_REVIEW_GROUP_ID,
-  getBuiltinWorkflow,
   resolveColumnAgentBinding,
   resolveMaxConsecutiveToolFailureRetries,
   resolveTaskOutputLanguage,
@@ -834,8 +833,7 @@ export async function executeWorkflowGraph(
           getTaskWorkflowSelection: () => selection,
           getTaskWorkflowSelectionAsync: async () => selection,
           getWorkflowDefinition: async (id: string) =>
-            (await deps.store.getWorkflowDefinition?.(id))
-              ?? (id === "builtin:coding" ? getBuiltinWorkflow("builtin:coding") : undefined),
+            (await deps.store.getWorkflowDefinition?.(id)),
           getTask: (taskId: string) => deps.store.getTask(taskId),
         },
         runId: resolvedRunId,

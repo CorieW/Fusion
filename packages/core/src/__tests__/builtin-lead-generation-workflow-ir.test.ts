@@ -1,11 +1,8 @@
 import { describe, expect, it } from "vitest";
 
-import { BUILTIN_LEAD_GENERATION_WORKFLOW_IR } from "../workflows/builtin-lead-generation-workflow-ir.js";
-import {
-  BUILTIN_WORKFLOWS,
-  defaultEnabledBuiltinWorkflowIds,
-  getBuiltinWorkflow,
-} from "../workflows/builtin-workflows.js";
+import { BUILTIN_LEAD_GENERATION_WORKFLOW_IR } from "../__test-utils__/legacy-workflows/builtin-lead-generation-workflow-ir.js";
+import { defaultEnabledBuiltinWorkflowIds } from "../workflows/builtin-workflows.js";
+import { BUILTIN_WORKFLOWS, getBuiltinWorkflow } from "../__test-utils__/legacy-workflows/builtin-workflows.js";
 import { parseWorkflowIr, serializeWorkflowIr } from "../workflows/workflow-ir.js";
 
 describe("built-in lead-generation workflow IR", () => {

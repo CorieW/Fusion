@@ -30,7 +30,7 @@ case.
 */
 import { describe, expect, it, vi } from "vitest";
 import type { Task, WorkflowIr } from "@fusion/core";
-import { getBuiltinWorkflow } from "@fusion/core";
+import { getBuiltinWorkflow } from "../../../core/src/__test-utils__/legacy-workflows/builtin-workflows.js";
 import { SelfHealingManager } from "../self-healing.js";
 
 /** A workflow declaring `intake` + `hold` + `done`, with NO `todo` column. A card stored

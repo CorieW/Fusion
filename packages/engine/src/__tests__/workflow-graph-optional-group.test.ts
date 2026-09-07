@@ -1,5 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
-import { BUILTIN_CODING_WORKFLOW_IR, BUILTIN_STEPWISE_CODING_WORKFLOW_IR, upsertWorkflowStepResult } from "@fusion/core";
+import { upsertWorkflowStepResult } from "@fusion/core";
+import { BUILTIN_CODING_WORKFLOW_IR } from "../../../core/src/__test-utils__/legacy-workflows/builtin-coding-workflow-ir.js";
+import { BUILTIN_STEPWISE_CODING_WORKFLOW_IR } from "../../../core/src/__test-utils__/legacy-workflows/builtin-stepwise-coding-workflow-ir.js";
 import type { TaskDetail, WorkflowIr, WorkflowStepResult } from "@fusion/core";
 
 import {

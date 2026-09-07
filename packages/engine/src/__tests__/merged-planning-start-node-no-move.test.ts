@@ -25,7 +25,8 @@ Mechanism under test (`workflow-column-boundary.ts`): `onNodeEntry` returns at
 capacity seam, and before `moveTask` is reachable at all.
 */
 import { describe, expect, it, vi } from "vitest";
-import { getBuiltinWorkflow, parseWorkflowIr, type WorkflowIr, type WorkflowIrNode } from "@fusion/core";
+import { parseWorkflowIr, type WorkflowIr, type WorkflowIrNode } from "@fusion/core";
+import { getBuiltinWorkflow } from "../../../core/src/__test-utils__/legacy-workflows/builtin-workflows.js";
 import { createWorkflowColumnBoundary } from "../workflows/workflow-column-boundary.js";
 
 /** The real default workflow — `builtin:coding`, post-merge. Not a hand-written fixture. */

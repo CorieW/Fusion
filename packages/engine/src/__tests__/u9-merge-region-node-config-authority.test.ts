@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { BUILTIN_CODING_WORKFLOW_IR, type TaskDetail, type WorkflowIrNode } from "@fusion/core";
+import { type TaskDetail, type WorkflowIrNode } from "@fusion/core";
+import { BUILTIN_CODING_WORKFLOW_IR } from "../../../core/src/__test-utils__/legacy-workflows/builtin-coding-workflow-ir.js";
 
 import { createDefaultNodeHandlers, createNoopLegacySeams } from "../workflows/workflow-node-handlers.js";
 import type { WorkflowNodeExecutionContext } from "../workflows/workflow-graph-executor.js";

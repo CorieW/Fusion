@@ -1,15 +1,11 @@
 import { describe, expect, it } from "vitest";
-import {
-  BUILTIN_CODING_WORKFLOW_IR,
-  BUILTIN_CODING_IDEAS_WORKFLOW_IR,
-  BUILTIN_LEAD_GENERATION_WORKFLOW_IR,
-  BUILTIN_MARKETING_WORKFLOW_IR,
-  BUILTIN_PR_WORKFLOW_IR,
-  BUILTIN_STEPWISE_CODING_WORKFLOW_IR,
-  DEFAULT_WORKFLOW_COLUMN_IDS,
-  parseWorkflowIr,
-  serializeWorkflowIr,
-} from "../index.js";
+import { DEFAULT_WORKFLOW_COLUMN_IDS, parseWorkflowIr, serializeWorkflowIr } from "../index.js";
+import { BUILTIN_CODING_WORKFLOW_IR } from "../__test-utils__/legacy-workflows/builtin-coding-workflow-ir.js";
+import { BUILTIN_CODING_IDEAS_WORKFLOW_IR } from "../__test-utils__/legacy-workflows/builtin-coding-ideas-workflow-ir.js";
+import { BUILTIN_LEAD_GENERATION_WORKFLOW_IR } from "../__test-utils__/legacy-workflows/builtin-lead-generation-workflow-ir.js";
+import { BUILTIN_MARKETING_WORKFLOW_IR } from "../__test-utils__/legacy-workflows/builtin-marketing-workflow-ir.js";
+import { BUILTIN_PR_WORKFLOW_IR } from "../__test-utils__/legacy-workflows/builtin-pr-workflow-ir.js";
+import { BUILTIN_STEPWISE_CODING_WORKFLOW_IR } from "../__test-utils__/legacy-workflows/builtin-stepwise-coding-workflow-ir.js";
 import { BROWSER_VERIFICATION_GROUP_ID, BROWSER_VERIFICATION_STEP_NODE_ID } from "../workflows/builtin-browser-verification-group.js";
 import { CODE_REVIEW_GROUP_ID, CODE_REVIEW_STEP_NODE_ID } from "../workflows/builtin-code-review-group.js";
 import type { WorkflowIrV2 } from "../workflows/workflow-ir-types.js";

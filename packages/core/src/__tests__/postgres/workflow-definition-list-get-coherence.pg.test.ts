@@ -7,7 +7,7 @@ import {
 } from "../../__test-utils__/pg-test-harness.js";
 import * as schema from "../../postgres/schema/index.js";
 import type { TaskStore } from "../../store.js";
-import { BUILTIN_CODING_WORKFLOW_IR } from "../../workflows/builtin-coding-workflow-ir.js";
+import { BUILTIN_CODING_WORKFLOW_IR } from "../../__test-utils__/legacy-workflows/builtin-coding-workflow-ir.js";
 import type { WorkflowDefinition } from "../../workflows/workflow-definition-types.js";
 
 pgDescribe("workflow definition list/get coherence", () => {

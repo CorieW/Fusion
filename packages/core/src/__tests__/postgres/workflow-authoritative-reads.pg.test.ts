@@ -3,7 +3,7 @@
  * Workflow lifecycle guards, legacy-column evacuation, and settings exports must read PostgreSQL as the source of truth. These regressions exercise the public TaskStore and export seams so a synchronous empty fallback cannot silently bypass production behavior.
  */
 import { afterAll, afterEach, beforeAll, beforeEach, expect, it } from "vitest";
-import { BUILTIN_CODING_WORKFLOW_IR } from "../../workflows/builtin-coding-workflow-ir.js";
+import { BUILTIN_CODING_WORKFLOW_IR } from "../../__test-utils__/legacy-workflows/builtin-coding-workflow-ir.js";
 import { exportSettings } from "../../config/settings-export.js";
 import type { WorkflowIrV2 } from "../../workflows/workflow-ir-types.js";
 import {

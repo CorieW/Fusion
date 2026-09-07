@@ -1,3 +1,4 @@
+import { getBuiltinWorkflow } from "../../../core/src/__test-utils__/legacy-workflows/builtin-workflows.js";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 // Mock external dependencies
@@ -211,6 +212,8 @@ function createMockStore(taskOverrides: Partial<Task> = {}, allTasks: Task[] = [
   };
 
   return {
+    getTaskWorkflowSelection: vi.fn(() => ({workflowId:"WF-MERGE",stepIds:[]})),
+    getWorkflowDefinition: vi.fn(async () => ({ir:getBuiltinWorkflow("builtin:coding")!.ir})),
     getTask: vi.fn().mockResolvedValue({ ...baseTask, prompt: "# test" }),
     listTasks: vi.fn().mockResolvedValue(allTasks),
     updateTask: vi.fn().mockResolvedValue(baseTask),
@@ -1673,6 +1676,7 @@ describe("aiMergeTask — no-op short-circuit", () => {
       id: "FN-3834-NOOP",
       branch: "fusion/fn-3834-noop",
       reviewLevel: 0,
+      enabledWorkflowSteps: [],
       mergeDetails: { mergeTargetBranch: "main" },
       worktree: "/tmp/root/.worktrees/FN-3834-NOOP",
     });
@@ -1690,7 +1694,7 @@ describe("aiMergeTask — no-op short-circuit", () => {
 
     const result = await aiMergeTask(store, "/tmp/root", "FN-3834-NOOP");
 
-    expect(result.merged).toBe(true);
+    expect(result.merged, JSON.stringify(result)).toBe(true);
     expect(result.noOp).toBe(true);
     expect(store.moveTask).toHaveBeenCalledWith("FN-3834-NOOP", "done", expect.objectContaining({ workflowMoveSource: "merger-complete-task" }));
     expect(store.updateTask).toHaveBeenCalledWith(

@@ -1,12 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
-import {
-  BUILTIN_CODING_IDEAS_V2_WORKFLOW_IR,
-  BUILTIN_CODING_IDEAS_WORKFLOW_IR,
-  resolveStepReopenPolicy,
-  planRemediationPlacement,
-  type Task,
-  type TaskStep,
-} from "@fusion/core";
+import { BUILTIN_CODING_IDEAS_V2_WORKFLOW_IR, resolveStepReopenPolicy, planRemediationPlacement, type Task, type TaskStep } from "@fusion/core";
+import { BUILTIN_CODING_IDEAS_WORKFLOW_IR } from "../../../core/src/__test-utils__/legacy-workflows/builtin-coding-ideas-workflow-ir.js";
 
 import { EMPTY_REVIEW_DIFF_FINGERPRINT } from "../worktree/review-diff-fingerprint.js";
 import { appendReviewRemediationSteps } from "../executor/append-review-remediation-steps.js";

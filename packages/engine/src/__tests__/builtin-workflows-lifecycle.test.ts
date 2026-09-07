@@ -9,14 +9,8 @@ import type {
   WorkflowIrNode,
   WorkflowStepResult,
 } from "@fusion/core";
-import {
-  BUILTIN_WORKFLOWS,
-  columnHasFlag,
-  parseWorkflowIr,
-  resolveCompleteColumn,
-  resolveCreationColumn,
-  serializeWorkflowIr,
-} from "@fusion/core";
+import { columnHasFlag, parseWorkflowIr, resolveCompleteColumn, resolveCreationColumn, serializeWorkflowIr } from "@fusion/core";
+import { BUILTIN_WORKFLOWS } from "../../../core/src/__test-utils__/legacy-workflows/builtin-workflows.js";
 
 import { WorkflowTaskRuntime } from "../workflows/workflow-task-runtime.js";
 import {

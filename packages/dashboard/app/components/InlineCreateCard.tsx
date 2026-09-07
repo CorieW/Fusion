@@ -309,7 +309,7 @@ export function InlineCreateCard({
   const hasPlanningOverride = Boolean(planningProvider && planningModelId);
   const hasMergerOverride = Boolean(mergerProvider && mergerModelId);
   const selectedModelCount = Number(hasExecutorOverride) + Number(hasValidatorOverride) + Number(hasPlanningOverride) + Number(hasMergerOverride);
-  const effectiveWorkflowId = selectedWorkflowId || settings?.defaultWorkflowId || "builtin:coding";
+  const effectiveWorkflowId = selectedWorkflowId || settings?.defaultWorkflowId || "";
 
   useEffect(() => {
     let cancelled = false;

@@ -22,13 +22,8 @@
 //   (pinned-at-dispatch, OFF-rollback recovery) on the stepwise path.
 // ─────────────────────────────────────────────────────────────────────────────
 import { describe, expect, it } from "vitest";
-import {
-  BUILTIN_STEPWISE_CODING_WORKFLOW_IR,
-  type StepStatus,
-  type TaskDetail,
-  type TaskStep,
-  type WorkflowIr,
-} from "@fusion/core";
+import { type StepStatus, type TaskDetail, type TaskStep, type WorkflowIr } from "@fusion/core";
+import { BUILTIN_STEPWISE_CODING_WORKFLOW_IR } from "../../../core/src/__test-utils__/legacy-workflows/builtin-stepwise-coding-workflow-ir.js";
 
 import { WorkflowGraphExecutor, type WorkflowNodeResult } from "../workflows/workflow-graph-executor.js";
 import {

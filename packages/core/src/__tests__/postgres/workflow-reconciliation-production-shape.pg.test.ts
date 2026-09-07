@@ -38,7 +38,7 @@ edit reverts the wrong one and the delete case then passes against what looks li
 reverted code. Anchor on surrounding context. Measured output is in the PR description.
 */
 import { afterAll, afterEach, beforeAll, beforeEach, expect, it } from "vitest";
-import { BUILTIN_CODING_WORKFLOW_IR } from "../../workflows/builtin-coding-workflow-ir.js";
+import { BUILTIN_CODING_WORKFLOW_IR } from "../../__test-utils__/legacy-workflows/builtin-coding-workflow-ir.js";
 import { resolveDefaultWorkflowIr } from "../../workflows/builtin-workflows.js";
 import { resolveEntryColumnId } from "../../workflows/workflow-reconciliation.js";
 import type { WorkflowIrV2 } from "../../workflows/workflow-ir-types.js";

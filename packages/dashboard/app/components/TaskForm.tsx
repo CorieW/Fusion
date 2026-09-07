@@ -431,7 +431,7 @@ export function TaskForm({
   const effectiveOptionalWorkflowId =
     selectedWorkflowId === null
       ? null
-      : (selectedWorkflowId ?? settings?.defaultWorkflowId ?? (settings ? "builtin:coding" : null));
+      : (selectedWorkflowId ?? settings?.defaultWorkflowId ?? null);
   const resolvedOptionalWorkflowId = onWorkflowIdChange ? effectiveOptionalWorkflowId : (optionalStepsWorkflowId ?? null);
   useEffect(() => {
     const isCreateOptionalStepPicker = Boolean(onWorkflowIdChange);
@@ -880,7 +880,7 @@ export function TaskForm({
 
   // U6/R3: the project default workflow id (preselected + "(default)" badged).
   const defaultWorkflowId = settings?.defaultWorkflowId ?? null;
-  const inheritedWorkflowId = defaultWorkflowId ?? (settings ? "builtin:coding" : null);
+  const inheritedWorkflowId = defaultWorkflowId ?? null;
   const defaultWorkflow = defaultWorkflowId ? workflows.find((workflow) => workflow.id === defaultWorkflowId) : undefined;
   const selectedWorkflow = selectedWorkflowId === null
     ? null

@@ -24,7 +24,7 @@ type WorkflowModelPair = {
     label: string;
     help: string;
 };
-const DEFAULT_WORKFLOW_ID = "builtin:coding";
+const DEFAULT_WORKFLOW_ID = "";
 
 /*
 FNXC:SettingsCredentialInstance 2026-08-01-10:19:
@@ -204,6 +204,12 @@ export function ProjectModelsSection({ form, setForm, models, projectId, onOpenW
         }
         const seq = ++workflowReqSeq.current;
         setWorkflowLoading(true);
+        if (!workflowId) {
+            setWorkflowPayload({ stored: {}, effective: {}, orphaned: [] });
+            setWorkflowModelPairs([]);
+            setWorkflowLoading(false);
+            return;
+        }
         Promise.all([
             fetchWorkflow(workflowId, projectId),
             fetchWorkflowSettingValues(workflowId, projectId),

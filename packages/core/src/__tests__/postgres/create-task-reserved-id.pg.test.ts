@@ -16,7 +16,7 @@ import {
 } from "../../__test-utils__/pg-test-harness.js";
 import { AgentStore } from "../../agents/agent-store.js";
 import { createFixtureIntakeOwnershipExemption } from "../../tasks/task-intake-owner-resolver.js";
-import { BUILTIN_CODING_WORKFLOW_IR } from "../../workflows/builtin-coding-workflow-ir.js";
+import { BUILTIN_CODING_WORKFLOW_IR } from "../../__test-utils__/legacy-workflows/builtin-coding-workflow-ir.js";
 
 pgDescribe("createTaskWithReservedId backend mode (PostgreSQL)", () => {
   let harness: PgTestHarness | null = null;

@@ -69,7 +69,6 @@ export const PROJECT_SECTION_KEYS: Readonly<Record<string, readonly string[]>> =
     "chatRoomSummaryMaxChars",
     "completionDocumentationMode",
     "reviewArtifacts",
-    "enabledBuiltinWorkflowIds",
     /*
     FNXC:OriginWorkflowSelection 2026-07-26-19:40:
     Owned by "general" because that is where both pickers render. Resetting them writes

@@ -18,7 +18,7 @@ It intentionally compares ORDER too, not just membership: the menu renders targe
 the order it receives them, so a reordering is an operator-visible change.
 */
 import { describe, expect, it } from "vitest";
-import { BUILTIN_CODING_WORKFLOW_IR } from "../workflows/builtin-coding-workflow-ir.js";
+import { BUILTIN_CODING_WORKFLOW_IR } from "../__test-utils__/legacy-workflows/builtin-coding-workflow-ir.js";
 import { resolveAllowedColumns } from "../workflows/workflow-transitions.js";
 import { COLUMNS } from "../types/board/index.js";
 import { VALID_TRANSITIONS } from "../types/board/board-config.js";

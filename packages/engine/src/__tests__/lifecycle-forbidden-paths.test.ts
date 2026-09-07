@@ -1,14 +1,7 @@
 import { EventEmitter } from "node:events";
 import { describe, expect, it, vi } from "vitest";
-import {
-  getBuiltinWorkflow,
-  resolveContainedBackwardTargetForTask,
-  evaluateLifecycleDirectionPostcondition,
-  TransitionRejectionError,
-  type Task,
-  type TaskStore,
-  type WorkflowIr,
-} from "@fusion/core";
+import { resolveContainedBackwardTargetForTask, evaluateLifecycleDirectionPostcondition, TransitionRejectionError, type Task, type TaskStore, type WorkflowIr } from "@fusion/core";
+import { getBuiltinWorkflow } from "../../../core/src/__test-utils__/legacy-workflows/builtin-workflows.js";
 import { ContaminationAutoRecoveryHandler } from "../auto-recovery-handlers/contamination.js";
 import { performWorkflowRerunBounce } from "../executor/workflow-rerun-bounce.js";
 import { RestartRecoveryCoordinator } from "../healing/restart-recovery-coordinator.js";

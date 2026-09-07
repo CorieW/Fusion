@@ -14,9 +14,8 @@
  * stays separate by design.
  */
 
-import { getBuiltinWorkflow, isBuiltinWorkflowId, resolveDefaultWorkflowIr, resolveRetiredBuiltinWorkflowId } from "./builtin-workflows.js";
+import { resolveDefaultWorkflowIr, resolveRetiredBuiltinWorkflowId } from "./builtin-workflows.js";
 import { parseWorkflowIr, serializeWorkflowIr } from "./workflow-ir.js";
-import { applyPromptOverridesToIr } from "./workflow-prompt-overrides.js";
 import type { WorkflowIr } from "./workflow-ir-types.js";
 
 /*
@@ -85,15 +84,7 @@ export function detectWorkflowDrift(ir: WorkflowIr, pin: WorkflowIrPin): Workflo
   return null;
 }
 
-function defaultCodingWorkflowIr(): WorkflowIr {
-  /*
-   * FNXC:WorkflowBuiltins 2026-06-29-02:18:
-   * `builtin:coding` is the operator-facing default workflow id, not the legacy monolithic IR export. Resolve the catalog entry first so no-selection tasks follow the new stepwise default; keep the old IR only as a missing-catalog safety fallback.
-   *
-   * FNXC:WorkflowBuiltins 2026-07-19-10:28: delegated to the shared
-   * resolveDefaultWorkflowIr() authority so the move-path resolvers and this
-   * one cannot drift (that drift produced "preflight is stale" on no-selection moves).
-   */
+function emptyWorkflowIr(): WorkflowIr {
   return resolveDefaultWorkflowIr();
 }
 
@@ -231,54 +222,15 @@ export async function resolveWorkflowIrById(
   const cached = irCache?.get(cacheKey);
   if (cached) return cached;
 
-  if (isBuiltinWorkflowId(workflowId)) {
-    const builtin = getBuiltinWorkflow(workflowId);
-    /*
-    FNXC:WorkflowLifecycleColumns 2026-08-01-01:15 (PR #2815 review — greptile P1, and it corrects me):
-    THE FOURTH DEGRADATION PATH, and the only one that was never branded. An id that LOOKS builtin but
-    is not registered — a workflow removed between releases, a typo'd selection — lands here, finds no
-    `builtin.ir`, and silently substitutes the default coding IR.
-
-    That matters to this PR specifically. Deleting the id cross-check was justified on the grounds
-    that every fallback is branded and the brand is checked first; this path is the counterexample, so
-    the deletion would have turned an unmarked fallback into a reported `source: "selection"` — the
-    lying signal this API exists to prevent, arriving through the one door I had not checked. My claim
-    that the id comparison "caught nothing the marker misses" was wrong: it caught exactly this,
-    because the default IR's id differs from the requested one.
-
-    Branding it is the right repair rather than restoring the id check, because it fixes the cause —
-    the resolver knew it was substituting and did not say so — instead of re-adding an inference that
-    misfires on every authored workflow (see the note below).
-    */
-    const fellBackToDefault = !builtin?.ir;
-    const ir = builtin?.ir ?? defaultCodingWorkflowIr();
-    const resolved = typeof ir === "string" ? parseWorkflowIr(ir) : ir;
-    const overrides = projectId
-      ? await (store.getWorkflowPromptOverridesAsync?.(workflowId, projectId)
-        ?? store.getWorkflowPromptOverrides?.(workflowId, projectId))
-      : undefined;
-    // FNXC:CustomWorkflows 2026-06-21-19:12:
-    // Public IR resolution must see the same project-scoped built-in prompt overrides as task execution, while callers without the new store methods keep the canonical built-in IR.
-    /*
-    Marked AFTER the overrides are applied, because `applyPromptOverridesToIr` may return a new object
-    and a non-enumerable brand does not survive a copy. Marking earlier would leave the returned and
-    cached IR unbranded, which is the bug this fixes wearing a different shape.
-    */
-    const effective = applyPromptOverridesToIr(resolved, overrides);
-    /* Branded BEFORE caching, so a later cache hit on this key reports the fallback too. */
-    const answer = fellBackToDefault ? markFellBack(effective) : effective;
-    irCache?.set(cacheKey, answer);
-    return answer;
-  }
 
   try {
     const def = await store.getWorkflowDefinition(workflowId);
-    if (!def) return markFellBack(defaultCodingWorkflowIr());
+    if (!def) return markFellBack(emptyWorkflowIr());
     const ir = typeof def.ir === "string" ? parseWorkflowIr(def.ir) : def.ir;
     irCache?.set(cacheKey, ir);
     return ir;
   } catch {
-    return markFellBack(defaultCodingWorkflowIr());
+    return markFellBack(emptyWorkflowIr());
   }
 }
 
@@ -410,7 +362,7 @@ export async function resolveWorkflowIrForTaskWithProvenance(
     }
     workflowId = selection?.workflowId;
   } catch {
-    return { ir: defaultCodingWorkflowIr(), source: "default" };
+    return { ir: emptyWorkflowIr(), source: "default" };
   }
   if (!workflowId) {
     return { ir: await resolveWorkflowIrById(store, "builtin:coding", irCache), source: "default", selectionAbsent: true };

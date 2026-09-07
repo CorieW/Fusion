@@ -2,12 +2,8 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import {
-  BUILTIN_CODING_WORKFLOW_IR,
-  resolveAgentPrompt,
-  resolveSeamPromptFromIr,
-  type WorkflowIr,
-} from "@fusion/core";
+import { resolveAgentPrompt, resolveSeamPromptFromIr, type WorkflowIr } from "@fusion/core";
+import { BUILTIN_CODING_WORKFLOW_IR } from "../../../core/src/__test-utils__/legacy-workflows/builtin-coding-workflow-ir.js";
 
 vi.mock("../pi.js", () => ({
   createFnAgent: vi.fn(),

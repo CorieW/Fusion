@@ -1,3 +1,4 @@
+import { installTestWorkflow } from "../../__test-utils__/custom-workflow.js";
 /**
  * FNXC:SqliteFinalRemoval 2026-06-25:
  * VAL-CROSS-001 — End-to-end task lifecycle (create → move columns → archive)
@@ -23,7 +24,7 @@ pgTest("VAL-CROSS-001: End-to-end task lifecycle (PostgreSQL)", () => {
   });
 
   beforeAll(h.beforeAll);
-  beforeEach(h.beforeEach);
+  beforeEach(async () => { await h.beforeEach(); await installTestWorkflow(h.store()); });
   afterEach(h.afterEach);
   afterAll(h.afterAll);
 

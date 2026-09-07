@@ -29,7 +29,7 @@ import {buildBootstrapPrompt} from "../mesh/mesh-task-replication.js";
 import {resolveWorkflowIrById, resolveWorkflowIrForTask} from "../workflows/workflow-ir-resolver.js";
 import {resolveTaskLifecycleColumns, toTaskMoveLanes} from "../workflows/workflow-lifecycle-traits.js";
 import type {WorkflowIr} from "../workflows/workflow-ir-types.js";
-import {DEFAULT_WORKFLOW_ID, getBuiltinWorkflow, isBuiltinWorkflowId} from "../workflows/builtin-workflows.js";
+import {DEFAULT_WORKFLOW_ID} from "../workflows/builtin-workflows.js";
 import {columnsWithFlag} from "../workflows/workflow-lifecycle-traits.js";
 import {validateFileScopeInPromptContent} from "../task-store/file-scope.js";
 import {__setTaskActivityLogLimitsForTesting, rewriteHeadingLine} from "../task-store/comments.js";
@@ -302,7 +302,7 @@ export async function createTaskBackendImpl(store: TaskStore, input: TaskCreateI
     if (!onSummarize && (resolvedSettings?.autoSummarizeTitles === true || input.summarize === true)) {
       let summarizerSettings: Partial<Settings> = resolvedSettings ?? {};
       try {
-        const defaultWorkflowId = (await store.getDefaultWorkflowId()) ?? "builtin:coding";
+        const defaultWorkflowId = (await store.getDefaultWorkflowId()) ?? DEFAULT_WORKFLOW_ID;
         const effective = await resolveEffectiveSettingsById(
           store,
           defaultWorkflowId,
@@ -634,9 +634,7 @@ export async function _createTaskInternalBackendImpl(store: TaskStore, input: Ta
         Intake may not turn a client-named missing workflow into an owned default-workflow task, so
         prove the requested definition exists before compiling it at this universal insert boundary.
         */
-        const exists = isBuiltinWorkflowId(workflowId)
-          ? getBuiltinWorkflow(workflowId) !== undefined
-          : (await store.getWorkflowDefinition(workflowId)) !== undefined;
+        const exists = (await store.getWorkflowDefinition(workflowId)) !== undefined;
         workflow = exists ? await resolveWorkflowIrById(store, workflowId) : "unresolvable";
       } catch {
         workflow = "unresolvable";

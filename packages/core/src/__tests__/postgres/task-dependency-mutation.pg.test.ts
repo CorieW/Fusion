@@ -17,9 +17,9 @@ import {
   type SharedPgTaskStoreHarness,
 } from "../../__test-utils__/pg-test-harness.js";
 import { TaskHasDependentsError, type TaskStore } from "../../store.js";
-import { BUILTIN_CODING_WORKFLOW_IR } from "../../workflows/builtin-coding-workflow-ir.js";
+import { BUILTIN_CODING_WORKFLOW_IR } from "../../__test-utils__/legacy-workflows/builtin-coding-workflow-ir.js";
 import { resolveDependencyReplanTarget } from "../../workflows/workflow-lifecycle-traits.js";
-import { BUILTIN_STEPWISE_FINAL_REVIEW_CODING_WORKFLOW_IR } from "../../workflows/builtin-stepwise-final-review-coding-workflow-ir.js";
+import { BUILTIN_STEPWISE_FINAL_REVIEW_CODING_WORKFLOW_IR } from "../../__test-utils__/legacy-workflows/builtin-stepwise-final-review-coding-workflow-ir.js";
 
 const pgTest = pgDescribe;
 

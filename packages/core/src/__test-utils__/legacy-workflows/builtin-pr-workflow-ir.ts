@@ -1,5 +1,5 @@
-import type { WorkflowIr } from "./workflow-ir-types.js";
-import { parseWorkflowIr } from "./workflow-ir.js";
+import type { WorkflowIr } from "../../workflows/workflow-ir-types.js";
+import { parseWorkflowIr } from "../../workflows/workflow-ir.js";
 
 /**
  * The built-in **PR** workflow (U9) — the unified PR-entity lifecycle wired end to

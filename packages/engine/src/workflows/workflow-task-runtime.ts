@@ -1,8 +1,6 @@
 import type { Settings, TaskDetail, WorkflowIr, WorkflowIrArtifact, WorkflowIrNode, WorkflowWorkItem, WorkflowWorkItemState } from "@fusion/core";
 import {
-  getBuiltinWorkflow,
   resolveTaskOutputLanguage,
-  isBuiltinWorkflowId,
   parseWorkflowIr,
   type WorkflowIrResolverStore,
 } from "@fusion/core";
@@ -65,15 +63,7 @@ export interface WorkflowTaskRuntimeDeps extends Omit<WorkflowGraphExecutorDeps,
   onEvent?: (event: { type: "start" | "terminal"; taskId: string; detail: string }) => void;
 }
 
-/**
- * WorkflowTaskRuntime is the workflow-engine execution facade.
- *
- * It always resolves a task to a workflow IR: explicit selections resolve only
- * to their selected workflow, and tasks without a selection resolve to the
- * built-in coding workflow. This is intentionally different from
- * `WorkflowGraphTaskRunner`, whose current contract still models "no selection"
- * as legacy fallback.
- */
+/* FNXC:CustomWorkflows 2026-09-07-01:09: Execute only a persisted project selection. A missing selection fails before any runtime primitive or node can run. */
 export class WorkflowTaskRuntime {
   public constructor(private readonly deps: WorkflowTaskRuntimeDeps) {}
 
@@ -421,14 +411,7 @@ export class WorkflowTaskRuntime {
       throw new Error(`workflow-selection-failed: ${err instanceof Error ? err.message : String(err)}`);
     }
 
-    if (!workflowId) return builtinCodingTarget();
-
-    if (isBuiltinWorkflowId(workflowId)) {
-      const builtin = getBuiltinWorkflow(workflowId);
-      if (!builtin) throw new Error(`workflow-missing: ${workflowId}`);
-      const ir = typeof builtin.ir === "string" ? parseWorkflowIr(builtin.ir) : builtin.ir;
-      return { workflowId, ir };
-    }
+    if (!workflowId) throw new Error("No workflow selected. Create or import a workflow and assign it before starting work.");
 
     const def = await this.deps.store.getWorkflowDefinition(workflowId);
     if (!def) throw new Error(`workflow-missing: ${workflowId}`);
@@ -458,17 +441,6 @@ export class WorkflowTaskRuntime {
 interface WorkflowRuntimeTarget {
   workflowId: string;
   ir: WorkflowIr;
-}
-
-function builtinCodingTarget(): WorkflowRuntimeTarget {
-  /*
-   * FNXC:WorkflowBuiltins 2026-06-29-02:18:
-   * Runtime defaulting must follow the built-in catalog entry for `builtin:coding`; importing the legacy coding IR here would bypass the renamed default workflow and strand unselected tasks on the old monolithic graph.
-   */
-  const builtin = getBuiltinWorkflow("builtin:coding");
-  if (!builtin) throw new Error("workflow-missing: builtin:coding");
-  const ir = typeof builtin.ir === "string" ? parseWorkflowIr(builtin.ir) : builtin.ir;
-  return { workflowId: "builtin:coding", ir };
 }
 
 function buildWorkflowRuntimeSettings(

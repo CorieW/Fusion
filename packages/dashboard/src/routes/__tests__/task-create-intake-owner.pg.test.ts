@@ -53,7 +53,7 @@ vi.mock("../../../../engine/src/worktree/worktree-acquisition.js", async (import
 });
 
 import { AgentStore, type TaskStore } from "@fusion/core";
-import { BUILTIN_CODING_WORKFLOW_IR } from "../../../../core/src/workflows/builtin-coding-workflow-ir.js";
+import { BUILTIN_CODING_WORKFLOW_IR } from "../../../../core/src/__test-utils__/legacy-workflows/builtin-coding-workflow-ir.js";
 import { TriageProcessor } from "../../../../engine/src/triage.js";
 import { HeartbeatMonitor } from "../../../../engine/src/agent-heartbeat.js";
 import { createTaskStoreForTest, pgDescribe, type PgTestHarness } from "../../../../core/src/__test-utils__/pg-test-harness.js";

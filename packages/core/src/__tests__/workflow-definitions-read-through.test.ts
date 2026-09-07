@@ -9,8 +9,8 @@ vi.mock("../async-stores/async-workflow-store.js", () => ({ listWorkflowRows }))
 
 import { readAllWorkflowDefinitionsImpl } from "../task-store/workflow-definitions.js";
 import type { TaskStore } from "../store.js";
-import { BUILTIN_CODING_WORKFLOW_IR } from "../workflows/builtin-coding-workflow-ir.js";
-import { BUILTIN_WORKFLOWS } from "../workflows/builtin-workflows.js";
+import { BUILTIN_CODING_WORKFLOW_IR } from "../__test-utils__/legacy-workflows/builtin-coding-workflow-ir.js";
+import { BUILTIN_WORKFLOWS } from "../__test-utils__/legacy-workflows/builtin-workflows.js";
 import type { WorkflowRow } from "../async-stores/async-workflow-store.js";
 
 function workflowRow(description: string, ir = BUILTIN_CODING_WORKFLOW_IR): WorkflowRow {

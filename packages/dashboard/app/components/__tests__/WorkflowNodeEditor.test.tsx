@@ -29,12 +29,10 @@ import {
   WF_EDGE_INTERACTION_WIDTH,
   isVisualOnlyWorkflowEdge,
 } from "../workflow-flow-mapping";
-import {
-  BUILTIN_CODING_WORKFLOW_IR,
-  BUILTIN_PR_WORKFLOW_IR,
-  BUILTIN_STEPWISE_CODING_WORKFLOW_IR,
-  BUILTIN_WORKFLOWS,
-} from "@fusion/core";
+import { BUILTIN_WORKFLOWS } from "../../../../core/src/__test-utils__/legacy-workflows/builtin-workflows.js";
+import { BUILTIN_CODING_WORKFLOW_IR } from "../../../../core/src/__test-utils__/legacy-workflows/builtin-coding-workflow-ir.js";
+import { BUILTIN_PR_WORKFLOW_IR } from "../../../../core/src/__test-utils__/legacy-workflows/builtin-pr-workflow-ir.js";
+import { BUILTIN_STEPWISE_CODING_WORKFLOW_IR } from "../../../../core/src/__test-utils__/legacy-workflows/builtin-stepwise-coding-workflow-ir.js";
 import { readAppFile } from "../../test/cssFixture";
 
 vi.mock("../../api", () => ({

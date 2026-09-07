@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { resolveRequiredPreMergeStepIds } from "../merge/required-pre-merge-steps.js";
-import { BUILTIN_WORKFLOWS } from "../workflows/builtin-workflows.js";
+import { BUILTIN_WORKFLOWS } from "../__test-utils__/legacy-workflows/builtin-workflows.js";
 import { resolveWorkflowStepVerdictRequirement } from "../workflows/review-verdict-authority.js";
 import {
   resolveAllOptionalGroupIds,

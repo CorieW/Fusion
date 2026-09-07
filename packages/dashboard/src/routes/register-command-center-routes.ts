@@ -508,7 +508,7 @@ async function resolveColumnFlagsByName(
       const store = await getScopedStore(req);
       const range = resolveRange(req.query);
       const settings = await store.getGlobalSettingsStore().getSettings();
-      const defaultWorkflowId = (await store.getDefaultWorkflowId()) ?? "builtin:coding";
+      const defaultWorkflowId = (await store.getDefaultWorkflowId()) ?? "";
       // FNXC:PostgresCommandCenterAnalytics 2026-06-28-09:30:
       // Workflow analytics now runs on the AsyncDataLayer in backend mode; pass
       // the async layer when present, otherwise the sync SQLite handle, and await.

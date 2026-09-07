@@ -23,8 +23,6 @@ import {appendConfigurationRevision, createConfigurationRevision} from "../async
 import {isValidProviderInstanceId} from "../provider-instance.js";
 import {applyWorkspaceModeToggle, withWorkspaceModeLock, type WorkspaceModeToggleOps} from "../git/git-repository.js";
 import {
-  getRequiredPluginIdForBuiltinWorkflow,
-  isBuiltinWorkflowId,
   validateEnabledBuiltinWorkflowIds,
 } from "../workflows/builtin-workflows.js";
 
@@ -64,24 +62,8 @@ export function __setWorkspaceModeOpsForTesting(ops: Partial<WorkspaceModeToggle
   workspaceModeOpsForTesting = ops;
 }
 
-async function assertValidEnabledBuiltinWorkflowIds(store: TaskStore, settings: Settings): Promise<void> {
-  const value = settings.enabledBuiltinWorkflowIds;
-  validateEnabledBuiltinWorkflowIds(value);
-  if (!Array.isArray(value)) return;
-  /* FNXC:CustomOnlyWorkflows 2026-09-06-23:33: An explicit empty set hides every built-in. Require a real custom default so unselected tasks cannot silently fall back to Coding. */
-  if (value.length === 0) {
-    const id = settings.defaultWorkflowId?.trim();
-    const workflow = id && !isBuiltinWorkflowId(id) ? await store.getWorkflowDefinition(id) : undefined;
-    if (!workflow || workflow.kind === "fragment") {
-      throw new Error("enabledBuiltinWorkflowIds: choose a custom project default workflow before disabling all built-in workflows");
-    }
-  }
-  for (const rawId of value) {
-    const requiredPluginId = getRequiredPluginIdForBuiltinWorkflow(rawId);
-    if (requiredPluginId && !(await store.isPluginInstalled(requiredPluginId))) {
-      throw new Error(`enabledBuiltinWorkflowIds contains unavailable plugin-gated workflow id: ${rawId}`);
-    }
-  }
+async function assertValidEnabledBuiltinWorkflowIds(_store: TaskStore, settings: Settings): Promise<void> {
+  validateEnabledBuiltinWorkflowIds(settings.enabledBuiltinWorkflowIds);
 }
 
 function assertValidCredentialInstanceSettingsPatch(patch: Record<string, unknown>): void {

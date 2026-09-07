@@ -36,7 +36,8 @@ import { describe, expect, it } from "vitest";
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 import ts from "typescript";
-import { getBuiltinWorkflow, parseWorkflowIr } from "@fusion/core";
+import { parseWorkflowIr } from "@fusion/core";
+import { getBuiltinWorkflow } from "../../../core/src/__test-utils__/legacy-workflows/builtin-workflows.js";
 
 const ENGINE_SRC = join(import.meta.dirname, "..");
 

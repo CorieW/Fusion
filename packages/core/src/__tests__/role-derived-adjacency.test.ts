@@ -13,7 +13,8 @@ The critical assertion in this file is the FIRST one: the built-in lifecycle mus
 import { describe, expect, it } from "vitest";
 import { resolveAllowedColumns, resolveColumnAdjacency } from "../workflows/workflow-transitions.js";
 import { VALID_TRANSITIONS } from "../types/board/board-config.js";
-import { getBuiltinWorkflow, parseWorkflowIr, type WorkflowIr } from "../index.js";
+import { parseWorkflowIr, type WorkflowIr } from "../index.js";
+import { getBuiltinWorkflow } from "../__test-utils__/legacy-workflows/builtin-workflows.js";
 
 const defaultIr: WorkflowIr = parseWorkflowIr(getBuiltinWorkflow("builtin:coding")!.ir as never);
 const legacyIr: WorkflowIr = parseWorkflowIr(getBuiltinWorkflow("builtin:legacy-coding")!.ir as never);

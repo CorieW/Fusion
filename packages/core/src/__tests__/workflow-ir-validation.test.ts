@@ -12,11 +12,8 @@ U2 — workflow IR validation hardening. Two axes:
 */
 import { describe, expect, it } from "vitest";
 
-import {
-  BUILTIN_CODING_WORKFLOW_IR,
-  parseWorkflowIr,
-  resolveCreationColumn,
-} from "../index.js";
+import { parseWorkflowIr, resolveCreationColumn } from "../index.js";
+import { BUILTIN_CODING_WORKFLOW_IR } from "../__test-utils__/legacy-workflows/builtin-coding-workflow-ir.js";
 import type { WorkflowIr } from "../workflows/workflow-ir-types.js";
 import { planReviewOptionalGroupNode } from "../workflows/builtin-plan-review-group.js";
 import { completionSummaryNode } from "../workflows/builtin-completion-summary-node.js";

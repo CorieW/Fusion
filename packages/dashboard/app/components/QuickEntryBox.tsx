@@ -420,7 +420,7 @@ export function QuickEntryBox({ onCreate, onMoveTask, addToast, tasks = [], avai
   const effectiveOptionalWorkflowId =
     selectedWorkflowForCreate === null
       ? null
-      : (selectedWorkflowForCreate ?? settings?.defaultWorkflowId ?? (settings ? "builtin:coding" : null));
+      : (selectedWorkflowForCreate ?? settings?.defaultWorkflowId ?? null);
 
   useEffect(() => {
     let cancelled = false;

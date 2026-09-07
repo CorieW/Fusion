@@ -1,3 +1,4 @@
+import { BUILTIN_STEPWISE_FINAL_REVIEW_CODING_WORKFLOW_IR } from "../../../core/src/__test-utils__/legacy-workflows/builtin-stepwise-final-review-coding-workflow-ir.js";
 import { describe, expect, it } from "vitest";
 import type { Settings, TaskDetail, TaskStep } from "@fusion/core";
 
@@ -32,7 +33,19 @@ const task = {
 const settings = { experimentalFeatures: {} } as Pick<Settings, "experimentalFeatures">;
 
 describe("task pipeline smoke", () => {
-  it("runs an unselected task through the default built-in coding pipeline", async () => {
+  it("does not dispatch any node when no workflow is selected", async () => {
+    const runtime = new WorkflowTaskRuntime({
+      store: { getTaskWorkflowSelection: () => undefined, getWorkflowDefinition: async () => undefined },
+      primitives: {} as WorkflowRuntimePrimitives,
+      runCustomNode: async () => { throw new Error("Unexpected node dispatch"); },
+    });
+    const result = await runtime.run({ ...task, steps: [] }, settings);
+    expect(result.disposition).toBe("failed");
+    expect(result.visitedNodeIds).toEqual([]);
+    expect(result.reason).toContain("Create or import a workflow");
+  });
+
+  it("runs an explicitly selected custom pipeline through planning, review, and merge", async () => {
     const calls: string[] = [];
     const mergeContexts: Array<{ workflowId: string; runId: string }> = [];
     let selectionReads = 0;
@@ -92,9 +105,9 @@ describe("task pipeline smoke", () => {
       store: {
         getTaskWorkflowSelection: () => {
           selectionReads += 1;
-          return undefined;
+          return { workflowId: "WF-TEST", stepIds: [] };
         },
-        getWorkflowDefinition: async () => undefined,
+        getWorkflowDefinition: async () => ({ ir: { ...BUILTIN_STEPWISE_FINAL_REVIEW_CODING_WORKFLOW_IR, name: "test-pipeline" } }),
         getTaskDocument: async (_taskId, key) => key === "PROMPT.md" ? { key, content: promptWithOneStep } : null,
       },
       recordWorkflowStepResult: (_taskId: string, r: { workflowStepId: string; status: string; leaseOwner?: string | null }) => {
@@ -119,8 +132,8 @@ describe("task pipeline smoke", () => {
     expect(result.disposition).toBe("completed");
     expect(result.outcome).toBe("success");
     expect(selectionReads).toBe(1);
-    expect(result.context[WORKFLOW_RUN_ID_CONTEXT_KEY]).toBe("FN-7228-SMOKE:builtin:coding");
-    expect(result.context[WORKFLOW_ID_CONTEXT_KEY]).toBe("builtin-stepwise-final-review-coding");
+    expect(result.context[WORKFLOW_RUN_ID_CONTEXT_KEY]).toBe("FN-7228-SMOKE:WF-TEST");
+    expect(result.context[WORKFLOW_ID_CONTEXT_KEY]).toBe("test-pipeline");
     /*
     FNXC:WorkflowGraphEntry 2026-07-26-17:10:
     A run with no continuation resumes at the card's OWN column instead of replaying the pipeline
@@ -169,7 +182,7 @@ describe("task pipeline smoke", () => {
       "merge",
     ]);
     expect(mergeContexts).toEqual([
-      { workflowId: "builtin-stepwise-final-review-coding", runId: "FN-7228-SMOKE:builtin:coding" },
+      { workflowId: "test-pipeline", runId: "FN-7228-SMOKE:WF-TEST" },
     ]);
 
     // R5: the graph is the sole Plan Review author — exactly one plan-review gate,
@@ -178,7 +191,7 @@ describe("task pipeline smoke", () => {
     const planReviewRecords = recordedStepResults.filter((r) => r.workflowStepId === "plan-review");
     expect(planReviewRecords.length).toBeGreaterThan(0);
     // Graph-authored lease: the pending record carries this run's id as leaseOwner.
-    expect(planReviewRecords.some((r) => r.leaseOwner === "FN-7228-SMOKE:builtin:coding")).toBe(true);
+    expect(planReviewRecords.some((r) => r.leaseOwner === "FN-7228-SMOKE:WF-TEST")).toBe(true);
     // Exactly one terminal plan-review outcome, and it PASSED (no duplicate reviewer,
     // no triage-authored result — the FN-1315 single-owner contract).
     const terminalPlanReview = planReviewRecords.filter((r) => r.status !== "pending");

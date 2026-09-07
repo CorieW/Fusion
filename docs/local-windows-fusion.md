@@ -60,10 +60,15 @@ A data rollback first backs up the current state. Restored directories replace t
 
 The original npm installation and its exported task XML remain available for the initial upgrade rollback. Never point version 0.76.0 at a database already migrated by the fork: restore its matching database and filesystem snapshot together.
 
-Projects can disable every built-in workflow after choosing a custom project default. Before rolling back to a build that requires at least one built-in, re-enable one in each project under General settings (or reset `enabledBuiltinWorkflowIds` to `null` through the settings API). Custom workflows and historical task assignments remain intact.
-
 ## Logs and source updates
 
 `local-release.json` records the commit, uncommitted source hashes, dependency versions, checks and packaged-asset hashes. Build/check logs are under the runtime `logs` directory; migration rehearsals and acceptance reports are retained there too. Keep generated files, credentials, `.fusion` state and dependencies outside Git.
 
 Changes in this checkout are intentionally local until committed. Use Git commits to preserve your edits before incorporating new work from the fork. Updating the checkout does not change the running release until you deploy it. Do not use the dashboard's source-rebuild button to modify an activated release; use the command above.
+
+
+## Workflows in this fork
+
+New projects start with no workflows. Create or import a workflow in the dashboard, then select it as the project default if desired. Task execution requires an assigned workflow; Coding and the other upstream templates are no longer bundled or available through settings.
+
+When upgrading an existing installation that used bundled workflows, preserve definitions referenced by saved tasks as project-owned historical snapshots before switching code. Those snapshots remain readable by their original IDs but are excluded from workflow catalogs and new-task selection. Keep them in private runtime data and backups, never in Git. Old graph samples under test utilities support regression tests and are excluded from published artifacts.

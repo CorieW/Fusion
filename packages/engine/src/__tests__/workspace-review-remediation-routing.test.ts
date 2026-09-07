@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
-import { getBuiltinWorkflow, planRemediationPlacement, type Task, type TaskStep } from "@fusion/core";
+import { planRemediationPlacement, type Task, type TaskStep } from "@fusion/core";
+import { getBuiltinWorkflow } from "../../../core/src/__test-utils__/legacy-workflows/builtin-workflows.js";
 
 import { appendReviewRemediationSteps } from "../executor/append-review-remediation-steps.js";
 import { requestPreMergeOptionalStepFix } from "../executor/request-pre-merge-optional-step-fix.js";

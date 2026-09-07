@@ -19,7 +19,9 @@ export async function build(config, id) {
   }
   const sourceCommit = await run('git.exe',['rev-parse','HEAD'],{cwd:sourceRoot});
   await run('git.exe',['read-tree',sourceCommit],{cwd:root});
-  const selected = (await run('git.exe',['ls-files','-z','--cached','--others','--exclude-standard'],{cwd:sourceRoot})).split('\0').filter(Boolean).filter(isSourceFile);
+  const currentPaths = (await run('git.exe',['ls-files','-z','--cached','--others','--exclude-standard'],{cwd:sourceRoot})).split('\0');
+  const committedPaths = (await run('git.exe',['ls-files','-z'],{cwd:root})).split('\0');
+  const selected = [...new Set([...currentPaths,...committedPaths])].filter(Boolean).filter(isSourceFile);
   const sourceHashes = {};
   for (const rel of selected) {
     const from = contained(sourceRoot,path.join(sourceRoot,rel));
@@ -30,6 +32,11 @@ export async function build(config, id) {
     await fs.copyFile(from,to);
     sourceHashes[rel] = await hashFile(to);
   }
+  // FNXC:LocalDeployment 2026-09-07-01:53: Static gates inspect Git's index. Stage precisely the isolated source snapshot so deleted presets disappear and new source files are covered, including uncommitted edits.
+  const indexPaths=path.join(config.runtime,`source-index-${id}.paths`);
+  await fs.writeFile(indexPaths,selected.join('\0')+'\0');
+  try { await run('git.exe',['--literal-pathspecs','add','--all',`--pathspec-from-file=${indexPaths}`,'--pathspec-file-nul'],{cwd:root}); }
+  finally { await fs.unlink(indexPaths); }
   const localChanges=(await run('git.exe',['diff','--name-only','-z','HEAD'],{cwd:sourceRoot})).split('\0').filter(Boolean).filter(isSourceFile);
   const untracked=(await run('git.exe',['ls-files','--others','--exclude-standard','-z'],{cwd:sourceRoot})).split('\0').filter(Boolean).filter(isSourceFile);
   const manifest = { format:1,id,root,sourceCommit,localChanges,untracked,createdAt:new Date().toISOString(),node:process.version,pnpm:'10.33.0',cli:path.join(root,'packages/cli/bin.mjs'),sourceHashes,verified:false };

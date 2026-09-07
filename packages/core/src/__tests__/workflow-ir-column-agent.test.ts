@@ -19,7 +19,7 @@ import {
   downgradeIrToV1IfPure,
   WorkflowIrError,
 } from "../workflows/workflow-ir.js";
-import { BUILTIN_CODING_WORKFLOW_IR } from "../workflows/builtin-coding-workflow-ir.js";
+import { BUILTIN_CODING_WORKFLOW_IR } from "../__test-utils__/legacy-workflows/builtin-coding-workflow-ir.js";
 import type {
   WorkflowColumnAgent,
   WorkflowIrEdge,

@@ -26,7 +26,7 @@ import {
   type SharedPgTaskStoreHarness,
 } from "../../__test-utils__/pg-test-harness.js";
 import { aggregateTeamAnalytics } from "../../board/team-analytics.js";
-import { BUILTIN_CODING_WORKFLOW_IR } from "../../index.js";
+import { BUILTIN_CODING_WORKFLOW_IR } from "../../__test-utils__/legacy-workflows/builtin-coding-workflow-ir.js";
 
 const IN_RANGE = "2026-06-15T12:00:00.000Z";
 const RANGE = { from: "2026-06-01T00:00:00.000Z", to: "2026-06-30T23:59:59.999Z", now: Date.parse(IN_RANGE) };

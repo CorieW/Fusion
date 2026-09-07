@@ -16,12 +16,9 @@ import { describe, expect, it, vi } from "vitest";
 import { readFile } from "node:fs/promises";
 import type { Task, TaskStep } from "@fusion/core";
 import { planRemediationPlacement } from "@fusion/core";
-import {
-  BUILTIN_CODING_IDEAS_V2_WORKFLOW_IR,
-  BUILTIN_CODING_IDEAS_WORKFLOW_IR,
-  BUILTIN_CODING_WORKFLOW_IR,
-  resolveStepReopenPolicy,
-} from "@fusion/core";
+import { BUILTIN_CODING_IDEAS_V2_WORKFLOW_IR, resolveStepReopenPolicy } from "@fusion/core";
+import { BUILTIN_CODING_IDEAS_WORKFLOW_IR } from "../../../core/src/__test-utils__/legacy-workflows/builtin-coding-ideas-workflow-ir.js";
+import { BUILTIN_CODING_WORKFLOW_IR } from "../../../core/src/__test-utils__/legacy-workflows/builtin-coding-workflow-ir.js";
 
 import {
   appendReviewRemediationSteps,

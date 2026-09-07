@@ -27,7 +27,8 @@ import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { BUILTIN_WORKFLOWS, resolveTaskOutputLanguage, type WorkflowIr } from "@fusion/core";
+import { resolveTaskOutputLanguage, type WorkflowIr } from "@fusion/core";
+import { BUILTIN_WORKFLOWS } from "../../../core/src/__test-utils__/legacy-workflows/builtin-workflows.js";
 import "./executor-test-helpers.js";
 // captureBaseCommitSha was peeled off TaskExecutor into executor/worktree-git-refs.ts (wave 18),
 // so the old per-test `vi.spyOn(executor, "captureBaseCommitSha")` seam no longer exists.

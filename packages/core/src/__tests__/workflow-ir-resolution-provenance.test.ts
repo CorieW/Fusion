@@ -17,7 +17,7 @@ behaviour is untouched.
 */
 import { describe, expect, it, vi } from "vitest";
 import { resolveWorkflowIrForTask, resolveWorkflowIrForTaskWithProvenance } from "../workflows/workflow-ir-resolver.js";
-import { BUILTIN_CODING_IDEAS_V2_WORKFLOW_IR } from "../workflows/builtin-coding-ideas-v2-workflow-ir.js";
+import { BUILTIN_CODING_IDEAS_V2_WORKFLOW_IR } from "../__test-utils__/legacy-workflows/builtin-coding-ideas-v2-workflow-ir.js";
 
 const WF = "custom:wf";
 const customIr = {

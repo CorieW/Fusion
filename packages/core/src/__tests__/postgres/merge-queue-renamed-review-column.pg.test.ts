@@ -26,7 +26,7 @@ import {
   createSharedPgTaskStoreTestHarness,
   type SharedPgTaskStoreHarness,
 } from "../../__test-utils__/pg-test-harness.js";
-import { BUILTIN_CODING_WORKFLOW_IR } from "../../index.js";
+import { BUILTIN_CODING_WORKFLOW_IR } from "../../__test-utils__/legacy-workflows/builtin-coding-workflow-ir.js";
 
 pgDescribe("merge-queue enqueue under a renamed review column", () => {
   const h: SharedPgTaskStoreHarness = createSharedPgTaskStoreTestHarness({

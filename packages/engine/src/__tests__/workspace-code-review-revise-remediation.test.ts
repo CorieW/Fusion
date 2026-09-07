@@ -1,7 +1,8 @@
 import "./executor-test-helpers.js";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Task, TaskStep, WorkflowReviewFinding } from "@fusion/core";
-import { getBuiltinWorkflow, planRemediationPlacement } from "@fusion/core";
+import { planRemediationPlacement } from "@fusion/core";
+import { getBuiltinWorkflow } from "../../../core/src/__test-utils__/legacy-workflows/builtin-workflows.js";
 
 import { appendReviewRemediationSteps } from "../executor/append-review-remediation-steps.js";
 import { deriveRemediationSteps } from "../executor/derive-remediation-steps.js";

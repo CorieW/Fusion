@@ -1132,7 +1132,7 @@ export interface ProjectSettings {
    * `task-revert.ts`) — these tasks surgically reverse ALREADY-SHIPPED code
    * while preserving unrelated later changes to the same files, so they
    * warrant a stricter default review posture than ordinary new work.
-   * Defaults to `builtin:review-heavy` (see `DEFAULT_PROJECT_SETTINGS`).
+   * Defaults to inheriting the project default (see `DEFAULT_PROJECT_SETTINGS`).
    * Empty/unset means AI-undo tasks inherit the project default workflow
    * (today's pre-FN-7556 behavior). The route resolving this setting
    * (`POST /api/tasks/:id/revert`) validates the configured id exists and
