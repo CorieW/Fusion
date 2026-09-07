@@ -361,6 +361,11 @@ export async function updateWorkflowDefinitionImpl(store: TaskStore, id: string,
 
 export async function deleteWorkflowDefinitionImpl(store: TaskStore, id: string): Promise<void> {
     if (isBuiltinWorkflowId(id)) throw new Error("Built-in workflows cannot be deleted");
+    /* FNXC:CustomOnlyWorkflows 2026-09-06-23:33: Preserve the custom-only project's default before any destructive cascade. The operator can choose another default or re-enable built-ins first. */
+    const settings = await store.getSettings();
+    if (settings.enabledBuiltinWorkflowIds?.length === 0 && settings.defaultWorkflowId === id) {
+      throw new Error("Choose another project default workflow before deleting this workflow while all built-in workflows are disabled");
+    }
     /* FNXC:SqliteDualPathCleanup 2026-07-26-14:08: workflow definition deletes require AsyncDataLayer. */
     const layer: AsyncDataLayer = store.asyncLayer!;
     /*

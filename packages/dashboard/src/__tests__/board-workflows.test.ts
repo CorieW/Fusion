@@ -72,6 +72,16 @@ the raw id, or the same words in different case) — never an override of a name
 This is also the mechanism that would clobber U11's Todo->Planning rename.
 */
 describe("buildBoardWorkflowsPayload disabled built-ins", () => {
+  it("exposes only the custom default for selection while describing historical built-in tasks", async () => {
+    const store = makeStore(customWorkflowIr(BUILTIN_CODING_WORKFLOW_IR.columns));
+    store.getSettings.mockResolvedValue({ defaultWorkflowId: CUSTOM_WORKFLOW_ID, enabledBuiltinWorkflowIds: [] });
+    store.getTaskWorkflowSelection.mockImplementation((taskId) => taskId === "FN-OLD" ? { workflowId: "builtin:coding" } : null);
+    const payload = await buildBoardWorkflowsPayload(store as never, ["FN-OLD", "FN-NEW"]);
+    expect(payload.workflows.filter((workflow) => workflow.selectable).map((workflow) => workflow.id)).toEqual([CUSTOM_WORKFLOW_ID]);
+    expect(payload.workflows.find((workflow) => workflow.id === "builtin:coding")).toMatchObject({ selectable: false });
+    expect(payload.taskWorkflowIds).toEqual({ "FN-OLD": "builtin:coding", "FN-NEW": CUSTOM_WORKFLOW_ID });
+  });
+
   function disabledCodingStore(taskWorkflowId?: string) {
     const quickFix = getBuiltinWorkflow("builtin:quick-fix")!;
     return {

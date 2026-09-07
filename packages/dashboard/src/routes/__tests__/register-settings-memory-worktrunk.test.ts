@@ -211,14 +211,16 @@ describe("register-settings-memory-routes worktrunk gate", () => {
     expect(scopedStore.updateSettings).not.toHaveBeenCalled();
   });
 
-  it("rejects an empty built-in workflow set before persistence", async () => {
+  it("passes an empty built-in workflow set to the store's custom-default validation", async () => {
     const { app, scopedStore } = createApp();
 
     const res = await patchSettings(app, { enabledBuiltinWorkflowIds: [] });
 
-    expect(res.status).toBe(400);
-    expect(res.body.error).toContain("at least one built-in workflow");
-    expect(scopedStore.updateSettings).not.toHaveBeenCalled();
+    expect(res.status).toBe(200);
+    expect(scopedStore.updateSettings).toHaveBeenCalledWith(
+      { enabledBuiltinWorkflowIds: [] },
+      { kind: "api", id: "http:unverified" },
+    );
   });
 
   it("accepts a single valid built-in workflow", async () => {

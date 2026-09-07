@@ -1178,7 +1178,7 @@ export interface ProjectSettings {
    */
   boardSelectedWorkflowId?: string;
   /** Built-in workflow ids visible/selectable in project workflow pickers.
-   *  Undefined preserves the default of showing every built-in workflow. */
+   *  Undefined shows every built-in; an empty list hides all and requires a custom project default. */
   enabledBuiltinWorkflowIds?: string[];
   /** Raw CLI commands a user has explicitly approved for workflow CLI nodes
    *  (trust-on-first-use). A node's command must appear here before it runs;
@@ -2587,4 +2587,3 @@ export {
   CLI_AGENT_ADAPTER_IDS,
   CLI_AGENT_AUTONOMY_MODES,
 } from "../../config/settings-schema.js";
-

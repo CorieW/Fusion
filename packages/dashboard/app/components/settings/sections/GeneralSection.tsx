@@ -129,18 +129,10 @@ export function GeneralSection({ form, setForm, projectId, addToast, prefixError
         const configured = Array.isArray(form.enabledBuiltinWorkflowIds) ? form.enabledBuiltinWorkflowIds : undefined;
         return new Set(configured ?? builtinWorkflows.map((workflow) => workflow.id));
     }, [builtinWorkflows, form.enabledBuiltinWorkflowIds]);
-    const enabledBuiltinWorkflowCount = builtinWorkflows.filter((workflow) => enabledBuiltinWorkflowIds.has(workflow.id)).length;
     const setBuiltinWorkflowEnabled = (workflowId: string, enabled: boolean) => {
         setForm((f) => {
             const allIds = builtinWorkflows.map((workflow) => workflow.id);
             const current = new Set(Array.isArray(f.enabledBuiltinWorkflowIds) ? f.enabledBuiltinWorkflowIds : allIds);
-            const currentEnabledCount = allIds.filter((id) => current.has(id)).length;
-            /*
-            FNXC:DisabledBuiltinWorkflows 2026-08-19-00:18:
-            The form itself enforces the persistence invariant, including callers
-            that invoke the setter without clicking the disabled final checkbox.
-            */
-            if (!enabled && current.has(workflowId) && currentEnabledCount <= 1) return f;
             if (enabled) {
                 current.add(workflowId);
             }
@@ -270,12 +262,11 @@ export function GeneralSection({ form, setForm, projectId, addToast, prefixError
             <SettingsHelpTip settingKey="enabledBuiltinWorkflowIds">{t("settings.general.disabledFusionWorkflowsAreHiddenFromWorkflow", "Disabled Fusion workflows are hidden from workflow pickers. Existing tasks that already use one continue to resolve. Default: all built-in workflows enabled (unset).")}</SettingsHelpTip>
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-sm)" }}>
-            <span id="builtin-workflow-enablement-hint" className="sr-only">{t("settings.general.builtinWorkflowAtLeastOneEnabled", "At least one built-in workflow must remain enabled.")}</span>
+            <span id="builtin-workflow-enablement-hint" className="sr-only">{t("settings.general.builtinWorkflowCustomDefault", "Choose a custom project default workflow to disable all built-in workflows.")}</span>
             {builtinWorkflows.map((workflow) => {
                 const checked = enabledBuiltinWorkflowIds.has(workflow.id);
-                const isLastEnabled = checked && enabledBuiltinWorkflowCount <= 1;
-                return (<label key={workflow.id} htmlFor={`builtin-workflow-${workflow.id}`} className="checkbox-label" title={isLastEnabled ? t("settings.general.builtinWorkflowAtLeastOneEnabled", "At least one built-in workflow must remain enabled.") : undefined}>
-                <input id={`builtin-workflow-${workflow.id}`} type="checkbox" checked={checked} disabled={isLastEnabled} aria-describedby="builtin-workflow-enablement-hint" onChange={(e) => setBuiltinWorkflowEnabled(workflow.id, e.target.checked)}/>
+                return (<label key={workflow.id} htmlFor={`builtin-workflow-${workflow.id}`} className="checkbox-label">
+                <input id={`builtin-workflow-${workflow.id}`} type="checkbox" checked={checked} aria-describedby="builtin-workflow-enablement-hint" onChange={(e) => setBuiltinWorkflowEnabled(workflow.id, e.target.checked)}/>
                 <WorkflowIcon workflowId={workflow.id} decorative />
                 <span>{workflow.name}</span>
               </label>);

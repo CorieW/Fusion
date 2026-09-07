@@ -1263,7 +1263,7 @@ describe("built-in workflows", () => {
       expect(await store.getTaskWorkflowSelectionAsync(task.id)).toMatchObject({ workflowId: "builtin:quick-fix" });
     });
 
-    it("requires one valid enabled built-in and rejects malformed sets atomically", async () => {
+    it("rejects malformed sets and disabling all built-ins without a custom default atomically", async () => {
       await store.updateSettings({ enabledBuiltinWorkflowIds: ["builtin:quick-fix"] });
       const invalidSets = [
         [],
@@ -1278,6 +1278,36 @@ describe("built-in workflows", () => {
         await expect(store.updateSettings({ enabledBuiltinWorkflowIds })).rejects.toThrow(/enabledBuiltinWorkflowIds/);
         expect((await store.getSettings()).enabledBuiltinWorkflowIds).toEqual(["builtin:quick-fix"]);
       }
+    });
+
+    it("uses only custom workflows for new work while retaining historical built-in selections", async () => {
+      const historical = await store.createTask({ description: "existing built-in task" });
+      const priorSelection = await store.getTaskWorkflowSelectionAsync(historical.id);
+      const custom = await store.createWorkflowDefinition({ name: "Team workflow", ir: getBuiltinWorkflow("builtin:quick-fix")!.ir });
+      await store.updateSettings({ defaultWorkflowId: custom.id, enabledBuiltinWorkflowIds: [] });
+
+      expect((await store.listWorkflowDefinitions()).map((workflow) => workflow.id)).toEqual([custom.id]);
+      expect(await store.getDefaultWorkflowId()).toBe(custom.id);
+      expect(await store.getTaskWorkflowSelectionAsync(historical.id)).toEqual(priorSelection);
+      expect(await store.getWorkflowDefinition(priorSelection!.workflowId)).toBeDefined();
+      const task = await store.createTask({ description: "new custom-only task" });
+      expect(await store.getTaskWorkflowSelectionAsync(task.id)).toMatchObject({ workflowId: custom.id });
+
+      await expect(store.setDefaultWorkflowId(null)).rejects.toThrow(/custom project default/);
+      await expect(store.setDefaultWorkflowId("builtin:coding")).rejects.toThrow(/custom project default/);
+      await expect(store.deleteWorkflowDefinition(custom.id)).rejects.toThrow(/another project default/);
+      expect(await store.getWorkflowDefinition(custom.id)).toBeDefined();
+      expect((await store.getSettings()).enabledBuiltinWorkflowIds).toEqual([]);
+      await store.updateSettings({ enabledBuiltinWorkflowIds: ["builtin:quick-fix"] });
+      await store.setDefaultWorkflowId("builtin:quick-fix");
+      expect(await store.getDefaultWorkflowId()).toBe("builtin:quick-fix");
+    });
+
+    it("rejects missing and fragment custom defaults when disabling all built-ins", async () => {
+      await expect(store.updateSettings({ defaultWorkflowId: "WF-missing", enabledBuiltinWorkflowIds: [] })).rejects.toThrow(/custom project default/);
+      const fragment = await store.createWorkflowDefinition({ name: "Reusable fragment", kind: "fragment", ir: getBuiltinWorkflow("builtin:pr-workflow")!.ir });
+      await expect(store.updateSettings({ defaultWorkflowId: fragment.id, enabledBuiltinWorkflowIds: [] })).rejects.toThrow(/custom project default/);
+      expect((await store.getSettings()).enabledBuiltinWorkflowIds).toBeUndefined();
     });
 
     it("can include disabled built-ins for workflow management surfaces", async () => {

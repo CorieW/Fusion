@@ -128,14 +128,19 @@ export async function buildDashboard(): Promise<void> {
   await cp(resolve(dashboardRoot, "src", "registry-manifest.json"), resolve(dashboardRoot, "dist", "registry-manifest.json"));
 }
 
-function runPnpm(args: string[], cwd: string): Promise<void> {
+export function runPnpm(args: string[], cwd: string): Promise<void> {
+  // FNXC:LocalDeployment 2026-09-06-23:49: Reuse pnpm's Node entrypoint for nested deploy commands. A Windows .cmd shell splits spaced deployment paths and interprets literal metacharacters.
+  const entry = process.env.npm_execpath;
+  const nodeEntry = entry && /pnpm\.(?:c?js|mjs)$/i.test(entry) ? entry : undefined;
+  if (process.platform === "win32" && !nodeEntry) {
+    return Promise.reject(new Error("Run the desktop build through pnpm so its Node entrypoint is available"));
+  }
   return new Promise((resolvePromise, rejectPromise) => {
-    const child = spawn("pnpm", args, {
+    const child = spawn(nodeEntry ? process.execPath : "pnpm", nodeEntry ? [nodeEntry, ...args] : args, {
       cwd,
       stdio: "inherit",
       env: process.env,
-      // pnpm resolves to a .cmd shim on Windows; Node refuses to spawn it without a shell.
-      shell: process.platform === "win32",
+      shell: false,
     });
     child.on("error", rejectPromise);
     child.on("exit", (code) =>

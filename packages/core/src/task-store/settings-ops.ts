@@ -24,6 +24,7 @@ import {isValidProviderInstanceId} from "../provider-instance.js";
 import {applyWorkspaceModeToggle, withWorkspaceModeLock, type WorkspaceModeToggleOps} from "../git/git-repository.js";
 import {
   getRequiredPluginIdForBuiltinWorkflow,
+  isBuiltinWorkflowId,
   validateEnabledBuiltinWorkflowIds,
 } from "../workflows/builtin-workflows.js";
 
@@ -63,9 +64,18 @@ export function __setWorkspaceModeOpsForTesting(ops: Partial<WorkspaceModeToggle
   workspaceModeOpsForTesting = ops;
 }
 
-async function assertValidEnabledBuiltinWorkflowIds(store: TaskStore, value: unknown): Promise<void> {
+async function assertValidEnabledBuiltinWorkflowIds(store: TaskStore, settings: Settings): Promise<void> {
+  const value = settings.enabledBuiltinWorkflowIds;
   validateEnabledBuiltinWorkflowIds(value);
   if (!Array.isArray(value)) return;
+  /* FNXC:CustomOnlyWorkflows 2026-09-06-23:33: An explicit empty set hides every built-in. Require a real custom default so unselected tasks cannot silently fall back to Coding. */
+  if (value.length === 0) {
+    const id = settings.defaultWorkflowId?.trim();
+    const workflow = id && !isBuiltinWorkflowId(id) ? await store.getWorkflowDefinition(id) : undefined;
+    if (!workflow || workflow.kind === "fragment") {
+      throw new Error("enabledBuiltinWorkflowIds: choose a custom project default workflow before disabling all built-in workflows");
+    }
+  }
   for (const rawId of value) {
     const requiredPluginId = getRequiredPluginIdForBuiltinWorkflow(rawId);
     if (requiredPluginId && !(await store.isPluginInstalled(requiredPluginId))) {
@@ -291,7 +301,7 @@ export async function updateSettingsImpl(store: TaskStore, patch: Partial<Settin
         before either the settings row or its immutable revision can be written. This
         keeps malformed enablement lists atomic across dashboard, CLI, and import writers.
         */
-        await assertValidEnabledBuiltinWorkflowIds(store, updatedProjectSettings.enabledBuiltinWorkflowIds);
+        await assertValidEnabledBuiltinWorkflowIds(store, updatedProjectSettings);
         /*
         FNXC:ConfigVersioning 2026-07-18-00:00:
         The project settings write and immutable revision share this existing
@@ -456,4 +466,3 @@ export async function updateGlobalSettingsImpl(store: TaskStore, patch: Partial<
     */
     return merged;
   }
-

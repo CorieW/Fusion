@@ -92,9 +92,6 @@ export function validateEnabledBuiltinWorkflowIds(value: unknown): asserts value
   if (!Array.isArray(value)) {
     throw new Error("enabledBuiltinWorkflowIds must be an array or null");
   }
-  if (value.length === 0) {
-    throw new Error("enabledBuiltinWorkflowIds must keep at least one built-in workflow enabled");
-  }
   const seen = new Set<string>();
   for (const rawId of value) {
     if (typeof rawId !== "string" || !isBuiltinWorkflowToggleEligible(resolveRetiredBuiltinWorkflowId(rawId))) {

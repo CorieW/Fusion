@@ -44,7 +44,7 @@ beforeEach(() => {
 afterEach(() => cleanup());
 
 describe("GeneralSection built-in workflow enablement", () => {
-  it("disables only the final checked workflow and prevents clearing it", async () => {
+  it("allows clearing every built-in workflow and enabling one again", async () => {
     render(<GeneralHost initialForm={{ enabledBuiltinWorkflowIds: ["builtin:coding", "builtin:quick-fix"] }} />);
 
     const coding = await screen.findByLabelText("Coding") as HTMLInputElement;
@@ -53,20 +53,24 @@ describe("GeneralSection built-in workflow enablement", () => {
     expect(quickFix.disabled).toBe(false);
 
     fireEvent.click(quickFix);
-    await waitFor(() => expect(coding.disabled).toBe(true));
+    await waitFor(() => expect(quickFix.checked).toBe(false));
+    expect(coding.disabled).toBe(false);
     expect(quickFix.checked).toBe(false);
     expect(coding).toHaveAttribute("aria-describedby", "builtin-workflow-enablement-hint");
 
     fireEvent.click(coding);
+    expect(coding.checked).toBe(false);
+    expect(quickFix.checked).toBe(false);
+    fireEvent.click(coding);
     expect(coding.checked).toBe(true);
   });
 
-  it("starts with a sole configured workflow disabled and explains the guard accessibly", async () => {
-    render(<GeneralHost initialForm={{ enabledBuiltinWorkflowIds: ["builtin:coding"] }} />);
+  it("keeps an empty configured set empty and explains the custom default requirement", async () => {
+    render(<GeneralHost initialForm={{ enabledBuiltinWorkflowIds: [] }} />);
 
     const coding = await screen.findByLabelText("Coding") as HTMLInputElement;
-    expect(coding.checked).toBe(true);
-    expect(coding.disabled).toBe(true);
-    expect(document.getElementById("builtin-workflow-enablement-hint")).toHaveTextContent("At least one built-in workflow must remain enabled");
+    expect(coding.checked).toBe(false);
+    expect(coding.disabled).toBe(false);
+    expect(document.getElementById("builtin-workflow-enablement-hint")).toHaveTextContent("Choose a custom project default workflow");
   });
 });
