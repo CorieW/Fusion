@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import type { AiSessionSummary } from "../../../api";
 import type { ModalManager } from "../../../hooks/useModalManager";
@@ -648,5 +648,26 @@ describe("DashboardBanners approval notification visibility", () => {
     );
 
     expect(screen.getByText("1 approval request need your attention")).toBeInTheDocument();
+  });
+});
+
+/* FNXC:MobileNavFit 2026-09-08-06:12: Surface enumeration: populated/empty project and overview banner stacks, all existing alert gates/actions, desktop/tablet and compact viewport layout. Scrolling must preserve every warning and action, not hide health failures to recover space. */
+describe("dashboard notification scroll region", () => {
+  it("retains independent alert actions inside a keyboard-reachable region", () => {
+    const onDismiss = vi.fn();
+    render(<DashboardBanners {...buildProps({ hasWarnings: true, setupReadinessLoading: false, setupWarningDismissed: false, handleDismissSetupWarning: onDismiss, dashboardHealth: unavailableEngineHealth() })} />);
+    const region = screen.getByRole("region", { name: "Notifications" });
+    expect(region).toHaveAttribute("tabindex", "0");
+    expect(within(region).getAllByRole("status").length).toBeGreaterThanOrEqual(2);
+    fireEvent.click(within(region).getByRole("button", { name: "Dismiss setup warning" }));
+    expect(onDismiss).toHaveBeenCalledOnce();
+  });
+
+  it("leaves an empty stack without a visible or focusable shell", () => {
+    const { container } = render(<DashboardBanners {...buildProps({ viewMode: "overview", currentProject: null, dashboardHealth: undefined })} />);
+    const region = container.querySelector(".dashboard-banners");
+    expect(region).toBeEmptyDOMElement();
+    expect(region).not.toBeVisible();
+    expect(screen.queryByRole("region", { name: "Notifications" })).toBeNull();
   });
 });

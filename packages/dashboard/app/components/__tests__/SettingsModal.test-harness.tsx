@@ -294,10 +294,18 @@ export function clearAdvancedSettingsPreference() {
 
 export function installSettingsModalEnv(options?: { advancedSettings?: boolean }) {
   const advancedSettings = options?.advancedSettings !== false;
+  const originalScrollTo = Object.getOwnPropertyDescriptor(HTMLElement.prototype, "scrollTo");
   beforeEach(() => {
     vi.useRealTimers();
     settingsModalUser = userEvent.setup({ delay: null, pointerEventsCheck: 0 });
     vi.resetAllMocks();
+    /* FNXC:MobileNavFit 2026-09-08-06:50: jsdom has no native element scrolling. Model the browser API for both responsive scroll owners in the shared factory, rather than masking auth success behind a missing-method exception. */
+    Object.defineProperty(HTMLElement.prototype, "scrollTo", {
+      configurable: true, writable: true,
+      value: vi.fn(function (this: HTMLElement, options: ScrollToOptions) {
+        this.scrollTop = options.top ?? this.scrollTop;
+      }),
+    });
     localStorage.clear();
     sessionStorage.clear();
     if (advancedSettings) {
@@ -577,6 +585,8 @@ export function installSettingsModalEnv(options?: { advancedSettings?: boolean }
     vi.useRealTimers();
     vi.unstubAllGlobals();
     vi.restoreAllMocks();
+    if (originalScrollTo) Object.defineProperty(HTMLElement.prototype, "scrollTo", originalScrollTo);
+    else Reflect.deleteProperty(HTMLElement.prototype, "scrollTo");
   });
 }
 

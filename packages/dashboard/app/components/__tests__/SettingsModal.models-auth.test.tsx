@@ -787,31 +787,17 @@ describe("SettingsModal", () => {
       });
     });
 
-    it("falls back to builtin workflow values when the configured default workflow is stale", async () => {
-      mockFetchWorkflowSettingValues
-        .mockRejectedValueOnce(new ApiRequestError("not found", 404))
-        .mockResolvedValueOnce({ stored: {}, effective: {}, orphaned: [] });
-      mockUpdateWorkflowSettingValues.mockResolvedValue({
-        stored: { planningProvider: "openai", planningModelId: "gpt-4o" },
-        effective: { planningProvider: "openai", planningModelId: "gpt-4o" },
-        orphaned: [],
-      });
+    /* FNXC:MobileNavFit 2026-09-08-06:50: Baseline verification found this stale assertion: bundled fallback workflows were removed. A missing configured workflow must leave no editable lanes and must never fetch or write a fabricated builtin. */
+    it("clears workflow lanes when the configured default workflow is stale", async () => {
+      mockFetchWorkflowSettingValues.mockRejectedValueOnce(new ApiRequestError("not found", 404));
       await setupWorkflowModelLaneTest();
-
       await waitFor(() => {
-        expect(mockFetchWorkflowSettingValues).toHaveBeenLastCalledWith("builtin:coding", "proj-1");
+        expect(screen.queryByText(/Loading workflow model lanes/)).not.toBeInTheDocument();
+        expect(screen.queryByLabelText("Plan/Triage Model")).not.toBeInTheDocument();
       });
-
-      await settingsModalUser.click(screen.getByLabelText("Plan/Triage Model"));
-      await settingsModalUser.click(await screen.findByText("GPT-4o"));
-
-      await waitFor(() => {
-        expect(mockUpdateWorkflowSettingValues).toHaveBeenCalledWith(
-          "builtin:coding",
-          { planningProvider: "openai", planningModelId: "gpt-4o" },
-          "proj-1",
-        );
-      });
+      expect(mockFetchWorkflowSettingValues).toHaveBeenCalledWith("workflow-custom", "proj-1");
+      expect(mockFetchWorkflowSettingValues.mock.calls.every(([id]) => id === "workflow-custom")).toBe(true);
+      expect(mockUpdateWorkflowSettingValues).not.toHaveBeenCalled();
     });
 
     it("shows typed workflow model lane rejections without closing or clearing pending edits", async () => {
@@ -1338,6 +1324,7 @@ describe("SettingsModal", () => {
 
       await waitFor(() => {
         expect(scrollToSpy).toHaveBeenCalledWith({ top: 0, behavior: "smooth" });
+        expect((document.querySelector(".settings-layout") as HTMLElement).scrollTo).toHaveBeenCalledWith({ top: 0, behavior: "smooth" });
       });
       expect(openSpy).toHaveBeenCalled();
     });
@@ -1879,6 +1866,7 @@ describe("SettingsModal", () => {
       await waitFor(() => {
         expect(mockSaveApiKey).toHaveBeenCalledWith("openai", "sk-test-key");
         expect(scrollToSpy).toHaveBeenCalledWith({ top: 0, behavior: "smooth" });
+        expect((document.querySelector(".settings-layout") as HTMLElement).scrollTo).toHaveBeenCalledWith({ top: 0, behavior: "smooth" });
       });
     });
 

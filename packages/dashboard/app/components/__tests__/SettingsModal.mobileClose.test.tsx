@@ -76,6 +76,23 @@ describe("SettingsModal mobile embedded close button (FN-7627)", () => {
     mockUseViewportMode.mockReturnValue("desktop");
   });
 
+  /* FNXC:MobileNavFit 2026-09-08-06:50: Section switches reset both responsive scroll owners, for embedded and dialog Settings, without depending on jsdom layout emulation. */
+  it.each(["embedded", "modal"] as const)("resets both scroll containers on section change (%s)", async (presentation) => {
+    mockUseViewportMode.mockReturnValue("mobile");
+    const { baseElement } = renderModal({ presentation, initialSection: "appearance" });
+    const picker = await screen.findByLabelText("Settings Section");
+    const layout = baseElement.querySelector<HTMLElement>(".settings-layout")!;
+    const content = baseElement.querySelector<HTMLElement>(".settings-content")!;
+    layout.scrollTop = 180;
+    content.scrollTop = 240;
+    const next = Array.from((picker as HTMLSelectElement).options).find(option => option.value !== "appearance" && !option.disabled)!;
+    fireEvent.change(picker, { target: { value: next.value } });
+    await waitFor(() => {
+      expect(layout.scrollTop).toBe(0);
+      expect(content.scrollTop).toBe(0);
+    });
+  });
+
   it("renders a close button in embedded+mobile with an accessible name and calls onClose exactly once", async () => {
     mockUseViewportMode.mockReturnValue("mobile");
     const onClose = vi.fn();
