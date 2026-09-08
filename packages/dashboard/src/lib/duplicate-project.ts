@@ -1,15 +1,20 @@
+import { win32, posix } from 'node:path';
 import { AgentStore, resolveEffectiveSettingValues, type TaskStore } from "@fusion/core";
 import { duplicateAgentConfiguration } from "./duplicate-agent.js";
 
 /** FNXC:Duplicate 2026-09-07-04:09: Rebind references recursively while preserving graph structure and custom configuration. */
 export function remapConfiguration<T>(value: T, ids: Map<string, string>, sourceRoot: string, targetRoot: string): T {
+  // FNXC:ProjectDuplicate 2026-09-08-12:40: Windows roots are case-insensitive and accept either separator. Compare normalized path boundaries, not string prefixes, while leaving prose and unrelated paths alone.
+  const paths = process.platform === 'win32' || /^[a-z]:/i.test(sourceRoot) || sourceRoot.startsWith(String.fromCharCode(92,92)) ? win32 : posix;
   const visit = (item: unknown): unknown => {
     if (typeof item === "string") {
       if (ids.has(item)) return ids.get(item);
-      for (const separator of ["/", "\\"]) {
-        if (item.startsWith(sourceRoot + separator)) return targetRoot + item.slice(sourceRoot.length);
+      if (paths.isAbsolute(item)) {
+        const relative = paths.relative(sourceRoot, item);
+        if (!relative) return targetRoot;
+        if (relative !== '..' && !relative.startsWith('..' + paths.sep) && !paths.isAbsolute(relative)) return paths.join(targetRoot, relative);
       }
-      return item === sourceRoot ? targetRoot : item;
+      return item;
     }
     if (Array.isArray(item)) return item.map(visit);
     if (item && typeof item === "object") return Object.fromEntries(Object.entries(item).map(([key, child]) => [ids.get(key) ?? key, visit(child)]));

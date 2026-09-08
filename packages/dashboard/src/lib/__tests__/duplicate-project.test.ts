@@ -25,3 +25,12 @@ describe("project configuration duplication", () => {
     expect(target.createWorkflowDefinition).toHaveBeenCalledTimes(populated ? 1 : 0);
   });
 });
+
+it.each(['a:/old project/worktrees','A:/Old Project/worktrees','A:/Old Project/./worktrees'])('rebases equivalent Windows path %s',value=>{
+ const copied=remapConfiguration({worktreesDir:value},new Map(),'A:/Old Project','A:/New Project');
+ expect(copied.worktreesDir.split(String.fromCharCode(92)).join('/')).toBe('A:/New Project/worktrees');
+});
+it('preserves unrelated paths and prose and handles root identity and empty values',()=>{
+ const value={root:'a:/old project',outside:'A:/Old Project Other/worktrees',escape:'A:/Old Project/../Elsewhere',prose:'Use A:/Old Project/worktrees',empty:null};
+ expect(remapConfiguration(value,new Map(),'A:/Old Project','A:/New Project')).toEqual({...value,root:'A:/New Project'});
+});
