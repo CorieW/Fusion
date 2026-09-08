@@ -25,7 +25,7 @@ import type { TaskStore } from "../store.js";
 interface FakeStoreOptions {
   settings?: Record<string, unknown>;
   /** Workflow ids that resolve, mapped to their kind. Anything else resolves to undefined. */
-  workflows?: Record<string, "workflow" | "fragment">;
+  workflows?: Record<string, "workflow" | "fragment" | "historical">;
   settingsThrows?: boolean;
   lookupThrows?: boolean;
 }
@@ -114,10 +114,10 @@ describe("resolveOriginWorkflowOverrideId", () => {
         await expect(resolveOriginWorkflowOverrideIdImpl(store, origin)).resolves.toBeUndefined();
       });
 
-      it("degrades a fragment id to inherit (a fragment is never independently selectable)", async () => {
+      it.each(["fragment", "historical"] as const)("degrades a %s id to inherit", async (kind) => {
         const store = makeStore({
           settings: { [PINNED_KEY[origin]]: "WF-frag" },
-          workflows: { "WF-frag": "fragment" },
+          workflows: { "WF-frag": kind },
         });
         await expect(resolveOriginWorkflowOverrideIdImpl(store, origin)).resolves.toBeUndefined();
       });

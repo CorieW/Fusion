@@ -27,13 +27,12 @@ pgTest("workflow definitions (PostgreSQL backend mode)", () => {
   afterEach(h.afterEach);
   afterAll(h.afterAll);
 
-  it("listWorkflowDefinitions resolves (builtins) without throwing in backend mode", async () => {
+  it("listWorkflowDefinitions resolves an empty catalog without throwing in backend mode", async () => {
     const store = h.store();
     expect(store.backendMode).toBe(true);
     const defs = await store.listWorkflowDefinitions({ includeDisabledBuiltins: true });
-    // Builtins come from code constants and must be present even with no custom rows.
-    expect(Array.isArray(defs)).toBe(true);
-    expect(defs.length).toBeGreaterThan(0);
+    // FNXC:CustomWorkflows 2026-09-08-13:54: No catalog entries exist until the operator saves a workflow.
+    expect(defs).toEqual([]);
   });
 
   it("custom workflow rows are read from project.workflows via the async helpers", async () => {

@@ -127,6 +127,14 @@ test("observed-flake register active count, escalation state, and owners stay sy
       heading: "14. Merge-node paused-abort retry sequence",
       status: "Quarantined 2026-08-29 after a second sequence-only sighting.",
     },
+    {
+      heading: "15. Workflow settings identity PostgreSQL setup hook",
+      status: "Active first sighting — recorded 2026-09-08 during operator-requested review; unassigned pending next sighting.",
+    },
+    {
+      heading: "16. Custom workflow lifecycle PostgreSQL setup hook",
+      status: "Active first sighting — recorded 2026-09-08 during operator-requested review; unassigned pending next sighting.",
+    },
   ]);
 });
 

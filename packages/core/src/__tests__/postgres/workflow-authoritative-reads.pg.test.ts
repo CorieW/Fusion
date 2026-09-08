@@ -41,7 +41,7 @@ pgDescribe("PostgreSQL workflow authoritative reads", () => {
     */
     const ir = workflowWithCustomColumn();
     const workflow = await store.createWorkflowDefinition({ name: "Occupancy", ir, layout: {} });
-    const task = await store.createTask({ description: "occupies custom column" });
+    const task = await store.createTask({ description: "occupies custom column", workflowId: workflow.id });
     await store.selectTaskWorkflow(task.id, workflow.id);
     await store.moveTask(task.id, "custom-hold", { moveSource: "engine", bypassGuards: true, recoveryRehome: true });
 

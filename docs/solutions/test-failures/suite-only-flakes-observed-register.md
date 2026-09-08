@@ -19,7 +19,7 @@ tags:
 
 # Observed suite-only flakes register
 
-This register has **4 active observation records** (entries 1, 2, 13, and 14): **2 active first sightings**, **1 reproduced-but-unattributed observation**, and **1 quarantined second sighting**. Entry 7 below is closed and retained for cross-reference only. It also has **1 merge-gate eviction record** (entry 6) and **8 archived closed records**. Only the active section drives quarantine and escalation decisions; the other sections preserve historical evidence.
+This register has **6 active observation records** (entries 1, 2, 13, 14, 15, and 16): **4 active first sightings**, **1 reproduced-but-unattributed observation**, and **1 quarantined second sighting**. Entry 7 below is closed and retained for cross-reference only. It also has **1 merge-gate eviction record** (entry 6) and **8 archived closed records**. Only the active section drives quarantine and escalation decisions; the other sections preserve historical evidence.
 
 <!--
 FNXC:TestFlakeRegister 2026-08-19-11:14:
@@ -240,6 +240,27 @@ Quarantine was not available as an alternative. Core PostgreSQL files cannot be 
 
 The failure remains sequence-only evidence, not an attribution to FN-249: its changed user-cancellation path is not enabled by this fixture, and the selected pre-existing engine-abort subject passes in isolation. Per the mandatory deletion ratchet, the second sighting is quarantined in `scripts/lib/test-quarantine.json` and the matching `engine-reliability` exclude; no timeout, retry, or assertion was changed. Rescue requires a root-cause fix that proves the file's recovery coverage is stable.
 
+
+### 15. Workflow settings identity PostgreSQL setup hook
+
+- **Status:** Active first sighting — recorded 2026-09-08 during operator-requested review; unassigned pending next sighting.
+- **File:** `packages/core/src/__tests__/postgres/workflow-settings-project-identity.pg.test.ts`
+- **Exact test:** `workflow-settings project identity keys by the central-registry id (PostgreSQL) > beforeAll(h.beforeAll)`
+- **Observed tree/SHA:** `fix/review-13-issues` at `00191ee5f`; Windows, Node 24.3.0, Vitest 4.1.10.
+- **Reproduction:** File-scoped Vitest run against a newly initialized disposable PostgreSQL cluster, with a sterile home/environment and `FUSION_PG_TEST_URL_BASE` explicitly pointing to that cluster. No production database was used.
+- **Observed result:** The existing shared-harness setup hit its inherited 15s hook limit before any of the five integration cases ran; four pure tests passed. An unchanged file-scoped rerun passed all nine tests. No timeout, worker count, retry, or assertion was changed.
+- **Evidence:** [Full first-sighting output](file:///A:/kb-worktrees/review-13-issues/.fusion/review-tests/pg-workflow-settings-project-identity.first-sighting.log). The retained `.fusion/run-pg.mjs` driver records and tears down the owned cluster.
+- **Disposition:** Preserve the five project-namespace/settings integration cases and four pure resolver cases under the first-sighting exception. This is an unattributed cold setup timeout, not evidence of a workflow-settings regression. A second sighting requires ordinary escalation/quarantine; the passing rerun does not close this observation.
+
+### 16. Custom workflow lifecycle PostgreSQL setup hook
+
+- **Status:** Active first sighting — recorded 2026-09-08 during operator-requested review; unassigned pending next sighting.
+- **File:** `packages/core/src/__tests__/builtin-workflows.test.ts`
+- **Exact test:** `custom workflow project lifecycle > beforeAll(harness.beforeAll)`
+- **Observed tree/SHA:** `fix/review-13-issues` at `c411fa715` plus the uncommitted historical-workflow fix, Windows/Node 24.3.0/Vitest 4.1.10.
+- **Reproduction:** Two file-scoped integration fixtures against a fresh disposable PostgreSQL cluster while an earlier dashboard typecheck was still running. Both schema setup hooks hit the existing 15s budget. No product-case assertion failed.
+- **Evidence limitation:** [Retained error output](file:///A:/kb-worktrees/review-13-issues/.fusion/review-tests/13-retest.log) contains the hook identities but not full stdout. Later runs retain complete output.
+- **Disposition:** Stop overlapping compilation with database verification; colocate the new historical-deletion tests with this existing module to reuse its schema template. All eight resulting tests passed without raising timeouts or adding retries. Preserve this meaningful lifecycle/history coverage under the first-sighting exception; an unchanged passing run does not establish a root-cause fix. A second sighting requires ordinary escalation/quarantine.
 
 ### Common shape and investigated result
 

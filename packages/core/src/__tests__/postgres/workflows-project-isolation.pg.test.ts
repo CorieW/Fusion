@@ -122,6 +122,8 @@ pgDescribe("workflows project isolation", () => {
       .where(and(eq(schema.project.workflows.id, "WF-003"), eq(schema.project.workflows.projectId, projectB.projectId!))))
       .toEqual([{ ir: foreignIr }]);
 
+    // FNXC:WorkflowDeletion 2026-09-08-13:54: This deletion-isolation case must release its live analytics reference first.
+    await storeA.selectTaskWorkflow("FN-WORKFLOW-ANALYTICS", "WF-005");
     await storeA.deleteWorkflowDefinition("WF-003");
     expect(await getWorkflowRow(projectA, "WF-003")).toBeUndefined();
     expect(await projectA.db.select().from(schema.project.workflowSettings).where(and(eq(schema.project.workflowSettings.workflowId, "WF-003"), eq(schema.project.workflowSettings.projectId, projectA.projectId!)))).toEqual([]);

@@ -101,12 +101,11 @@ pgDescribe("workflow definition list/get coherence", () => {
     expect(await storeA.getWorkflowDefinition(id)).toBeUndefined();
   });
 
-  it("retains builtin definitions for a project with no custom workflow rows", async () => {
+  it("keeps an empty catalog when no project definitions are saved", async () => {
     const storeA = h.store();
     const listed = await storeA.listWorkflowDefinitions({ includeDisabledBuiltins: true });
 
-    expect(listed.length).toBeGreaterThan(0);
-    expect(listed.find((definition) => definition.id === "builtin:coding"))
-      .toEqual(await storeA.getWorkflowDefinition("builtin:coding"));
+    expect(listed).toEqual([]);
+    expect(await storeA.getWorkflowDefinition("builtin:coding")).toBeUndefined();
   });
 });
