@@ -4687,6 +4687,19 @@ describe("WorkflowNodeEditor simplified view modes", () => {
 describe('workflow duplication protects unsaved edits',()=>{
  beforeEach(()=>{vi.clearAllMocks();vi.mocked(fetchTraits).mockResolvedValue(TRAIT_CATALOG);vi.mocked(fetchStepParsers).mockResolvedValue(['step-headings','json-steps']);vi.mocked(fetchModels).mockResolvedValue({models:[]});});
  afterEach(()=>cleanup());
+ it.each([true,false])('duplicate permission escalation requires explicit approval (%s)',async approved=>{
+  const original=v2Def();vi.mocked(fetchWorkflows).mockResolvedValue([original]);
+  vi.mocked(createWorkflow).mockRejectedValueOnce(Object.assign(new Error('broader permissions'),{details:{policyEscalation:true}})).mockResolvedValue({...original,id:'WF-copy',name:'Copy'});
+  const confirmation=vi.spyOn(window,'confirm').mockReturnValue(approved);
+  try {
+   renderWithConfirm(<WorkflowNodeEditor isOpen onClose={()=>{}} addToast={()=>{}} />);
+   fireEvent.click(await screen.findByRole('button',{name:'Duplicate',exact:true}));
+   await waitFor(()=>expect(confirmation).toHaveBeenCalledTimes(1));
+   await waitFor(()=>expect(createWorkflow).toHaveBeenCalledTimes(approved?2:1));
+   if(approved)expect(vi.mocked(createWorkflow).mock.calls[1][0]).toHaveProperty('confirmPolicyEscalation',true);
+   else expect(screen.getByTestId('wf-workflow-name')).toHaveTextContent(original.name);
+  }finally{confirmation.mockRestore();}
+ });
  it.each(['desktop','mobile'] as const)('cancel retains the dirty graph; confirmed discard copies saved state on %s',async mode=>{
   mockWorkflowEditorViewport(mode);const original=v2Def();vi.mocked(fetchWorkflows).mockResolvedValue([original]);
   vi.mocked(createWorkflow).mockResolvedValue({...original,id:'WF-copy',name:'Custom (copy)'});

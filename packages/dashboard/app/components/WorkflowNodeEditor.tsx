@@ -2235,6 +2235,14 @@ function InnerEditor({
     }
   }, [activeWorkflow, projectId, addToast, confirm, t, isMobileMode]);
 
+  // FNXC:WorkflowDuplicate 2026-09-08-12:50: Save and Duplicate share explicit permission confirmation; a copy never inherits prior approval.
+  const confirmColumnPolicyEscalation = useCallback((err: unknown) => {
+    if ((err as { details?: { policyEscalation?: boolean } } | null)?.details?.policyEscalation !== true) throw err;
+    return window.confirm(`${getErrorMessage(err)}
+
+${t("workflowColumns.confirmPolicyEscalation", "Bind it anyway? The column agent will run with broader permissions than this project's default.")}`);
+  }, [t]);
+
   const handleDuplicate = useCallback(async () => {
     if (!activeWorkflow || duplicatePending.current) return;
     duplicatePending.current = true;
@@ -2246,16 +2254,19 @@ function InnerEditor({
         fetchWorkflowSettingValues(activeWorkflow.id, projectId),
         fetchWorkflowPromptOverrides(activeWorkflow.id, projectId),
       ]);
-      const created = await createWorkflow(
-        {
-          name: duplicateName(activeWorkflow.name, workflows.map(workflow => workflow.name)),
-          description: activeWorkflow.description,
-          icon: isBuiltinWorkflowId(activeWorkflow.id) || !activeWorkflow.icon ? "✨" : activeWorkflow.icon,
-          ir: activeWorkflow.ir,
-          layout: activeWorkflow.layout,
-        },
-        projectId,
-      );
+      const createCopy = (confirmPolicyEscalation?: boolean) => createWorkflow({
+        name: duplicateName(activeWorkflow.name, workflows.map(workflow => workflow.name)),
+        description: activeWorkflow.description,
+        icon: isBuiltinWorkflowId(activeWorkflow.id) || !activeWorkflow.icon ? "✨" : activeWorkflow.icon,
+        ir: activeWorkflow.ir, layout: activeWorkflow.layout,
+        ...(confirmPolicyEscalation ? { confirmPolicyEscalation: true } : {}),
+      }, projectId);
+      let created: WorkflowDefinition;
+      try { created = await createCopy(); }
+      catch (error) {
+        if (!confirmColumnPolicyEscalation(error)) return;
+        created = await createCopy(true);
+      }
       incompleteCopyId = created.id;
       if (Object.keys(values.effective).length) await updateWorkflowSettingValues(created.id, values.effective, projectId);
       const overrides = Object.fromEntries(Object.entries(prompts.stored).filter(([nodeId]) => nodeId in prompts.effective));
@@ -2273,7 +2284,7 @@ function InnerEditor({
       duplicatePending.current = false;
       setDuplicating(false);
     }
-  }, [activeWorkflow, workflows, projectId, addToast, t]);
+  }, [activeWorkflow, workflows, projectId, addToast, t, confirmColumnPolicyEscalation]);
 
   const handleSave = useCallback(async () => {
     if (!activeWorkflow) return;
@@ -2354,21 +2365,7 @@ function InnerEditor({
       try {
         await finishSave(await updateWorkflow(activeWorkflow.id, savePayload, projectId));
       } catch (err) {
-        // Policy-escalation handshake (R13, PR #1432 review): the route rejects a
-        // binding to a broader-than-default agent until the author explicitly
-        // confirms. Surface the server's explanation, then retry with the flag —
-        // otherwise such bindings would be unsavable from the dashboard.
-        // Shape-checked rather than `instanceof ApiRequestError` so test doubles
-        // (and any error wrapper) that carry the details payload still route here.
-        const escalation =
-          (err as { details?: { policyEscalation?: boolean } } | null)?.details?.policyEscalation === true;
-        if (!escalation) throw err;
-        const proceed = window.confirm(
-          `${getErrorMessage(err)}\n\n${t(
-            "workflowColumns.confirmPolicyEscalation",
-            "Bind it anyway? The column agent will run with broader permissions than this project's default.",
-          )}`,
-        );
+        const proceed = confirmColumnPolicyEscalation(err);
         if (!proceed) {
           addToast(t("workflowColumns.escalationDeclined", "Save cancelled — column agent binding not confirmed"), "error");
           return;
@@ -2391,7 +2388,7 @@ function InnerEditor({
     } finally {
       setSaving(false);
     }
-  }, [activeWorkflow, name, description, nodes, edges, columns, fields, settings, unplaced, blockingViolationCount, projectId, addToast, t]);
+  }, [activeWorkflow, name, description, nodes, edges, columns, fields, settings, unplaced, blockingViolationCount, projectId, addToast, t, confirmColumnPolicyEscalation]);
 
   // Stamp the shared error-state badge onto offending nodes: unplaced step
   // nodes and any node the server flagged (seam-in-branch). One component
