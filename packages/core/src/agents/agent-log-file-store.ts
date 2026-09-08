@@ -31,6 +31,8 @@ export interface AgentLogFileAppendInput {
   type: AgentLogEntry["type"];
   detail?: string | null;
   agent?: AgentLogEntry["agent"] | null;
+  agentId?: string;
+  agentName?: string;
   durationMs?: number | null;
   timeToFirstTokenMs?: number | null;
 }
@@ -42,6 +44,8 @@ interface AgentLogJsonlRow {
   type: AgentLogEntry["type"];
   detail?: string;
   agent?: AgentLogEntry["agent"];
+  agentId?: string;
+  agentName?: string;
   durationMs?: number;
   timeToFirstTokenMs?: number;
 }
@@ -186,6 +190,8 @@ function serializeEntry(entry: AgentLogFileAppendInput): string {
     type: entry.type,
     ...(normalizedDetail !== undefined && { detail: normalizedDetail }),
     ...(entry.agent != null && { agent: entry.agent }),
+    ...(typeof entry.agentId === "string" && entry.agentId.trim() && { agentId: entry.agentId.trim() }),
+    ...(typeof entry.agentName === "string" && entry.agentName.trim() && { agentName: entry.agentName.trim() }),
     ...(durationMs !== undefined && { durationMs }),
     ...(timeToFirstTokenMs !== undefined && { timeToFirstTokenMs }),
   };
@@ -203,6 +209,8 @@ function materializeEntry(entry: AgentLogFileAppendInput, lineNo: number): Store
     type: entry.type,
     ...(normalizedDetail !== undefined && { detail: normalizedDetail }),
     ...(entry.agent != null && { agent: entry.agent }),
+    ...(typeof entry.agentId === "string" && entry.agentId.trim() && { agentId: entry.agentId.trim() }),
+    ...(typeof entry.agentName === "string" && entry.agentName.trim() && { agentName: entry.agentName.trim() }),
     ...(durationMs !== undefined && { durationMs }),
     ...(timeToFirstTokenMs !== undefined && { timeToFirstTokenMs }),
     lineNo,

@@ -368,6 +368,7 @@ describe("TaskChatTab", () => {
   });
 
   afterEach(() => {
+    vi.unstubAllGlobals();
     removeBoardWorkflowSelection("project-1");
     vi.useRealTimers();
     restoreMetricDescriptor("scrollTop", originalScrollTopDescriptor);
@@ -393,6 +394,23 @@ describe("TaskChatTab", () => {
   it("subscribes to live agent logs only when active", () => {
     render(<TaskChatTab task={makeTask()} active={false} projectId="project-1" addToast={vi.fn()} />);
     expect(mockedUseAgentLogs).toHaveBeenCalledWith("FN-001", false, "project-1");
+  });
+
+  it.each([390, 1280])("labels workflow activity by agent identity at %ipx", (width) => {
+    vi.stubGlobal("innerWidth", width);
+    mockLogs([
+      makeEntry({ agent: "executor", agentId: "coder", agentName: "Kit Parity Coder", text: "Coding result" }),
+      makeEntry({ agent: "reviewer", agentId: "reviewer", agentName: "Kit Parity Reviewer", text: "Review result" }),
+      makeEntry({ agent: "executor", agentId: "tester", agentName: "Kit Parity Tester", text: "Testing result" }),
+      makeEntry({ agent: "executor", agentId: "other-tester", agentName: "Kit Parity Tester", text: "Independent test" }),
+      makeEntry({ agent: "executor", text: "Legacy activity" }),
+    ]);
+    render(<TaskChatTab task={makeTask()} active addToast={vi.fn()} />);
+    expect(screen.getByRole("region", { name: "Kit Parity Coder messages" })).toHaveTextContent("Coding result");
+    expect(screen.getByRole("region", { name: "Kit Parity Reviewer messages" })).toHaveTextContent("Review result");
+    expect(screen.getAllByRole("region", { name: "Kit Parity Tester messages" })).toHaveLength(2);
+    expect(screen.getByRole("region", { name: "Executor messages" })).toHaveTextContent("Legacy activity");
+    expect(screen.queryByRole("region", { name: "Reviewer messages" })).not.toBeInTheDocument();
   });
 
   it("renders empty state without timestamp shells when no transcript messages exist", () => {

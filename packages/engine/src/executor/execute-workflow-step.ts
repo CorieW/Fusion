@@ -9,6 +9,7 @@
 import { exec } from "node:child_process";
 import { promisify } from "node:util";
 import type {
+  AgentRole,
   AgentStore,
   ResolvedTaskOutputLanguage,
   Settings,
@@ -237,6 +238,7 @@ export async function executeWorkflowStep(
   stepOptions?: {
     unattended?: boolean;
     principalAgentId?: string;
+    activityRole?: AgentRole;
     outputLanguage?: ResolvedTaskOutputLanguage;
     sessionBoundary?: SessionBoundaryDescriptor;
     diffBaseCommitSha?: string;
@@ -790,10 +792,15 @@ CRITICAL SCOPING RULES — read before doing anything else:
     const sessionTask = workflowPrincipal
       ? { ...task, assignedAgentId: workflowPrincipal.id }
       : task;
+    const workflowAgent = workflowPrincipal ?? await deps.getAuthoritativeAssignedAgent(task.assignedAgentId);
+    const activityRole = stepOptions?.activityRole
+      ?? (workflowStepMetadata.reviewKind || isReviewTypeWorkflowStep ? "reviewer" : "executor");
     const agentLogger = new AgentLogger({
       store: deps.store,
       taskId: task.id,
-      agent: "reviewer",
+      agent: activityRole,
+      agentId: workflowAgent?.id,
+      agentName: workflowAgent?.name,
       persistAgentToolOutput: settings.persistAgentToolOutput,
       // Review-in-executor sessions are task-scoped ephemeral workers.
       persistAgentThinkingLog: resolvePersistAgentThinkingLog(settings, { ephemeral: true }),
@@ -879,7 +886,6 @@ CRITICAL SCOPING RULES — read before doing anything else:
         pluginRunner: deps.options.pluginRunner,
       });
 
-      const workflowAgent = workflowPrincipal ?? await deps.getAuthoritativeAssignedAgent(task.assignedAgentId);
       const workflowRuntimeHint = extractRuntimeHint(workflowAgent?.runtimeConfig);
       // Signal to skills running in this step (e.g. compound-engineering ce-plan /
       // ce-work) that they are inside a Fusion autonomous workflow step, NOT an
@@ -950,7 +956,7 @@ CRITICAL SCOPING RULES — read before doing anything else:
       }
       const logBrowserVerificationActivity = async (message: string) => {
         await deps.store.logEntry(task.id, message);
-        await deps.store.appendAgentLog(task.id, message, "status", undefined, "reviewer");
+        await deps.store.appendAgentLog(task.id, message, "status", undefined, activityRole, { agentId: workflowAgent?.id, agentName: workflowAgent?.name });
       };
       if (workflowStep.requiresBrowser === true) {
         effectiveSkillSelection = augmentSessionSkillsForBrowserStep(effectiveSkillSelection, deps.rootDir);

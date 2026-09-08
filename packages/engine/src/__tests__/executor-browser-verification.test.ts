@@ -203,7 +203,7 @@ describe("browser-verification workflow-step browser capability", () => {
     );
   });
 
-  it("logs browser verification start, availability, and finish while augmenting session skills", async () => {
+  it.each(["executor", "reviewer"])("logs browser verification under the %s role while augmenting session skills", async (activityRole) => {
     const store = createMockStore();
     const executor = makeExecutor(store);
     const cap = captureSession();
@@ -218,7 +218,7 @@ describe("browser-verification workflow-step browser capability", () => {
       "/tmp/wt",
       {},
       undefined,
-      undefined,
+      { activityRole },
     );
 
     expect(result.success).toBe(true);
@@ -232,21 +232,24 @@ describe("browser-verification workflow-step browser capability", () => {
       expect.stringContaining("[browser-verification] starting browser verification"),
       "status",
       undefined,
-      "reviewer",
+      activityRole,
+      { agentId: undefined, agentName: undefined },
     );
     expect(store.appendAgentLog).toHaveBeenCalledWith(
       "FN-7130",
       "[browser-verification] agent-browser available — version agent-browser 9.9.9",
       "status",
       undefined,
-      "reviewer",
+      activityRole,
+      { agentId: undefined, agentName: undefined },
     );
     expect(store.appendAgentLog).toHaveBeenCalledWith(
       "FN-7130",
       "[browser-verification] finished browser verification for task FN-7130: verdict APPROVE",
       "status",
       undefined,
-      "reviewer",
+      activityRole,
+      { agentId: undefined, agentName: undefined },
     );
   });
 
@@ -278,7 +281,7 @@ describe("browser-verification workflow-step browser capability", () => {
     expect(cap.last).toBeUndefined();
     expect(formatAgentBrowserAvailabilityLog({ available: false, reason: "not installed" })).toBe(warning);
     expect(store.logEntry).toHaveBeenCalledWith("FN-7130", warning);
-    expect(store.appendAgentLog).toHaveBeenCalledWith("FN-7130", warning, "status", undefined, "reviewer");
+    expect(store.appendAgentLog).toHaveBeenCalledWith("FN-7130", warning, "status", undefined, "reviewer", { agentId: undefined, agentName: undefined });
   });
 
   it("records browser verification as not executed when the availability probe times out", async () => {
@@ -309,7 +312,7 @@ describe("browser-verification workflow-step browser capability", () => {
     expect(String(result.output)).toContain("probe timed out");
     expect(cap.last).toBeUndefined();
     expect(store.logEntry).toHaveBeenCalledWith("FN-7130", warning);
-    expect(store.appendAgentLog).toHaveBeenCalledWith("FN-7130", warning, "status", undefined, "reviewer");
+    expect(store.appendAgentLog).toHaveBeenCalledWith("FN-7130", warning, "status", undefined, "reviewer", { agentId: undefined, agentName: undefined });
   });
 
   it("keeps flag-absent prompt steps byte-inert for browser logging and skills", async () => {

@@ -85,7 +85,7 @@ export async function markLegacyAutoMergeStampsOnceImpl(store: TaskStore): Promi
     });
   }
 
-export async function appendAgentLogImpl(store: TaskStore, taskId: string, text: string, type: AgentLogEntry["type"], detail?: string, agent?: AgentLogEntry["agent"], timing?: Pick<AgentLogEntry, "durationMs" | "timeToFirstTokenMs">,): Promise<void> {
+export async function appendAgentLogImpl(store: TaskStore, taskId: string, text: string, type: AgentLogEntry["type"], detail?: string, agent?: AgentLogEntry["agent"], timing?: Pick<AgentLogEntry, "durationMs" | "timeToFirstTokenMs" | "agentId" | "agentName">,): Promise<void> {
     const timestamp = new Date().toISOString();
     const normalizedDetail = truncateAgentLogDetail(detail, type);
     const entry: AgentLogEntry = {
@@ -95,6 +95,8 @@ export async function appendAgentLogImpl(store: TaskStore, taskId: string, text:
       type,
       ...(normalizedDetail !== undefined && { detail: normalizedDetail }),
       ...(agent !== undefined && { agent }),
+      ...(timing?.agentId?.trim() && { agentId: timing.agentId.trim() }),
+      ...(timing?.agentName?.trim() && { agentName: timing.agentName.trim() }),
       ...(timing?.durationMs !== undefined && { durationMs: timing.durationMs }),
       ...(timing?.timeToFirstTokenMs !== undefined && { timeToFirstTokenMs: timing.timeToFirstTokenMs }),
     };
@@ -122,6 +124,8 @@ export async function appendAgentLogImpl(store: TaskStore, taskId: string, text:
       type,
       detail: normalizedDetail ?? null,
       agent: agent ?? null,
+      agentId: entry.agentId,
+      agentName: entry.agentName,
       durationMs: null,
       timeToFirstTokenMs: null,
     });
@@ -342,4 +346,3 @@ export async function backfillCommitAssociationDiffStatsImpl(store: TaskStore, o
 
     return report;
   }
-

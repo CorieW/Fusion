@@ -680,6 +680,8 @@ export class TaskStore extends EventEmitter<TaskStoreEvents> {
     type: AgentLogEntry["type"];
     detail: string | null;
     agent: AgentLogEntry["agent"] | null;
+    agentId?: string;
+    agentName?: string;
     durationMs: number | null;
     timeToFirstTokenMs: number | null;
   }> = [];
@@ -3527,7 +3529,7 @@ export class TaskStore extends EventEmitter<TaskStoreEvents> {
   async deleteAttachment(id: string, filename: string): Promise<Task> {
     return deleteAttachmentImpl(this, id, filename);
   }
-  async appendAgentLog( taskId: string, text: string, type: AgentLogEntry["type"], detail?: string, agent?: AgentLogEntry["agent"], timing?: Pick<AgentLogEntry, "durationMs" | "timeToFirstTokenMs">, ): Promise<void> {
+  async appendAgentLog( taskId: string, text: string, type: AgentLogEntry["type"], detail?: string, agent?: AgentLogEntry["agent"], timing?: Pick<AgentLogEntry, "durationMs" | "timeToFirstTokenMs" | "agentId" | "agentName">, ): Promise<void> {
     return appendAgentLogImpl(this, taskId, text, type, detail, agent, timing);
   }
 
@@ -3541,7 +3543,7 @@ export class TaskStore extends EventEmitter<TaskStoreEvents> {
   public flushAgentLogBuffer(): void {
     flushAgentLogBufferImpl(this);
   }
-  async appendAgentLogBatch( entries: Array<{ taskId: string; text: string; type: AgentLogEntry["type"]; detail?: string; agent?: AgentLogEntry["agent"]; durationMs?: number; timeToFirstTokenMs?: number }>, ): Promise<void> {
+  async appendAgentLogBatch( entries: Array<Omit<AgentLogEntry, "timestamp">>, ): Promise<void> {
     return appendAgentLogBatchImpl(this, entries);
   }
 
