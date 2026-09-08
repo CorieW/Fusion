@@ -175,8 +175,12 @@ export interface AgentLogEntry {
    * to task transcript renderers even when verbose successful tool output is disabled.
    */
   detail?: string;
-  /** Which agent produced this entry. Absent in logs written before this field was added. */
+  /** Execution role, separate from the durable agent identity. Absent in legacy logs. */
   agent?: AgentRole;
+  /** Durable agent identity captured when the session runs; optional on historical logs. */
+  agentId?: string;
+  /** Display name at execution time, so history does not depend on today's agent roster. */
+  agentName?: string;
   /** Request/tool processing duration in milliseconds. Absent for legacy rows and entries without bounded timing. */
   durationMs?: number;
   /** Time to first visible model output in milliseconds. Absent after the first visible output and on legacy rows. */
@@ -216,4 +220,3 @@ export interface TaskCommentInput {
   text: string;
   author: string;
 }
-

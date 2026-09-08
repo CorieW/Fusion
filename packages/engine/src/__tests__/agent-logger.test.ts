@@ -84,6 +84,28 @@ describe("AgentLogger", () => {
     vi.useRealTimers();
   });
 
+  it.each([false, true])("preserves agent identity for every entry kind (batch=%s)", async (batch) => {
+    const store = createMockStore(batch);
+    const appendLog = vi.fn().mockResolvedValue(undefined);
+    const logger = new AgentLogger({ store, taskId: "FN-IDENTITY", agent: "executor", agentId: "coder", agentName: "Kit Parity Coder", appendLog, persistAgentThinkingLog: true });
+    logger.onText("Implemented parity");
+    logger.onThinking("Inspect affected kits");
+    logger.onToolStart("read", { path: "config.ts" });
+    logger.onToolEnd("read", false, "ok");
+    logger.onToolEnd("bash", true, "failed");
+    await logger.flush();
+    const entries = appendLog.mock.calls.map(([entry]) => entry);
+    expect(new Set(entries.map((entry) => entry.type))).toEqual(new Set(["text", "thinking", "tool", "tool_result", "tool_error"]));
+    for (const entry of entries) expect(entry).toMatchObject({ agent: "executor", agentId: "coder", agentName: "Kit Parity Coder" });
+    if (batch) {
+      for (const [entries] of vi.mocked(store.appendAgentLogBatch).mock.calls) {
+        for (const entry of entries) expect(entry).toMatchObject({ agentId: "coder", agentName: "Kit Parity Coder" });
+      }
+    } else {
+      for (const args of vi.mocked(store.appendAgentLog).mock.calls) expect(args[5]).toMatchObject({ agentId: "coder", agentName: "Kit Parity Coder" });
+    }
+  });
+
   it("uses appendAgentLogBatch when available", async () => {
     const store = createMockStore(true) as unknown as TaskStore & { appendAgentLogBatch: ReturnType<typeof vi.fn> };
     const logger = new AgentLogger({

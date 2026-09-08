@@ -19,7 +19,7 @@ import type {
   WorkflowStep,
   WorkspaceConfig,
 } from "@fusion/core";
-import { isFastExecutionMode, isFastLaneSkippableCustomNode, isLegacyWorkspaceWorktreeLayout, requiresContentReviewProof, resolveEffectiveAgent, resolveWorkspaceTaskWorktreeDir, THINKING_LEVELS, WORKFLOW_STEP_NOT_RUN_REASONS } from "@fusion/core";
+import { classifyWorkflowAgentNode, isFastExecutionMode, isFastLaneSkippableCustomNode, isLegacyWorkspaceWorktreeLayout, requiresContentReviewProof, resolveEffectiveAgent, resolveWorkspaceTaskWorktreeDir, THINKING_LEVELS, WORKFLOW_STEP_NOT_RUN_REASONS } from "@fusion/core";
 import { executorLog } from "../logger.js";
 import type { EngineRunContext } from "../util/run-audit.js";
 import type { WorkflowNodeResult } from "../workflows/workflow-graph-executor.js";
@@ -914,6 +914,7 @@ export async function runGraphCustomNode(
             : await deps.executeWorkflowStep(workspaceReviewTarget, step, repoWorktreePath, settings, repoEnv, {
               unattended,
               principalAgentId,
+              activityRole: classifyWorkflowAgentNode(node),
               outputLanguage,
               sessionBoundary: reviewBoundary,
               ...(repoRelPath ? { dispatchLabel: repoRelPath } : {}),
@@ -987,6 +988,7 @@ export async function runGraphCustomNode(
         return deps.executeWorkflowStep(live, step, worktreePath, settings, nodeEnv, {
           unattended,
           principalAgentId,
+          activityRole: classifyWorkflowAgentNode(node),
           outputLanguage,
           ...(nodeSessionBoundary ? { sessionBoundary: nodeSessionBoundary } : {}),
           ...(reviewInputFingerprint !== undefined ? { reviewInputFingerprint } : {}),

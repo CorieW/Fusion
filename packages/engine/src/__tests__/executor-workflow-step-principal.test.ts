@@ -87,13 +87,48 @@ function makeExecutor() {
     ["agent-assigned", { id: "agent-assigned", runtimeConfig: { model: "openai/gpt-assigned", modelProvider: "openai", modelId: "gpt-assigned", runtimeHint: "assigned-hint" } }],
   ]);
   const agentStore = { getAgent: vi.fn(async (id: string) => agents.get(id) ?? null), createAgent: vi.fn() };
-  return { store, executor: new TaskExecutor(store as any, "/tmp/test", { agentStore } as any) };
+  return { store, agents, executor: new TaskExecutor(store as any, "/tmp/test", { agentStore } as any) };
 }
 
 describe("executor workflow-step routed principal", () => {
   beforeEach(() => {
     resetExecutorMocks();
     mockedExecSync.mockImplementation(() => Buffer.from(""));
+  });
+
+  it.each([
+    ["Implement kit parity", "Kit Parity Coder", "executor"],
+    ["Code Review", "Kit Parity Reviewer", "reviewer"],
+    ["Test affected kit behavior", "Kit Parity Tester", "executor"],
+  ])("attributes %s activity to its routed agent", async (name, agentName, role) => {
+    const { store, agents, executor } = makeExecutor();
+    Object.assign(agents.get("agent-principal")!, { name: agentName });
+    const appendAgentLogBatch = vi.fn().mockResolvedValue(undefined);
+    Object.assign(store, { appendAgentLogBatch });
+    captureSession();
+    await (executor as any).executeWorkflowStep(
+      task({ assignedAgentId: "agent-assigned" }), step({ name }), "/tmp/wt", {}, undefined,
+      { principalAgentId: "agent-principal" },
+    );
+    const entries = appendAgentLogBatch.mock.calls.flatMap(([batch]) => batch);
+    expect(entries.filter((entry) => entry.type === "text")).toEqual(expect.arrayContaining([
+      expect.objectContaining({ agent: role, agentId: "agent-principal", agentName }),
+    ]));
+  });
+
+  it.each(["triage", "executor", "reviewer", "merger"])("honors the declared %s role independently of agent name", async (activityRole) => {
+    const { store, executor } = makeExecutor();
+    const appendAgentLogBatch = vi.fn().mockResolvedValue(undefined);
+    Object.assign(store, { appendAgentLogBatch });
+    captureSession();
+    await (executor as any).executeWorkflowStep(task(), step({ name: "Renamed stage" }), "/tmp/wt", {}, undefined, { activityRole });
+    const entries = appendAgentLogBatch.mock.calls.flatMap(([batch]) => batch);
+    expect(entries.length).toBeGreaterThan(0);
+    for (const entry of entries) {
+      expect(entry.agent).toBe(activityRole);
+      expect(entry).not.toHaveProperty("agentId");
+      expect(entry).not.toHaveProperty("agentName");
+    }
   });
 
   it.each([
@@ -122,14 +157,14 @@ describe("executor workflow-step routed principal", () => {
     store.getTask.mockImplementation(async (id: string) => task({ id }));
     const execute = vi.spyOn(executor as any, "executeWorkflowStep").mockResolvedValue({ success: true, output: "ok" });
     const executeScript = vi.spyOn(executor as any, "executeScriptWorkflowStep").mockResolvedValue({ success: true, output: "ok" });
-    const promptNode = { id: "principal-prompt", kind: "prompt", config: { prompt: "Review" } };
+    const promptNode = { id: "principal-prompt", kind: "prompt", config: { prompt: "Review", workflowRole: "executor" } };
     const scriptNode = { id: "principal-script", kind: "script", config: { command: "true" } };
 
     await (executor as any).runGraphCustomNode(promptNode, task(), {}, undefined, { "workflow:principal-agent-id": "agent-principal" });
     await (executor as any).runGraphCustomNode(promptNode, task(), {}, undefined, { "workflow:principal-agent-id": 42 });
     await (executor as any).runGraphCustomNode(scriptNode, task(), {}, undefined, { "workflow:principal-agent-id": "agent-principal" });
 
-    expect(execute.mock.calls[0][5]).toMatchObject({ principalAgentId: "agent-principal" });
+    expect(execute.mock.calls[0][5]).toMatchObject({ principalAgentId: "agent-principal", activityRole: "executor" });
     expect(execute.mock.calls[1][5]).toMatchObject({ principalAgentId: undefined });
     expect(execute).toHaveBeenCalledTimes(2);
     expect(executeScript.mock.calls[0]).toHaveLength(5);
@@ -144,11 +179,16 @@ describe("executor workflow-step routed principal", () => {
   });
 
   it("keeps unrouted steps on their assigned agent", async () => {
-    const { executor } = makeExecutor();
+    const { store, agents, executor } = makeExecutor();
+    Object.assign(agents.get("agent-assigned")!, { name: "Assigned Coder" });
+    const appendAgentLogBatch = vi.fn().mockResolvedValue(undefined);
+    Object.assign(store, { appendAgentLogBatch });
     const captured = captureSession();
     await (executor as any).executeWorkflowStep(
       task({ assignedAgentId: "agent-assigned" }), step({ name: "Implementation Prompt" }), "/tmp/wt", {}, undefined,
     );
     expect(captured.last).toMatchObject({ defaultProvider: "openai", defaultModelId: "gpt-assigned", runtimeHint: "assigned-hint" });
+    const entries = appendAgentLogBatch.mock.calls.flatMap(([batch]) => batch);
+    expect(entries).toContainEqual(expect.objectContaining({ agent: "executor", agentId: "agent-assigned", agentName: "Assigned Coder" }));
   });
 });

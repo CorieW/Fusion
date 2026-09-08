@@ -216,6 +216,8 @@ export interface AgentLoggerOptions {
   appendLog?: (entry: AgentLogEntry) => Promise<void>;
   /** Which agent role is producing log entries (persisted on every entry). */
   agent?: AgentRole;
+  agentId?: string;
+  agentName?: string;
   /** Optional callback invoked alongside text logging (e.g. for SSE streaming). */
   onAgentText?: (taskId: string, delta: string) => void;
   /**
@@ -281,6 +283,8 @@ export class AgentLogger {
   private readonly taskId: string;
   private readonly appendLogCb?: (entry: AgentLogEntry) => Promise<void>;
   private readonly agent?: AgentRole;
+  private readonly agentId?: string;
+  private readonly agentName?: string;
   private readonly externalTextCb?: (taskId: string, delta: string) => void;
   private readonly externalToolCb?: (taskId: string, toolName: string, detail?: string) => void;
   private readonly onEntriesFlushedCb?: (taskId: string, entries: AgentLogEntry[]) => void | Promise<void>;
@@ -314,6 +318,8 @@ export class AgentLogger {
     this.taskId = options.taskId ?? "";
     this.appendLogCb = options.appendLog;
     this.agent = options.agent;
+    this.agentId = options.agentId?.trim() || undefined;
+    this.agentName = options.agentName?.trim() || undefined;
     this.externalTextCb = options.onAgentText;
     this.externalToolCb = options.onAgentTool;
     this.onEntriesFlushedCb = options.onEntriesFlushed;
@@ -549,6 +555,8 @@ export class AgentLogger {
       type,
       ...(persistedDetail !== undefined && { detail: persistedDetail }),
       ...(this.agent !== undefined && { agent: this.agent }),
+      ...(this.agentId !== undefined && { agentId: this.agentId }),
+      ...(this.agentName !== undefined && { agentName: this.agentName }),
       ...(timing?.durationMs !== undefined && { durationMs: timing.durationMs }),
       ...(timing?.timeToFirstTokenMs !== undefined && { timeToFirstTokenMs: timing.timeToFirstTokenMs }),
     };
@@ -654,6 +662,8 @@ export class AgentLogger {
               type: entry.type,
               detail: entry.detail,
               agent: entry.agent,
+              ...(entry.agentId !== undefined && { agentId: entry.agentId }),
+              ...(entry.agentName !== undefined && { agentName: entry.agentName }),
               ...(entry.durationMs !== undefined && { durationMs: entry.durationMs }),
               ...(entry.timeToFirstTokenMs !== undefined && { timeToFirstTokenMs: entry.timeToFirstTokenMs }),
             })),
@@ -664,8 +674,8 @@ export class AgentLogger {
       } else {
         await Promise.all(
           entries.map((entry) => {
-            const timing = entry.durationMs !== undefined || entry.timeToFirstTokenMs !== undefined
-              ? { durationMs: entry.durationMs, timeToFirstTokenMs: entry.timeToFirstTokenMs }
+            const timing = entry.durationMs !== undefined || entry.timeToFirstTokenMs !== undefined || entry.agentId !== undefined || entry.agentName !== undefined
+              ? { durationMs: entry.durationMs, timeToFirstTokenMs: entry.timeToFirstTokenMs, agentId: entry.agentId, agentName: entry.agentName }
               : undefined;
             const write = timing === undefined
               ? this.store!.appendAgentLog(entry.taskId, entry.text, entry.type, entry.detail, entry.agent)

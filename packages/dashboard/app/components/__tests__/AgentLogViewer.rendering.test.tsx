@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { AgentLogViewer } from "../AgentLogViewer";
 import { FileBrowserProvider } from "../../context/FileBrowserContext";
@@ -19,8 +19,24 @@ vi.mock("lucide-react", () => ({
 }));
 
 describe("AgentLogViewer", () => {
+  afterEach(() => vi.unstubAllGlobals());
   beforeEach(() => {
     window.localStorage.clear();
+  });
+
+  it.each([390, 1280])("keeps named agents separate in activity at %ipx", (width) => {
+    vi.stubGlobal("innerWidth", width);
+    const entries = [
+      makeEntry({ agent: "executor", agentId: "coder", agentName: "Kit Parity Coder", text: "Coding" }),
+      makeEntry({ agent: "executor", agentId: "tester", agentName: "Kit Parity Tester", text: "Testing" }),
+      makeEntry({ agent: "executor", agentId: "another-tester", agentName: "Kit Parity Tester", text: "Testing" }),
+      makeEntry({ agent: "reviewer", agentName: " ", text: "Legacy review" }),
+    ];
+    const { container } = render(<AgentLogViewer entries={entries} loading={false} />);
+    expect(screen.getByText("[Kit Parity Coder]")).toBeInTheDocument();
+    expect(screen.getAllByText("[Kit Parity Tester]")).toHaveLength(2);
+    expect(screen.getByText("[reviewer]")).toBeInTheDocument();
+    expect(container.querySelectorAll(".agent-log-text")).toHaveLength(4);
   });
 
   it("shows loading message when loading with no entries", () => {
