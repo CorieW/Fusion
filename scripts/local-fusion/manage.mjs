@@ -78,7 +78,8 @@ export async function restoreCopies(config, backup) {
 export async function resumeActivation(config, backup, requestedRelease, verifiedManifest) {
   const runtime=config.runtime;
   const journal=await readJson(path.join(runtime,'journal.json'));
-  if(journal.action!=='activate'||!['backup','backed-up'].includes(journal.phase))throw new Error('This maintenance phase requires manual recovery; automatic activation resume is unsafe');
+  // FNXC:LocalDeployment 2026-09-08-12:44: Deploy and Activate share the same pre-migration resume boundary and all existing cold-backup and process checks.
+  if(!['activate','deploy'].includes(journal.action)||!['backup','backed-up'].includes(journal.phase))throw new Error('This maintenance phase requires manual recovery; automatic activation resume is unsafe');
   if(requestedRelease&&requestedRelease!==journal.target)throw new Error('Resume must use the original candidate');
   const state=JSON.parse(await ps('Inspect'));
   if(state.enabled||state.processes.length)throw new Error('Resume requires the startup task disabled and all Fusion processes stopped');
