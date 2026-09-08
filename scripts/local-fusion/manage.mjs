@@ -118,6 +118,42 @@ export async function resumeActivation(config, backup, requestedRelease, verifie
     throw error;
   }
 }
+// FNXC:LocalDeployment 2026-09-08-12:30: Offline recovery is an explicit operator operation. Require a matching journal/backup and stopped processes; never depend on a broken dashboard or bypass a live maintenance operation.
+export async function offlineRollback(config, backup, releaseId, overrides = {}) {
+  const ops = { ps, verifyBackup, restoreCopies, installLauncher, startFusion, inventory, resumeProjects, ...overrides };
+  const runtime = config.runtime;
+  if (!backup || !releaseId || !await exists(path.join(runtime,'maintenance.json'))) throw new Error('Offline rollback requires --release, --backup, --restore-data and an existing maintenance marker');
+  const journal = await readJson(path.join(runtime,'journal.json'));
+  if (!['activating','failed-after-activation','failed-during-data-restore','offline-restoring','offline-starting'].includes(journal.phase)) throw new Error('Journal phase is not eligible for offline rollback');
+  if (journal.previous?.id !== releaseId || !journal.backup || path.resolve(journal.backup).toLowerCase() !== path.resolve(backup).toLowerCase()) throw new Error('Offline rollback must use the journal previous release and matching cold backup');
+  const manifest = await ops.verifyBackup(backup);
+  if (!manifest.cold || manifest.release?.id !== releaseId || !manifest.copies.some(copy => copy.kind === 'global' && path.resolve(copy.source).toLowerCase() === path.resolve(config.dataHome).toLowerCase())) throw new Error('Offline rollback backup does not match this installation');
+  const release = await readJson(releaseId === 'legacy-0.76.0' ? path.join(runtime,'legacy.json') : path.join(contained(path.join(runtime,'releases'),path.join(runtime,'releases',releaseId)),'local-release.json'));
+  if (!release.verified || !release.artifactHashes || !Object.keys(release.artifactHashes).length) throw new Error('Previous release has no verified artifacts');
+  await verifyChecksums(release.dist ?? path.join(release.root,'packages/cli/dist'),release.artifactHashes);
+  const state = JSON.parse(await ops.ps('Inspect'));
+  if (state.enabled || state.processes.length || await exists(path.join(config.dataHome,'embedded-postgres/default/postmaster.pid'))) throw new Error('Offline rollback requires the startup task disabled and Fusion and PostgreSQL stopped');
+  try {
+    journal.phase='offline-restoring'; await writeJson(path.join(runtime,'journal.json'),journal);
+    await ops.restoreCopies(config,backup);
+    await ops.installLauncher(config);
+    await writeJson(path.join(runtime,'active.json'),{id:release.id,cli:release.cli,schemaHashes:release.schemaHashes,backup,activatedAt:new Date().toISOString()});
+    journal.phase='offline-starting'; await writeJson(path.join(runtime,'journal.json'),journal);
+    await ops.startFusion(config);
+    const live=JSON.parse(await ops.ps('Inspect'));
+    if (live.processes.length!==2 || live.processes.some(p=>!p.CommandLine.includes(release.cli))) throw new Error('Recovered processes do not match the previous release');
+    const report=compareInventory(await readJson(path.join(backup,'inventory.json')),await ops.inventory(config));
+    await writeJson(path.join(runtime,`acceptance-${release.id}.json`),report);
+    await ops.resumeProjects(config,manifest.resumeProjects,manifest.pauseSettings);
+    await fs.rm(path.join(runtime,'drain.json'),{force:true});
+    journal.phase='complete'; journal.completedAt=new Date().toISOString(); delete journal.error;
+    await writeJson(path.join(runtime,'journal.json'),journal);
+  } catch(error) {
+    journal.error=error.message; await writeJson(path.join(runtime,'journal.json'),journal);
+    await writeJson(path.join(runtime,'maintenance.json'),{error:error.message}); await ops.ps('Disable');
+    throw error;
+  }
+}
 export async function main(argv=process.argv.slice(2)) {
   const action=(argv[0]??'Status').toLowerCase();
   const option = name=>{const i=argv.indexOf(name);return i<0?undefined:argv[i+1];};
@@ -139,6 +175,10 @@ export async function main(argv=process.argv.slice(2)) {
   try {
     if (action==='build') {await build(config,option('--release'));return;}
     if (action==='verify') {await verify(config,option('--release'));return;}
+    if (action === 'rollback' && argv.includes('--offline')) {
+      if (!argv.includes('--restore-data')) throw new Error('Offline rollback requires --restore-data');
+      await offlineRollback(config,option('--backup'),option('--release')); return;
+    }
     if (await exists(path.join(runtime,'maintenance.json'))) {
       if(action==='activate'&&option('--backup')) {await resumeActivation(config,option('--backup'),option('--release'));return;}
       throw new Error('An interrupted maintenance operation needs recovery. Inspect Status and journal.json before continuing.');

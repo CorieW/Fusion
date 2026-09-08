@@ -74,3 +74,13 @@ New projects start with no workflows. Create or import a workflow in the dashboa
 When upgrading an existing installation that used bundled workflows, preserve definitions referenced by saved tasks as project-owned historical snapshots before switching code. Those snapshots remain readable by their original IDs but are excluded from workflow catalogs and new-task selection. Keep them in private runtime data and backups, never in Git. Old graph samples under test utilities support regression tests and are excluded from published artifacts.
 
 Activation now checks saved task workflow references before pausing projects and again after the isolated migration rehearsal. Missing private historical definitions stop activation with their project/workflow IDs. Restore the exact snapshots from the previous release; do not substitute a new workflow or erase task selections. This does not reintroduce bundled templates.
+
+### Recovery when the candidate cannot boot
+
+Run recovery yourself in an external PowerShell terminal, never through a Fusion agent. Inspect `Status` and the journal first. Stop the failed Fusion instance and its owned PostgreSQL cluster, and leave the startup task disabled. Do not kill an unrelated process or remove a live maintenance marker.
+
+```powershell
+.\scriptsusion-local.ps1 Rollback -Offline -RestoreData -Release '<journal.previous.id>' -Backup '<journal.backup>'
+```
+
+This path requires the failed activation journal, its exact verified cold backup, matching installation paths and verified previous-release artifacts. It restores without calling the failed dashboard API. Existing directories are renamed and preserved by restoration, not overwritten. Failure keeps the maintenance fence and records the recovery phase; only successful startup and inventory checks resume the saved project state. Never manually point an older binary at migrated data without restoring its matching backup.

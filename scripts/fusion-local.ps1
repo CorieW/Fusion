@@ -4,6 +4,7 @@ param(
     [string]$Release,
     [string]$Backup,
     [switch]$RestoreData,
+    [switch]$Offline,
     [string]$RuntimeRoot = 'A:\Custom Fusion Runtime',
     [string]$BackupRoot = 'A:\Fusion Backup Data'
 )
@@ -13,6 +14,7 @@ $arguments = @((Join-Path $PSScriptRoot 'local-fusion\manage.mjs'), $Action, '--
 if ($Release) { $arguments += @('--release', $Release) }
 if ($Backup) { $arguments += @('--backup', $Backup) }
 if ($RestoreData) { $arguments += '--restore-data' }
+if ($Offline) { $arguments += '--offline' }
 $previousPoolSize=$env:UV_THREADPOOL_SIZE
 try {
     $env:UV_THREADPOOL_SIZE='32'
