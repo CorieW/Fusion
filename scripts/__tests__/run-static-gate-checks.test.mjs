@@ -1,6 +1,9 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { copyFileSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
+import { fileURLToPath, URL } from "node:url";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -30,6 +33,7 @@ const EXPECTED_GATE_CHECKS = [
   check("pi-versions-pinned"),
   check("workspace-package-graph"),
   check("no-test-timeout-appeasement"),
+  check("no-comment-assertions-in-tests"),
   check("changeset-format"),
   check("mock-completeness"),
   check("inert-sync-lane-conversions"),
@@ -37,7 +41,7 @@ const EXPECTED_GATE_CHECKS = [
 ];
 
 function createFixture() {
-  const root = mkdtempSync(join(tmpdir(), "static-gate-checks-"));
+  const root = mkdtempSync(join(tmpdir(), "static gate checks-"));
   mkdirSync(join(root, "scripts"));
   return root;
 }
@@ -45,6 +49,42 @@ function createFixture() {
 function writeFixtureCheck(root, name, source) {
   writeFileSync(join(root, "scripts", `${name}.mjs`), source);
 }
+
+const runFile = promisify(execFile);
+
+test("CLI entry point runs validators and propagates failure from paths with spaces", async () => {
+  const root = createFixture();
+  try {
+    const runner = join(root, "scripts", "run-static-gate-checks.mjs");
+    copyFileSync(new URL("../run-static-gate-checks.mjs", import.meta.url), runner);
+    writeFileSync(join(root, "package.json"), JSON.stringify({ scripts: { "test:gate:static": "node scripts/check-fixture.mjs" } }));
+    writeFixtureCheck(root, "check-fixture", 'console.log("fixture inspected");');
+    const result = await runFile(process.execPath, [runner], { cwd: root });
+    assert.match(result.stdout, /fixture inspected/);
+    assert.match(result.stdout, /1 validators passed/);
+    writeFixtureCheck(root, "check-fixture", 'process.exit(1);');
+    await assert.rejects(runFile(process.execPath, [runner], { cwd: root }), (error) => {
+      assert.match(error.stderr, /1 static merge-gate validator failed/);
+      return true;
+    });
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("capacity CLI inspects tracked source files with shell-independent Git arguments", async () => {
+  const root = createFixture();
+  try {
+    mkdirSync(join(root, "packages", "example", "src"), { recursive: true });
+    writeFileSync(join(root, "packages", "example", "src", "clean.ts"), "export const value = 1;\n");
+    await runFile("git", ["init", root]);
+    await runFile("git", ["add", "packages"], { cwd: root });
+    const result = await runFile(process.execPath, [fileURLToPath(new URL("../check-capacity-pool-id.mjs", import.meta.url))], { cwd: root });
+    assert.match(result.stdout, /ok \(1 files inspected\)/);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
 
 test("extractLeadingStaticGateChecks keeps only the blocking validator prefix", () => {
   assert.deepEqual(
