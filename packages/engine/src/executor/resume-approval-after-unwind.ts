@@ -8,7 +8,7 @@
  */
 import type { Task, TaskStore } from "@fusion/core";
 import { executorLog } from "../logger.js";
-import type { ResumeLanes } from "./resolve-resume-lanes.js";
+import { isResumeWipColumn, type ResumeLanes } from "./resolve-resume-lanes.js";
 
 export type ResumeApprovalAfterUnwindDeps = {
   store: TaskStore;
@@ -29,7 +29,7 @@ export async function resumeApprovalAfterUnwindIfNeeded(
     executorLog.warn(`${taskId}: failed to read latest task state for deferred approval resume: ${error instanceof Error ? error.message : String(error)}`);
     return false;
   }
-  if (latestTask.paused || latestTask.userPaused
-    || latestTask.column !== (await deps.resolveResumeLanes(taskId)).wip) return false;
+  if (latestTask.paused || latestTask.userPaused || latestTask.deletedAt
+    || !isResumeWipColumn(await deps.resolveResumeLanes(taskId), latestTask.column)) return false;
   return deps.dispatchUnpauseResume(latestTask);
 }

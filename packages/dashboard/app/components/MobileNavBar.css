@@ -20,6 +20,7 @@
   right: var(--icb-right-offset, 0px);
   z-index: 45;
   display: none;
+  flex-wrap: wrap;
   align-items: stretch;
   background: var(--surface);
   /*
@@ -27,7 +28,8 @@
   Mobile bottom navigation follows the executor footer rule: no visible divider between main content and the fixed footer/navigation surface.
   */
   border-top: none;
-  min-height: var(--mobile-nav-height);
+  /* FNXC:MobileNavFit 2026-09-08-05:39: The measured height is an output for siblings, never a minimum for this bar; feeding it back prevents wrapped rows from shrinking after rotation. */
+  min-height: var(--touch-target-min-size);
   /*
   FNXC:MobileNav 2026-06-24-22:27:
   The mobile bottom nav must use symmetric outer side spacing while keeping its fixed right edge compensated by --icb-right-offset, equal-width tab columns, and safe-area bottom padding intact.
@@ -131,7 +133,8 @@ html:is([data-viewport-mode="tablet"], [data-viewport-mode="desktop"]) .project-
 /*
 FNXC:MobileNav 2026-06-20-02:04:
 Every mobile nav tab must be an equal-width column with a centered icon so inter-icon spacing stays uniform across tab counts, long labels, active state, badges, and status dots.
-Use a zero flex basis plus min-width:0 so intrinsic label width cannot bias flex distribution; badges and status dots stay absolutely positioned and out of flow.
+FNXC:MobileNavFit 2026-09-08-05:39:
+Use measured equal-width columns across balanced rows. Labels wrap without ellipses, and theme-token minimum widths preserve readable text and touch targets; badges and dots remain out of flow.
 
 FNXC:MobileNav 2026-06-20-16:11:
 Real-browser geometry showed the SVG centers were uniform after FN-6766, but status dots protruded past Chat/Mailbox icon boxes and made those icon clusters optically right-heavy.
@@ -139,20 +142,21 @@ Wrap every tab icon in the same token-sized icon slot and keep unread/pending do
 */
 .mobile-nav-tab {
   --mobile-nav-icon-size: calc(var(--space-lg) + var(--space-sm) - (var(--space-xs) / 2));
-  flex: 1 1 0;
-  min-width: 0;
+  flex: 0 0 calc(100% / var(--mobile-nav-columns, 4));
+  min-width: max(var(--touch-target-min-size), calc(var(--space-2xl) * 2 + var(--space-sm)));
+  box-sizing: border-box;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   gap: calc(var(--space-xs) / 2);
-  min-height: calc(var(--space-xl) + var(--space-md));
+  min-height: var(--touch-target-min-size);
   padding: calc(var(--space-sm) - (var(--space-xs) / 2)) 0;
   background: none;
   border: none;
   color: var(--text-muted);
-  font-size: 10px;
-  line-height: 1.2;
+  font-size: var(--font-size-2xs);
+  line-height: var(--line-height-normal);
   cursor: pointer;
   transition: color var(--transition-fast);
   position: relative;
@@ -192,12 +196,11 @@ Wrap every tab icon in the same token-sized icon slot and keep unread/pending do
   width: 100%;
   min-width: 0;
   max-width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  font-size: 10px;
-  line-height: 1.2;
+  font-size: var(--font-size-2xs);
+  line-height: var(--line-height-normal);
   text-align: center;
-  white-space: nowrap;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 .mobile-nav-tab-badge {
@@ -307,7 +310,7 @@ Wrap every tab icon in the same token-sized icon slot and keep unread/pending do
   gap: 12px;
   width: 100%;
   padding: 12px 16px;
-  min-height: 36px;
+  min-height: var(--touch-target-min-size);
   background: none;
   border: none;
   color: var(--text);
@@ -386,6 +389,8 @@ rather than the full-width row.
 }
 
 .mobile-more-split-toggle {
+  min-width: var(--touch-target-min-size);
+  min-height: var(--touch-target-min-size);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -491,4 +496,34 @@ rather than the full-width row.
   .activity-log-content {
     -webkit-overflow-scrolling: touch;
   }
+}
+
+/* FNXC:NavigationGroups 2026-09-07-17:41: Group controls reuse touch rows and theme tokens; collapsed contents must leave no clickable or focusable shells. */
+.mobile-more-group-toggle {
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-muted);
+}
+
+.mobile-more-group-items {
+  padding-inline-start: var(--space-md);
+}
+
+.mobile-more-group-items[hidden] {
+  display: none;
+}
+
+.mobile-more-item--active,
+.mobile-more-item--active svg {
+  color: var(--accent);
+}
+
+.mobile-more-item:hover {
+  background: var(--surface-hover);
+}
+
+.mobile-nav-tab:focus-visible,
+.mobile-more-split-toggle:focus-visible,
+.mobile-more-item:focus-visible {
+  outline: var(--space-3xs) solid var(--accent);
+  outline-offset: calc(-1 * var(--space-3xs));
 }

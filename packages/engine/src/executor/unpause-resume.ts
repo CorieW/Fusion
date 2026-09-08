@@ -15,6 +15,7 @@ import type { Task, TaskStore } from "@fusion/core";
 import { executorLog } from "../logger.js";
 import type { EngineRunContext } from "../util/run-audit.js";
 import { isTaskWorkComplete } from "./task-predicates.js";
+import { workflowInputNodeId } from "./workflow-input-markers.js";
 
 export type UnpauseResumeDeps = {
   store: TaskStore;
@@ -39,7 +40,7 @@ export async function dispatchUnpauseResume(
   deps: UnpauseResumeDeps,
   task: Task,
 ): Promise<boolean> {
-  if (task.status === "failed") {
+  if (task.status === "failed" || task.paused || task.userPaused || task.deletedAt) {
     return false;
   }
 
@@ -78,7 +79,10 @@ export async function dispatchUnpauseResume(
     }
 
     deps.approvalSuspended.delete(task.id);
-    if (isTaskWorkComplete(task) && !task.mergeDetails) {
+    /* FNXC:WorkflowCheckpointResume 2026-09-08-12:37:
+       A finished coding checklist does not satisfy a pending human gate. Resume that graph node
+       before any completion recovery can hand off to review or skip its answer condition. */
+    if (isTaskWorkComplete(task) && !task.mergeDetails && workflowInputNodeId(task) === undefined) {
       deps.resumingUnpaused.delete(task.id);
       deps.recoveringCompleted.add(task.id);
       handoffOwnsClaim = true; // prevent finally from double-deleting a already-cleared claim

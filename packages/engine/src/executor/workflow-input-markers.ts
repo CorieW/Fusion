@@ -13,6 +13,11 @@ export type WorkflowInputMarkerDeps = {
   getRunContextFor: (taskId: string) => EngineRunContext | undefined;
 };
 
+/** FNXC:WorkflowCheckpointResume 2026-09-08-12:37: Match the whole node ID so similarly named checkpoints never share answers. */
+export function workflowInputNodeId(task: Pick<TaskDetail, "pausedReason">): string | undefined {
+  return /^workflow-input:([^:@\s]+)(?:@\d+)?:/.exec(task.pausedReason ?? "")?.[1];
+}
+
 export function workflowInputRepliesAfterWatermark(
   task: TaskDetail,
   marker: string,
@@ -39,11 +44,17 @@ export async function resolveWorkflowInputMarkerForGraphNode(
 ): Promise<"clear" | "waiting" | "none"> {
   const pausedReason = live.pausedReason ?? "";
   if (!pausedReason.startsWith("workflow-input:")) return "none";
-  const markerMatch = /^workflow-input:([^:@\s]+)(?:@\d+)?[:]/.exec(pausedReason);
-  if (!markerMatch) return "none";
-  const marker = `workflow-input:${markerMatch[1]}`;
+  const ownerNodeId = workflowInputNodeId(live);
+  if (!ownerNodeId) return "none";
+  /*
+   * FNXC:WorkflowCheckpointResume 2026-09-08-12:37:
+   * The owning ask-user/awaitInput or skill runner consumes its own answer. Clearing its marker
+   * here loses the reply before it can be published into the downstream gate's context.
+   */
+  if (ownerNodeId === nodeId) return "none";
+  const marker = `workflow-input:${ownerNodeId}`;
   const replies = workflowInputRepliesAfterWatermark(live, marker);
-  if (live.paused || replies.length === 0) {
+  if (live.paused || live.userPaused || replies.length === 0) {
     await deps.store.updateTask(live.id, { status: "awaiting-user-input", paused: true }, deps.getRunContextFor(live.id));
     return "waiting";
   }
@@ -54,9 +65,7 @@ export async function resolveWorkflowInputMarkerForGraphNode(
   await deps.store.updateTask(live.id, { status: null, pausedReason: null }, deps.getRunContextFor(live.id));
   await deps.store.logEntry(
     live.id,
-    marker === `workflow-input:${nodeId}`
-      ? `Workflow input received for step '${nodeId}' — resuming`
-      : `Workflow input marker '${markerMatch[1]}' already has a reply — clearing stale marker before step '${nodeId}'`,
+    `Workflow input marker '${ownerNodeId}' already has a reply — clearing stale marker before step '${nodeId}'`,
     undefined,
     deps.getRunContextFor(live.id),
   );

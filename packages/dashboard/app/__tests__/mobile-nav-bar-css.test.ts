@@ -50,10 +50,9 @@ describe("mobile-nav-bar.css", () => {
     expect(cssContent).toMatch(/@media[^{]*\(max-width:\s*768px\)[^{]*\{[\s\S]*?\.mobile-nav-bar\s*\{[\s\S]*?display:\s*flex[;\s]/);
   });
 
-  it("tab touch targets are at least 36px", () => {
+  it("tab touch targets use the shared accessibility minimum", () => {
     const block = extractRuleBlock(cssContent, ".mobile-nav-tab");
-    // FNXC:DashboardStyling 2026-06-20-20:56: FN-6809 keeps the 36px touch-target intent via tokens; --space-xl (24px) + --space-md (12px) resolves to the same min-height.
-    expect(block).toContain("min-height: calc(var(--space-xl) + var(--space-md))");
+    expect(block).toContain("min-height: var(--touch-target-min-size)");
   });
 
   it("footer-aware positioning keeps nav at bottom: 0 when footer is visible", () => {
@@ -95,9 +94,9 @@ describe("mobile-nav-bar.css", () => {
     expect(block).toContain("z-index: 45");
   });
 
-  it("sheet items maintain 36px touch targets", () => {
+  it("sheet items maintain accessible touch targets", () => {
     const block = extractRuleBlock(cssContent, ".mobile-more-item");
-    expect(block).toContain("min-height: 36px");
+    expect(block).toContain("min-height: var(--touch-target-min-size)");
   });
 
   it("defines content padding rule for mobile nav", () => {

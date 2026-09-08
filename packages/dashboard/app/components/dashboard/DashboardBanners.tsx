@@ -2,6 +2,8 @@
 FNXC:DashboardBanners 2026-06-24-00:00:
 DashboardBanners is the conditional banner cluster rendered above the dashboard-project-shell, extracted verbatim from AppInner's main return JSX. It is a pure render of the same gated banners (every condition, prop, FNXC comment, and the TaskIdIntegrityBanner setDashboardHealth updater preserved byte-for-byte); the banner components are imported directly from their siblings.
 */
+import "../DashboardBanners.css";
+import { useTranslation } from "react-i18next";
 import type { DashboardBannersProps } from "./types";
 import type { DashboardHealthResponse } from "../../api/client/health";
 import type { SectionId } from "../SettingsModal";
@@ -83,6 +85,7 @@ export function DashboardBanners({
   markGitHubStarPromptShown,
   setShowGitHubStarPrompt,
 }: DashboardBannersProps) {
+  const { t } = useTranslation("app");
   /* FNXC:DashboardBanners 2026-06-26-00:00: The Open Mailbox approval banner is gated by an approval:<id> candidate from a real ApprovalRequest. The count floor remains only for the approval-SSE/count-refresh race and must not fabricate a mailbox request for task awaiting-approval states. */
   const showMailboxApprovalBanner = isMailboxApprovalCandidate(approvalBannerCandidate);
   /* FNXC:AuthRecovery 2026-06-29-00:00: Daemon-auth token recovery owns unauthorized remediation while its blocking dialog is open. Suppress engine remediation banners in parallel so operators fix the token once without seeing stale engine restart/start controls or live-region shells. */
@@ -90,7 +93,7 @@ export function DashboardBanners({
 
 
   return (
-    <>
+    <div className="dashboard-banners" role="region" aria-label={t("dashboard.notifications", "Notifications")} tabIndex={0}>
       {/* FNXC:MigrationHoldingPage 2026-07-17-12:45: Rendered OUTSIDE the
           project gate — while the boot-window holding server reports
           status "migrating", project data is not fetchable, yet the open tab
@@ -222,6 +225,6 @@ export function DashboardBanners({
           }}
         />
       )}
-    </>
+    </div>
   );
 }
