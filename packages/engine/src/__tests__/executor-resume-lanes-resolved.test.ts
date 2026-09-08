@@ -110,6 +110,7 @@ describe("resume lanes come from the task's own workflow", () => {
     await expect(h.lanes("FN-1")).resolves.toEqual({
       hold: "queued",
       wip: "building",
+      wipColumns: ["building"],
       review: "checking",
       wipDeclared: true,
     });
@@ -147,6 +148,7 @@ describe("resume lanes come from the task's own workflow", () => {
     await expect(h.lanes("FN-1")).resolves.toEqual({
       hold: "todo",
       wip: "in-progress",
+      wipColumns: ["in-progress"],
       review: "in-review",
       wipDeclared: true,
     });
@@ -192,6 +194,7 @@ describe("resume lanes come from the task's own workflow", () => {
     await expect(h.lanes("FN-1")).resolves.toEqual({
       hold: "todo",
       wip: "in-progress",
+      wipColumns: ["in-progress"],
       review: "in-review",
       wipDeclared: true,
     });
@@ -212,6 +215,7 @@ describe("resume lanes come from the task's own workflow", () => {
     await expect(h.lanes("FN-1")).resolves.toEqual({
       hold: "todo",
       wip: "in-progress",
+      wipColumns: ["in-progress"],
       review: "in-review",
       wipDeclared: true,
     });

@@ -2741,10 +2741,17 @@ The header row wraps so the badge drops below the heading on narrow widths inste
 
 
 @media (max-width: 768px) {
-  /* Settings modal: use the section picker as the only mobile navigation */
+  /* FNXC:MobileNavFit 2026-09-08-06:12: Scroll the section picker and fields together on mobile. Keeping the picker fixed above a separately shrinking body can reduce the fields to zero height under warning banners or a multi-row footer; both embedded and dialog Settings must retain reachable controls. */
   .settings-layout {
     flex-direction: column;
     min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior-y: contain;
+  }
+
+  .settings-layout > .settings-content {
+    flex: 0 0 auto;
+    overflow: visible;
   }
 
   .settings-navigation {

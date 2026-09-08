@@ -29,6 +29,8 @@ import { detectReviewHandoffIntent } from "./pseudo-pause.js";
 import { createSeenSteeringIds } from "./task-predicates.js";
 import { facadeFields, facadeMethods } from "./facade-methods.js";
 import { WorkflowAgentCapacity } from "../agents/workflow-agent-capacity.js";
+import { isResumeWipColumn } from "./resolve-resume-lanes.js";
+import { workflowInputNodeId } from "./workflow-input-markers.js";
 
 /**
  * FNXC:WorkspaceWorktree 2026-08-23-06:25:
@@ -306,13 +308,15 @@ export function wireExecutorLifecycle(deps: WireExecutorLifecycleDeps): WireExec
       // Handle unpause of an in-progress task with no active session.
       // Approval can be decided while the old session is still unwinding;
       // remember that edge instead of losing the only task:updated event.
-      /* FNXC:WorkflowLifecycleColumns 2026-07-30-21:40 (fleet): both checks in this listener ask "is
-         this card still in the wip lane?"; one snapshot for the pair. With the literal neither fired on a
-         renamed board — an unpaused card with no active session was never resumed. */
-      const unpauseWipLane = (await deps.resolveResumeLanes(task.id)).wip;
-      if (!task.paused && task.column === unpauseWipLane && deps.approvalSuspended.has(task.id)) {
+      /* FNXC:WorkflowCheckpointResume 2026-09-08-12:37:
+         Replies must resume in every WIP column, including Review and Testing on custom boards.
+         Remember checkpoint replies arriving during graph teardown even without a plan-approval hold. */
+      const canResumeInPlace = !task.paused && !task.userPaused && !task.deletedAt
+        && isResumeWipColumn(await deps.resolveResumeLanes(task.id), task.column);
+      if (canResumeInPlace && (deps.approvalSuspended.has(task.id) || workflowInputNodeId(task) !== undefined)) {
         if (
           deps.executing.has(task.id)
+          || deps.graphRouting.has(task.id)
           || deps.activeSessions.has(task.id)
           || deps.activeStepExecutors.has(task.id)
           || deps.activeWorkflowStepSessions.has(task.id)
@@ -327,8 +331,7 @@ export function wireExecutorLifecycle(deps: WireExecutorLifecycleDeps): WireExec
       // startup failed-orphan recovery is owned by resumeOrphaned().
       // dispatchUnpauseResume owns the terminal-failure and duplicate guards.
       if (
-        !task.paused
-        && task.column === unpauseWipLane
+        canResumeInPlace
         && !deps.activeSessions.has(task.id)
         && !deps.activeStepExecutors.has(task.id)
         && !deps.activeWorkflowStepSessions.has(task.id)

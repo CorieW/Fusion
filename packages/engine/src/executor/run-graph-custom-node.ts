@@ -19,7 +19,7 @@ import type {
   WorkflowStep,
   WorkspaceConfig,
 } from "@fusion/core";
-import { isFastExecutionMode, isFastLaneSkippableCustomNode, isLegacyWorkspaceWorktreeLayout, requiresContentReviewProof, resolveEffectiveAgent, resolveWorkspaceTaskWorktreeDir, THINKING_LEVELS, WORKFLOW_STEP_NOT_RUN_REASONS } from "@fusion/core";
+import { classifyWorkflowAgentNode, isFastExecutionMode, isFastLaneSkippableCustomNode, isLegacyWorkspaceWorktreeLayout, requiresContentReviewProof, resolveEffectiveAgent, resolveWorkspaceTaskWorktreeDir, THINKING_LEVELS, WORKFLOW_STEP_NOT_RUN_REASONS } from "@fusion/core";
 import { executorLog } from "../logger.js";
 import type { EngineRunContext } from "../util/run-audit.js";
 import type { WorkflowNodeResult } from "../workflows/workflow-graph-executor.js";
@@ -34,6 +34,7 @@ import {
   type WorkflowStepOutcome,
 } from "./workflow-step-verdict.js";
 import { parseAwaitInputSentinel } from "./await-input-parse.js";
+import { workflowInputNodeId } from "./workflow-input-markers.js";
 // FNXC:ReviewLaneRecommendations 2026-08-26-07:34: a readonly review node holds no writer; projection is its only durable channel.
 import { parseWorkflowStepRecommendations, resolveMaxRecommendationsPerTask } from "./workflow-step-recommendations.js";
 import { buildAgentPersona } from "./agent-binding-pure.js";
@@ -354,12 +355,12 @@ export async function runGraphCustomNode(
     // continues with the answer; otherwise keep the task parked and halt.
     const skillAwaitMarker = `workflow-input:${node.id}`;
     const skillPausedReason = live.pausedReason ?? "";
-    if (skillPausedReason.startsWith(skillAwaitMarker)) {
+    if (workflowInputNodeId(live) === node.id) {
       // Mirror runAwaitInputNode: only inspect replies once the task is actually
       // unpaused. While `live.paused` is still true the user has added a comment
       // but not released the task — keep it parked and never consume that reply,
       // so a still-paused task can't short-circuit straight back into the skill.
-      if (live.paused) {
+      if (live.paused || live.userPaused) {
         return { outcome: "failure", value: "awaiting-user-input" };
       }
       const watermark = (() => {
@@ -913,6 +914,7 @@ export async function runGraphCustomNode(
             : await deps.executeWorkflowStep(workspaceReviewTarget, step, repoWorktreePath, settings, repoEnv, {
               unattended,
               principalAgentId,
+              activityRole: classifyWorkflowAgentNode(node),
               outputLanguage,
               sessionBoundary: reviewBoundary,
               ...(repoRelPath ? { dispatchLabel: repoRelPath } : {}),
@@ -986,6 +988,7 @@ export async function runGraphCustomNode(
         return deps.executeWorkflowStep(live, step, worktreePath, settings, nodeEnv, {
           unattended,
           principalAgentId,
+          activityRole: classifyWorkflowAgentNode(node),
           outputLanguage,
           ...(nodeSessionBoundary ? { sessionBoundary: nodeSessionBoundary } : {}),
           ...(reviewInputFingerprint !== undefined ? { reviewInputFingerprint } : {}),

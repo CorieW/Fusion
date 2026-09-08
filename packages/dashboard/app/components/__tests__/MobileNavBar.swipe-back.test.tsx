@@ -56,7 +56,9 @@ function dispatchPopState(navIndex: number) {
 
 async function openMore() {
   fireEvent.click(screen.getByTestId("mobile-nav-tab-more"));
-  await waitFor(() => expect(screen.getByTestId("mobile-more-item-activity")).toBeInTheDocument());
+  const other = screen.getByRole("button", { name: "Other" });
+  if (other.getAttribute("aria-expanded") === "false") fireEvent.click(other);
+  expect(screen.getByTestId("mobile-more-item-activity")).toBeVisible();
 }
 
 describe("MobileNavBar More sheet navigation history", () => {
@@ -168,31 +170,24 @@ describe("MobileNavBar More sheet navigation history", () => {
     await expectProgrammaticCloseConsumesMoreEntry(() => fireEvent.click(screen.getByTestId("mobile-nav-tab-more")));
   });
 
-  it("consumes the More entry when a script runs", async () => {
-    vi.mocked(fetchScripts).mockResolvedValueOnce({ build: "pnpm build" });
-    await expectProgrammaticCloseConsumesMoreEntry(async () => {
-      fireEvent.click(screen.getByTestId("mobile-more-terminal-split-toggle"));
-      await waitFor(() => expect(screen.getByTestId("mobile-more-script-item-build")).toBeInTheDocument());
-      fireEvent.click(screen.getByTestId("mobile-more-script-item-build"));
-    });
-  });
-
-  it("consumes the More entry from Manage Scripts", async () => {
-    vi.mocked(fetchScripts).mockResolvedValueOnce({ build: "pnpm build" });
-    await expectProgrammaticCloseConsumesMoreEntry(async () => {
-      fireEvent.click(screen.getByTestId("mobile-more-terminal-split-toggle"));
-      await waitFor(() => expect(screen.getByTestId("mobile-more-scripts-manage")).toBeInTheDocument());
-      fireEvent.click(screen.getByTestId("mobile-more-scripts-manage"));
-    });
-  });
-
-  it("consumes the More entry from the no-scripts add-one branch", async () => {
-    vi.mocked(fetchScripts).mockResolvedValueOnce({});
-    await expectProgrammaticCloseConsumesMoreEntry(async () => {
-      fireEvent.click(screen.getByTestId("mobile-more-terminal-split-toggle"));
-      await waitFor(() => expect(screen.getByText("No scripts — add one…")).toBeInTheDocument());
-      fireEvent.click(screen.getByTestId("mobile-more-scripts-manage"));
-    });
+  /* FNXC:MobileNavFit 2026-09-08-06:50: Script execution, populated Manage, and empty Add are destination transitions, not plain dismissal. A delayed self-pop must never consume the new destination. */
+  it.each(["run", "manage", "empty"])("replaces More before a script destination (%s)", async (action) => {
+    vi.mocked(fetchScripts).mockResolvedValueOnce(action === "empty" ? {} : { build: "pnpm build" });
+    const destinationClose = vi.fn();
+    const props = createDefaultProps();
+    const openDestination = vi.fn(() => { navigationHistory?.pushNav({ type: "modal", close: destinationClose }); });
+    props.onRunScript = openDestination;
+    props.onOpenScripts = openDestination;
+    renderWithHistory(props);
+    await openMore();
+    fireEvent.click(screen.getByTestId("mobile-more-terminal-split-toggle"));
+    const item = await screen.findByTestId(action === "run" ? "mobile-more-script-item-build" : "mobile-more-scripts-manage");
+    fireEvent.click(item);
+    expect(openDestination).toHaveBeenCalledOnce();
+    expect(window.history.back).not.toHaveBeenCalled();
+    expect(document.querySelector(".mobile-more-sheet")).toBeNull();
+    dispatchPopState(0);
+    expect(destinationClose).toHaveBeenCalledOnce();
   });
 
   it("keeps provider-less More-sheet renders functional", async () => {

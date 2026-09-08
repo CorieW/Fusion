@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { loadAllAppCss } from "../test/cssFixture";
-import { computePublishedMobileNavHeight } from "../components/MobileNavBar";
+import { loadAllAppCss, loadComponentCss } from "../test/cssFixture";
+import { computePublishedMobileNavHeight, computeMobileNavColumns } from "../components/MobileNavBar";
 
 function extractMobileMediaBlocks(content: string): string {
   const blocks: string[] = [];
@@ -114,5 +114,49 @@ describe("mobile bottom-space layout invariant", () => {
         tabHeights: [],
       }),
     ).toBe(44);
+  });
+});
+
+/* FNXC:MobileNavFit 2026-09-08-05:39: Surface enumeration covers narrow/wide screens, default/custom/empty tab sets, one/multiple rows, wrapped labels, safe-area padding, and translated rectangles during keyboard hiding. */
+describe("responsive mobile navigation measurements", () => {
+  it.each([
+    [8, 304, 72, 4], [8, 374, 72, 4], [8, 736, 72, 8],
+    [6, 304, 72, 3], [3, 304, 72, 3], [0, 304, 72, 1],
+    [8, 0, 72, 1], [8, 304, 20, 4],
+  ])("balances %i tabs across %i available pixels", (count, width, minimum, expected) => {
+    expect(computeMobileNavColumns(count, width, minimum)).toBe(expected);
+  });
+
+  it.each([Number.NaN, 12, 34])("excludes safe-area padding %s while reserving both rows", paddingBottom => {
+    expect(computePublishedMobileNavHeight({
+      navOffsetHeight: 140, paddingBottom,
+      tabHeights: [48, 48, 48, 48, 48, 48, 48, 48],
+      tabTops: [700, 700, 700, 700, 748, 748, 748, 748],
+    })).toBe(96);
+  });
+
+  it("accounts for wrapped labels and fractional geometry without counting translated position", () => {
+    expect(computePublishedMobileNavHeight({
+      navOffsetHeight: 128, paddingBottom: Number.NaN,
+      tabHeights: [60.25, 60.25, 48, 48], tabTops: [900, 900, 960.25, 960.25],
+    })).toBe(109);
+  });
+
+  it("shrinks back to one row after rotation and ignores unavailable rectangles", () => {
+    expect(computePublishedMobileNavHeight({
+      navOffsetHeight: 128, paddingBottom: Number.NaN,
+      tabHeights: [48, 48, 0, Number.NaN], tabTops: [100, 100, 0, 0],
+    })).toBe(48);
+  });
+});
+
+describe("short viewport navigation and settings access", () => {
+  const mobileCss = extractMobileMediaBlocks(loadComponentCss("SettingsModal.css"));
+  it("gives the mobile Settings picker and fields one scroll owner", () => {
+    const layout = extractRuleBlock(mobileCss, ".settings-layout");
+    expect(layout).toContain("overflow-y: auto");
+    const fields = extractRuleBlock(mobileCss, ".settings-layout > .settings-content");
+    expect(fields).toContain("flex: 0 0 auto");
+    expect(fields).toContain("overflow: visible");
   });
 });

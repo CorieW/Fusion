@@ -9,6 +9,7 @@ import type { TFunction } from "i18next";
 import { addSteeringComment, refineTask } from "../api";
 import { useAgentLogs } from "../hooks/useAgentLogs";
 import { isLogGapMarker } from "../hooks/logStreamReconcile";
+import { agentLogDisplayName, agentLogIdentityKey } from "../utils/agentLogIdentity";
 import { useComposerDictation } from "../hooks/useComposerDictation";
 import { useChatSnippets } from "../hooks/useChatSnippetsCache";
 import { MicButton } from "./MicButton";
@@ -300,11 +301,11 @@ function buildTranscriptItems(entries: readonly AgentLogEntry[], userMessages: r
 
     const previousItem = items[items.length - 1];
     const role = item.entry.agent;
-    if (previousItem?.kind === "agent" && previousItem.role === role) {
+    if (previousItem?.kind === "agent" && agentLogIdentityKey(previousItem.entries[0]) === agentLogIdentityKey(item.entry)) {
       previousItem.entries.push(item.entry);
       return items;
     }
-    items.push({ kind: "agent", role, label: getRoleLabel(role, t), entries: [item.entry] });
+    items.push({ kind: "agent", role, label: agentLogDisplayName(item.entry, getRoleLabel(role, t)), entries: [item.entry] });
     return items;
   }, []);
 }

@@ -35,6 +35,7 @@ import type { TaskView } from "../hooks/useViewState";
 import { buildPluginTaskViewId } from "../plugins/pluginViewRegistry";
 import { getPluginDashboardViewNavIcon } from "./pluginNavIcon";
 import { GithubIcon } from "./GithubIcon";
+import { groupNavigationEntries, DEFAULT_NAVIGATION_GROUPS, type NavigationGroupId } from "../utils/navigationGroups";
 import { getDashboardViewLabel } from "../../src/shared/dashboard-views";
 
 export interface LeftSidebarExperimentalFeatures {
@@ -75,8 +76,8 @@ const LEFT_SIDEBAR_WIDTH_STORAGE_KEY = "fusion:left-sidebar-width";
 const LEFT_SIDEBAR_COLLAPSED_STORAGE_KEY = "fusion:left-sidebar-collapsed";
 
 const LEFT_SIDEBAR_GROUPS_STORAGE_KEY = "fusion:left-sidebar-groups";
-type SidebarGroupId = "tasks" | "ai" | "other";
-const DEFAULT_GROUPS: Record<SidebarGroupId, boolean> = { tasks: true, ai: true, other: false };
+type SidebarGroupId = NavigationGroupId;
+const DEFAULT_GROUPS = DEFAULT_NAVIGATION_GROUPS;
 
 /* FNXC:SidebarGroups 2026-09-07-02:52: Tasks and AI begin expanded; Other begins collapsed. Remember explicit choices locally without changing project settings. */
 function readStoredGroups(): Record<SidebarGroupId, boolean> {
@@ -485,16 +486,7 @@ export function LeftSidebarNav({
   ];
 
   /* FNXC:SidebarGroups 2026-09-07-03:00: Dashboard stands alone. Tasks contains Board/List; AI contains Chat/Agents/Workflows/Memory. Other also retains History, Recommendations, optional views, and installed plugin views, all alphabetized by their displayed labels. */
-  const pickEntries = (ids: string[]) => ids.flatMap(id => {
-    const entry = navEntries.find(candidate => candidate.id === id);
-    return entry ? [entry] : [];
-  });
-  const primaryIds = new Set(["command-center", "board", "list", "chat", "agents", "workflows", "memory"]);
-  const groups: { id: SidebarGroupId; label: string; entries: SidebarNavEntry[] }[] = [
-    { id: "tasks", label: t("nav.groups.tasks", "Tasks"), entries: pickEntries(["board", "list"]) },
-    { id: "ai", label: t("nav.groups.ai", "AI"), entries: pickEntries(["chat", "agents", "workflows", "memory"]) },
-    { id: "other", label: t("nav.groups.other", "Other"), entries: navEntries.filter(entry => !primaryIds.has(entry.id)).sort((a, b) => a.label.localeCompare(b.label)) },
-  ];
+  const { dashboard, groups } = groupNavigationEntries(navEntries);
 
   const renderEntry = (entry: SidebarNavEntry) => {
     const Icon = entry.icon;
@@ -539,7 +531,7 @@ export function LeftSidebarNav({
     >
       <nav className="left-sidebar-nav__list" aria-label={t("nav.primaryNavAriaLabel", "Primary navigation")}>
         <div className="left-sidebar-nav__section">
-          {pickEntries(["command-center"]).map(renderEntry)}
+          {dashboard.map(renderEntry)}
           {groups.filter(group => group.entries.length > 0).map(group => {
             const expanded = expandedGroups[group.id];
             const active = group.entries.some(entry => entry.isActive || entry.view === optimisticView);
@@ -555,7 +547,7 @@ export function LeftSidebarNav({
                     onClick={() => toggleGroup(group.id)}
                   >
                     {expanded ? <ChevronDown size={14} aria-hidden="true" /> : <ChevronRight size={14} aria-hidden="true" />}
-                    <span>{group.label}</span>
+                    <span>{t(`nav.groups.${group.id}`, group.label)}</span>
                   </button>
                 )}
                 <div id={contentId} className="left-sidebar-nav__group-items" hidden={!isCollapsed && !expanded}>

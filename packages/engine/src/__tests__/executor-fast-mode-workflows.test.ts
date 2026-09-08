@@ -15,6 +15,7 @@ import { WorkflowGraphTaskRunner } from "../workflows/workflow-graph-task-runner
 import { FOREACH_ACTIVE_CONTEXT_KEY } from "../workflows/workflow-node-handlers.js";
 import {
   createMockStore,
+  createWorkflowRoutingAgentStore,
   mockedCreateFnAgent,
   mockedExistsSync,
   mockedExec,
@@ -1336,11 +1337,12 @@ describe("fast mode workflow/runtime invariants", () => {
     }));
     const store = createMockStore();
     store.getTask.mockResolvedValue(task({ id: "FN-TOOLS", executionMode: "fast" }));
-    const executor = new TaskExecutor(store, "/tmp/test");
+    store.getWorkflowDefinition = vi.fn(async (id: string) => getBuiltinWorkflow(id));
+    const executor = new TaskExecutor(store, "/tmp/test", { agentStore: createWorkflowRoutingAgentStore(store).agentStore });
 
     await executor.execute(task({ id: "FN-TOOLS", executionMode: "fast" }));
 
-    expect(allSessionToolNames()).toContain("fn_task_done");
+    expect(allSessionToolNames(), JSON.stringify(store.logEntry.mock.calls)).toContain("fn_task_done");
     expect(allSessionToolNames()).not.toContain("fn_review_step");
   });
 
@@ -1360,11 +1362,12 @@ describe("fast mode workflow/runtime invariants", () => {
     }));
     const store = createMockStore();
     store.getTask.mockResolvedValue(task({ id: "FN-TOOLS", executionMode: "standard" }));
-    const executor = new TaskExecutor(store, "/tmp/test");
+    store.getWorkflowDefinition = vi.fn(async (id: string) => getBuiltinWorkflow(id));
+    const executor = new TaskExecutor(store, "/tmp/test", { agentStore: createWorkflowRoutingAgentStore(store).agentStore });
 
     await executor.execute(task({ id: "FN-TOOLS", executionMode: "standard" }));
 
-    expect(allSessionToolNames()).toContain("fn_task_done");
+    expect(allSessionToolNames(), JSON.stringify(store.logEntry.mock.calls)).toContain("fn_task_done");
     expect(allSessionToolNames()).not.toContain("fn_review_step");
   });
 

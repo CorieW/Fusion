@@ -127,6 +127,13 @@ const createProjects = () => [
   },
 ];
 
+/* FNXC:NavigationGroups 2026-09-07-17:41: Legacy destination tests must open the collapsed group before interacting with its visible controls. */
+function toggleMoreWithOtherExpanded() {
+  fireEvent.click(screen.getByTestId("mobile-nav-tab-more"));
+  const other = screen.queryByRole("button", { name: /^Other/, expanded: false });
+  if (other) fireEvent.click(other);
+}
+
 describe("Mobile Feature Access Regression Guard", () => {
   beforeEach(() => {
     mockViewport("mobile");
@@ -195,7 +202,7 @@ describe("Mobile Feature Access Regression Guard", () => {
   it("more sheet provides access to secondary mobile features", () => {
     render(<MobileNavBar {...createDefaultMobileNavProps()} />);
 
-    fireEvent.click(screen.getByTestId("mobile-nav-tab-more"));
+    toggleMoreWithOtherExpanded();
 
     expect(screen.getByTestId("mobile-nav-tab-mailbox")).toBeDefined();
     expect(screen.queryByTestId("mobile-more-item-mailbox")).toBeNull();
@@ -227,7 +234,7 @@ describe("Mobile Feature Access Regression Guard", () => {
     expect(screen.queryByTestId("mobile-nav-tab-skills")).toBeNull();
     expect(screen.getByTestId("mobile-nav-tab-more")).toBeInTheDocument();
 
-    fireEvent.click(screen.getByTestId("mobile-nav-tab-more"));
+    toggleMoreWithOtherExpanded();
     expect(screen.getByTestId("mobile-more-item-missions")).toBeInTheDocument();
     expect(screen.queryByTestId("mobile-more-item-skills")).toBeNull();
   });
@@ -236,7 +243,7 @@ describe("Mobile Feature Access Regression Guard", () => {
     const props = createDefaultMobileNavProps();
     render(<MobileNavBar {...props} />);
 
-    fireEvent.click(screen.getByTestId("mobile-nav-tab-more"));
+    toggleMoreWithOtherExpanded();
     expect(screen.queryByTestId("mobile-more-item-reliability")).toBeNull();
 
     fireEvent.click(screen.getByTestId("mobile-nav-tab-command-center"));
@@ -247,7 +254,7 @@ describe("Mobile Feature Access Regression Guard", () => {
     const props = createDefaultMobileNavProps();
     render(<MobileNavBar {...props} />);
 
-    fireEvent.click(screen.getByTestId("mobile-nav-tab-more"));
+    toggleMoreWithOtherExpanded();
     expect(screen.queryByTestId("mobile-more-item-nodes")).toBeNull();
 
     fireEvent.click(screen.getByTestId("mobile-nav-tab-command-center"));
@@ -261,7 +268,7 @@ describe("Mobile Feature Access Regression Guard", () => {
     fireEvent.click(screen.getByTestId("mobile-nav-tab-chat"));
     expect(props.onChangeView).toHaveBeenCalledWith("chat");
 
-    fireEvent.click(screen.getByTestId("mobile-nav-tab-more"));
+    toggleMoreWithOtherExpanded();
     expect(screen.queryByTestId("mobile-more-item-chat")).toBeNull();
   });
 

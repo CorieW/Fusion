@@ -110,7 +110,7 @@ function lastGapMarkerIndex(entries: readonly AgentLogEntry[]): number {
 const LOG_ENTRY_KEY_SEPARATOR = String.fromCharCode(0);
 
 function logEntryKey(entry: AgentLogEntry): string {
-  return [entry.timestamp, entry.type, entry.text, entry.detail ?? "", entry.agent ?? ""].join(LOG_ENTRY_KEY_SEPARATOR);
+  return [entry.timestamp, entry.type, entry.text, entry.detail ?? "", entry.agent ?? "", entry.agentId ?? "", entry.agentName ?? ""].join(LOG_ENTRY_KEY_SEPARATOR);
 }
 
 /**

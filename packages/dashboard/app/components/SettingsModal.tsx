@@ -977,6 +977,7 @@ export function SettingsModal({
       } as CSSProperties)
     : {};
   const settingsContentRef = useRef<HTMLDivElement>(null);
+  const settingsLayoutRef = useRef<HTMLDivElement>(null);
   const workflowLaneSaverRef = useRef<SectionSaveHandler | null>(null);
   /*
   FNXC:SettingsAutoSave 2026-07-20-01:00:
@@ -1402,7 +1403,9 @@ export function SettingsModal({
     FNXC:SettingsNavigation 2026-07-16-01:10:
     Assigns `scrollTop` rather than calling `scrollTo({top:0})`: jsdom implements the property but not the method, so the smarter-looking call throws "scrollTo is not a function" in component tests. The jump is instant either way — a section change is a context switch, not a movement the eye should follow.
     */
+    /* FNXC:MobileNavFit 2026-09-08-06:50: Mobile scrolls the picker and fields together; desktop scrolls only fields. Reset both owners so section switches cannot preserve an offscreen starting point after a resize. Search jumps retain their existing exemption above. */
     if (settingsContentRef.current) settingsContentRef.current.scrollTop = 0;
+    if (settingsLayoutRef.current) settingsLayoutRef.current.scrollTop = 0;
   }, [activeSection]);
 
   useEffect(() => {
@@ -2493,6 +2496,7 @@ export function SettingsModal({
 
   const scrollSettingsToTop = useCallback(() => {
     settingsContentRef.current?.scrollTo({ top: 0, behavior: "smooth" });
+    settingsLayoutRef.current?.scrollTo({ top: 0, behavior: "smooth" });
   }, []);
 
   const clearAuthLoginUiState = useCallback((providerId: string) => {
@@ -4768,7 +4772,7 @@ export function SettingsModal({
         {loading ? (
           <div className="settings-empty-state settings-loading"><LoadingSpinner label={t("settings.loading", "Loading…")} /></div>
         ) : (
-          <div className="settings-layout">
+          <div className="settings-layout" ref={settingsLayoutRef}>
             <aside
               className="settings-navigation"
               aria-label={t("settings.search.navigationLabel", "Settings navigation")}

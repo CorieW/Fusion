@@ -116,7 +116,7 @@ export function flushAgentLogBufferImpl(store: TaskStore): void {
     }
   }
 
-export async function appendAgentLogBatchImpl(store: TaskStore, entries: Array<{ taskId: string; text: string; type: AgentLogEntry["type"]; detail?: string; agent?: AgentLogEntry["agent"]; durationMs?: number; timeToFirstTokenMs?: number }>,): Promise<void> {
+export async function appendAgentLogBatchImpl(store: TaskStore, entries: Array<Omit<AgentLogEntry, "timestamp">>,): Promise<void> {
     /*
     FNXC:AgentLogging 2026-08-29-04:26:
     AgentLogger uses this batch path in production, so fields dropped here disappear from durable logs,
@@ -165,6 +165,8 @@ export async function appendAgentLogBatchImpl(store: TaskStore, entries: Array<{
           type: entry.type,
           detail: entry.detail ?? null,
           agent: entry.agent ?? null,
+          agentId: entry.agentId,
+          agentName: entry.agentName,
           durationMs: entry.durationMs ?? null,
           timeToFirstTokenMs: entry.timeToFirstTokenMs ?? null,
         })),
@@ -214,9 +216,10 @@ export async function appendAgentLogBatchImpl(store: TaskStore, entries: Array<{
         type: entry.type,
         ...(entry.detail !== undefined && { detail: entry.detail }),
         ...(entry.agent !== undefined && { agent: entry.agent }),
+        ...(entry.agentId !== undefined && { agentId: entry.agentId }),
+        ...(entry.agentName !== undefined && { agentName: entry.agentName }),
         ...(entry.durationMs !== undefined && { durationMs: entry.durationMs }),
         ...(entry.timeToFirstTokenMs !== undefined && { timeToFirstTokenMs: entry.timeToFirstTokenMs }),
       });
     }
   }
-

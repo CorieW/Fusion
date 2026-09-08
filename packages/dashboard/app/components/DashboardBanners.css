@@ -1,0 +1,42 @@
+/*
+FNXC:MobileNavFit 2026-09-08-05:39:
+Stacked operational notices must not consume the whole viewport and make mobile Settings or navigation unreachable.
+Keep all warnings and actions in a keyboard-scrollable region; bound its height only on compact screens, never hide or dismiss alerts to recover content space.
+*/
+.dashboard-banners {
+  display: flex;
+  flex-direction: column;
+  flex: 0 0 auto;
+  min-height: 0;
+}
+
+.dashboard-banners:empty {
+  display: none;
+}
+
+.dashboard-banners:focus-visible {
+  outline: var(--space-3xs) solid var(--accent);
+  outline-offset: calc(-1 * var(--space-3xs));
+}
+
+@media (max-width: 768px), (max-height: 600px) {
+  .dashboard-banners {
+    max-height: 25dvh;
+    overflow-y: auto;
+    overscroll-behavior-y: contain;
+  }
+
+  .dashboard-banners > * {
+    flex-shrink: 0;
+  }
+}
+
+html[data-viewport-mode="mobile"] .dashboard-banners {
+  max-height: 25dvh;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+}
+
+html[data-viewport-mode="mobile"] .dashboard-banners > * {
+  flex-shrink: 0;
+}

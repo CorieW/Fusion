@@ -1,4 +1,5 @@
 import type { AgentLogEntry } from "@fusion/core";
+import { agentLogDisplayName, agentLogIdentityKey } from "../utils/agentLogIdentity";
 // FNXC:WorkflowLifecycleColumns 2026-07-30-11:50: these are AGENT ROLE comparisons, not
 // column guards — the planner LANE keeps the name `triage`; U11 removed only the COLUMN.
 import { PLANNER_AGENT_ROLE } from "@fusion/core";
@@ -149,7 +150,7 @@ function getEntrySignature(entry: AgentLogEntry): string {
   return [
     entry.taskId,
     entry.timestamp,
-    entry.agent ?? "",
+    agentLogIdentityKey(entry),
     entry.type,
     entry.text,
     entry.detail ?? "",
@@ -238,9 +239,9 @@ function CollapsibleToolDetail({ detail, type = "tool_result" }: CollapsibleTool
 }
 
 function shouldShowBadge(entry: AgentLogEntry, previousEntry?: AgentLogEntry): boolean {
-  if (!entry.agent) return false;
+  if (!entry.agent && !entry.agentName?.trim()) return false;
   if (isToolLikeType(entry.type)) return true;
-  return !previousEntry || previousEntry.agent !== entry.agent || previousEntry.type !== entry.type;
+  return !previousEntry || agentLogIdentityKey(previousEntry) !== agentLogIdentityKey(entry) || previousEntry.type !== entry.type;
 }
 
 interface RenderEntry {
@@ -281,7 +282,7 @@ function buildRenderGroups(renderEntries: RenderEntry[], entryKeys: string[]): A
         const nextEntry = next.entry;
         if (
           nextEntry.type !== entry.type
-          || nextEntry.agent !== entry.agent
+          || agentLogIdentityKey(nextEntry) !== agentLogIdentityKey(entry)
           || next.hiddenToolBoundaryId !== hiddenToolBoundaryId
         ) {
           break;
@@ -763,7 +764,7 @@ export function AgentLogViewer({
 
           const agentBadge = group.showBadge ? (
             <span className="agent-log-badge-row">
-              <span className="agent-log-agent-badge">[{getAgentDisplayName(firstEntry.agent!, t as TFunction<"app">)}]</span>
+              <span className="agent-log-agent-badge">[{agentLogDisplayName(firstEntry, getAgentDisplayName(firstEntry.agent ?? "agent", t as TFunction<"app">))}]</span>
               {timestampSpan}
               {preciseTimestamp}
             </span>

@@ -1,10 +1,11 @@
 import { readFileSync } from "fs";
 import { resolve } from "path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { LeftSidebarNav } from "../LeftSidebarNav";
 import { MobileNavBar } from "../MobileNavBar";
 import { MOBILE_NAV_SELECTABLE_ITEMS } from "../../../../core/src/board/mobile-nav-primary-items";
-import { MOBILE_MEDIA_QUERY } from "../../hooks/useViewportMode";
+import { MOBILE_MEDIA_QUERY, publishViewportMode } from "../../hooks/useViewportMode";
 import { readAppFile } from "../../test/cssFixture";
 
 vi.mock("../../api", () => ({
@@ -56,8 +57,8 @@ function expectUniformMobileNavColumns(container: HTMLElement, expectedTabCount:
 
   const tabRule = extractRuleBlock(mobileNavCss, ".mobile-nav-tab");
   expect(tabRule).toContain("--mobile-nav-icon-size: calc(var(--space-lg) + var(--space-sm) - (var(--space-xs) / 2))");
-  expect(tabRule).toContain("flex: 1 1 0");
-  expect(tabRule).toContain("min-width: 0");
+  expect(tabRule).toContain("flex: 0 0 calc(100% / var(--mobile-nav-columns, 4))");
+  expect(tabRule).toContain("min-width: max(var(--touch-target-min-size), calc(var(--space-2xl) * 2 + var(--space-sm)))");
   expect(tabRule).toContain("align-items: center");
   expect(tabRule).toMatch(/padding:\s*[^;]+\s+0;/);
   expect(tabRule).not.toMatch(/margin-left|margin-right/);
@@ -130,6 +131,13 @@ const createDefaultProps = () => ({
   projectId: "proj_1",
 });
 
+/* FNXC:NavigationGroups 2026-09-07-17:41: Legacy destination tests must open the collapsed group before interacting with its visible controls. */
+function toggleMoreWithOtherExpanded() {
+  fireEvent.click(screen.getByTestId("mobile-nav-tab-more"));
+  const other = screen.queryByRole("button", { name: /^Other/, expanded: false });
+  if (other) fireEvent.click(other);
+}
+
 describe("MobileNavBar", () => {
   beforeEach(() => {
     mockViewport("mobile");
@@ -153,7 +161,7 @@ describe("MobileNavBar", () => {
     expect(screen.queryByTestId("mobile-nav-tab-roadmaps")).toBeNull();
     expect(screen.getByTestId("mobile-nav-tab-more")).toBeDefined();
 
-    fireEvent.click(screen.getByTestId("mobile-nav-tab-more"));
+    toggleMoreWithOtherExpanded();
     expect(screen.getByTestId("mobile-more-item-skills")).toBeDefined();
   });
 
@@ -177,7 +185,7 @@ describe("MobileNavBar", () => {
         artifactUnreadCount={120}
       />,
     );
-    fireEvent.click(screen.getByTestId("mobile-nav-tab-more"));
+    toggleMoreWithOtherExpanded();
     expect(screen.getByTestId("mobile-more-item-recommendations").querySelector(".mobile-more-item-badge")).toHaveTextContent("7");
     expect(screen.getByTestId("mobile-more-item-documents").querySelector(".mobile-more-item-badge")).toHaveTextContent("99+");
   });
@@ -186,7 +194,7 @@ describe("MobileNavBar", () => {
     const { container } = render(<MobileNavBar {...createDefaultProps()} mobileNavPrimaryItems={["command-center", "tasks", "agents", "planning", "chat", "mailbox"]} />);
     expect(screen.getByTestId("mobile-nav-tab-planning")).toBeInTheDocument();
     expect(screen.queryByTestId("mobile-nav-tab-missions")).toBeNull();
-    fireEvent.click(screen.getByTestId("mobile-nav-tab-more"));
+    toggleMoreWithOtherExpanded();
     expect(screen.getByTestId("mobile-more-item-missions")).toBeInTheDocument();
     expect(container.querySelector('[data-testid="mobile-nav-tab-missions"]')).toBeNull();
   });
@@ -205,11 +213,11 @@ describe("MobileNavBar", () => {
       const { unmount } = render(<MobileNavBar {...createDefaultProps()} mobileNavPrimaryItems={[item]} showSkillsTab experimentalFeatures={{ insights: true, memoryView: true, researchView: true, evalsView: true, ideationView: true, goalsView: true, todoView: true, devServerView: true }} />);
       if (item === "ideation") {
         expect(screen.queryByTestId("mobile-nav-tab-ideation")).toBeNull();
-        fireEvent.click(screen.getByTestId("mobile-nav-tab-more"));
+        toggleMoreWithOtherExpanded();
         expect(screen.getAllByTestId("mobile-more-item-ideation")).toHaveLength(1);
       } else {
         expect(screen.getAllByTestId(`mobile-nav-tab-${item}`)).toHaveLength(1);
-        fireEvent.click(screen.getByTestId("mobile-nav-tab-more"));
+        toggleMoreWithOtherExpanded();
         expect(screen.queryByTestId(`mobile-more-item-${moreTestIds[item] ?? item}`)).toBeNull();
       }
       unmount();
@@ -221,7 +229,7 @@ describe("MobileNavBar", () => {
     render(<MobileNavBar {...createDefaultProps()} mobileNavPrimaryItems={["ideation"]} experimentalFeatures={{ ideationView: true }} />);
 
     expect(screen.queryByTestId("mobile-nav-tab-ideation")).toBeNull();
-    fireEvent.click(screen.getByTestId("mobile-nav-tab-more"));
+    toggleMoreWithOtherExpanded();
     expect(screen.getAllByTestId("mobile-more-item-ideation")).toHaveLength(1);
   });
 
@@ -236,7 +244,7 @@ describe("MobileNavBar", () => {
     expect(screen.queryByTestId("mobile-nav-tab-skills")).toBeNull();
     expect(screen.queryByTestId("mobile-nav-tab-roadmaps")).toBeNull();
 
-    fireEvent.click(screen.getByTestId("mobile-nav-tab-more"));
+    toggleMoreWithOtherExpanded();
     expect(screen.getByTestId("mobile-more-item-skills")).toBeDefined();
     expect(screen.queryByTestId("mobile-more-item-roadmaps")).toBeNull();
   });
@@ -246,7 +254,7 @@ describe("MobileNavBar", () => {
 
     expect(screen.queryByTestId("mobile-nav-tab-skills")).toBeNull();
 
-    fireEvent.click(screen.getByTestId("mobile-nav-tab-more"));
+    toggleMoreWithOtherExpanded();
     expect(screen.getByTestId("mobile-more-item-skills")).toBeDefined();
   });
 
@@ -294,7 +302,7 @@ describe("MobileNavBar", () => {
     expect(screen.queryByTestId("mobile-nav-tab-skills")).toBeNull();
     expect(screen.getByTestId("mobile-nav-tab-more").className).toContain("mobile-nav-tab--active");
     expect(screen.getByTestId("mobile-nav-tab-mailbox").querySelector(".mobile-nav-tab-badge")?.textContent).toBe("99+");
-    fireEvent.click(screen.getByTestId("mobile-nav-tab-more"));
+    toggleMoreWithOtherExpanded();
     expect(screen.getByTestId("mobile-more-item-skills")).toBeDefined();
     skillsEnabledRender.unmount();
 
@@ -312,7 +320,7 @@ describe("MobileNavBar", () => {
     );
     expectUniformMobileNavColumns(pluginVariantRender.container, 8);
     expect(screen.queryByTestId("mobile-nav-tab-plugin-fusion-plugin-spacing-check-wide")).toBeNull();
-    fireEvent.click(screen.getByTestId("mobile-nav-tab-more"));
+    toggleMoreWithOtherExpanded();
     expect(screen.getByTestId("mobile-more-item-plugin-fusion-plugin-spacing-check-wide")).toBeDefined();
   });
 
@@ -338,7 +346,7 @@ describe("MobileNavBar", () => {
       />,
     );
 
-    fireEvent.click(screen.getByTestId("mobile-nav-tab-more"));
+    toggleMoreWithOtherExpanded();
     fireEvent.click(screen.getByTestId("mobile-more-item-plugin-fusion-plugin-todos-todos"));
 
     expect(props.onChangeView).toHaveBeenCalledWith("plugin:fusion-plugin-todos:todos");
@@ -349,7 +357,7 @@ describe("MobileNavBar", () => {
 
     expect(screen.getByTestId("mobile-nav-tab-mailbox")).toBeInTheDocument();
 
-    fireEvent.click(screen.getByTestId("mobile-nav-tab-more"));
+    toggleMoreWithOtherExpanded();
     expect(screen.queryByTestId("mobile-more-item-mailbox")).toBeNull();
   });
 
@@ -363,7 +371,7 @@ describe("MobileNavBar", () => {
 
     expect(screen.queryByTestId("mobile-nav-tab-plugin-fusion-plugin-todos-todos")).toBeNull();
 
-    fireEvent.click(screen.getByTestId("mobile-nav-tab-more"));
+    toggleMoreWithOtherExpanded();
     expect(screen.getByTestId("mobile-more-item-plugin-fusion-plugin-todos-todos")).toBeInTheDocument();
   });
 
@@ -383,7 +391,7 @@ describe("MobileNavBar", () => {
     const props = createDefaultProps();
     render(<MobileNavBar {...props} />);
 
-    fireEvent.click(screen.getByTestId("mobile-nav-tab-more"));
+    toggleMoreWithOtherExpanded();
     expect(screen.getByTestId("mobile-more-item-documents")).toHaveTextContent("Artifacts");
     fireEvent.click(screen.getByTestId("mobile-more-item-documents"));
 
@@ -394,7 +402,7 @@ describe("MobileNavBar", () => {
     const props = createDefaultProps();
     render(<MobileNavBar {...props} />);
 
-    fireEvent.click(screen.getByTestId("mobile-nav-tab-more"));
+    toggleMoreWithOtherExpanded();
     fireEvent.click(screen.getByTestId("mobile-more-item-secrets"));
 
     expect(props.onChangeView).toHaveBeenCalledWith("secrets");
@@ -430,12 +438,12 @@ describe("MobileNavBar", () => {
 
     expect(screen.queryByTestId("mobile-nav-tab-plugin-fusion-plugin-dependency-graph-graph")).toBeNull();
 
-    fireEvent.click(screen.getByTestId("mobile-nav-tab-more"));
+    toggleMoreWithOtherExpanded();
     const graphItem = screen.getByTestId("mobile-more-item-plugin-fusion-plugin-dependency-graph-graph");
     fireEvent.click(graphItem);
     expect(props.onChangeView).toHaveBeenCalledWith("graph");
 
-    fireEvent.click(screen.getByTestId("mobile-nav-tab-more"));
+    toggleMoreWithOtherExpanded();
     const overflowItem = screen.getByTestId("mobile-more-item-plugin-fusion-plugin-dependency-graph-queue");
     expect(overflowItem.querySelector(".lucide-workflow")).toBeTruthy();
     fireEvent.click(overflowItem);
@@ -462,7 +470,7 @@ describe("MobileNavBar", () => {
     expect(screen.queryByTestId("mobile-nav-tab-plugin-fusion-plugin-dependency-graph-graph")).toBeNull();
     expect(screen.queryByTestId("mobile-nav-tab-plugin-fusion-plugin-dependency-graph-queue")).toBeNull();
 
-    fireEvent.click(screen.getByTestId("mobile-nav-tab-more"));
+    toggleMoreWithOtherExpanded();
     expect(screen.getByTestId("mobile-more-item-plugin-fusion-plugin-dependency-graph-graph")).toBeDefined();
     expect(screen.getByTestId("mobile-more-item-plugin-fusion-plugin-dependency-graph-queue")).toBeDefined();
   });
@@ -550,7 +558,7 @@ describe("MobileNavBar", () => {
     fireEvent.click(commandCenterTab);
     expect(props.onChangeView).toHaveBeenCalledWith("command-center");
 
-    fireEvent.click(screen.getByTestId("mobile-nav-tab-more"));
+    toggleMoreWithOtherExpanded();
     expect(screen.queryByTestId("mobile-more-item-command-center")).toBeNull();
     expect(screen.getByTestId("mobile-more-item-plugin-fusion-plugin-compound-engineering-compound-engineering")).toBeDefined();
   });
@@ -581,7 +589,7 @@ describe("MobileNavBar", () => {
     expect(tabBadge).toBeDefined();
     expect(tabBadge?.textContent).toBe("7");
 
-    fireEvent.click(screen.getByTestId("mobile-nav-tab-more"));
+    toggleMoreWithOtherExpanded();
     expect(screen.queryByTestId("mobile-more-item-mailbox")).toBeNull();
   });
 
@@ -674,7 +682,7 @@ describe("MobileNavBar", () => {
 
     it("shows a needs-input dot on the Planning More-sheet item and keeps the count badge unaffected", () => {
       render(<MobileNavBar {...createDefaultProps()} view="board" planningNeedsInput={true} activePlanningSessionCount={2} />);
-      fireEvent.click(screen.getByTestId("mobile-nav-tab-more"));
+      toggleMoreWithOtherExpanded();
 
       const planningItem = screen.getByTestId("mobile-more-item-planning");
       expect(planningItem.querySelector(".status-dot.status-dot--pending")).toBeTruthy();
@@ -683,7 +691,7 @@ describe("MobileNavBar", () => {
 
     it("hides the Planning More-sheet dot when planningNeedsInput is false while the count badge still renders", () => {
       render(<MobileNavBar {...createDefaultProps()} view="board" planningNeedsInput={false} activePlanningSessionCount={3} />);
-      fireEvent.click(screen.getByTestId("mobile-nav-tab-more"));
+      toggleMoreWithOtherExpanded();
 
       const planningItem = screen.getByTestId("mobile-more-item-planning");
       expect(planningItem.querySelector(".status-dot.status-dot--pending")).toBeNull();
@@ -697,7 +705,7 @@ describe("MobileNavBar", () => {
 
     expect(screen.queryByTestId("mobile-nav-tab-skills")).toBeNull();
 
-    fireEvent.click(screen.getByTestId("mobile-nav-tab-more"));
+    toggleMoreWithOtherExpanded();
     expect(screen.getByTestId("mobile-more-item-skills")).toHaveTextContent("Skills & Snippets");
     fireEvent.click(screen.getByTestId("mobile-more-item-skills"));
     expect(props.onChangeView).toHaveBeenCalledWith("skills");
@@ -719,10 +727,10 @@ describe("MobileNavBar", () => {
     const props = createDefaultProps();
     const { container } = render(<MobileNavBar {...props} />);
 
-    fireEvent.click(screen.getByTestId("mobile-nav-tab-more"));
+    toggleMoreWithOtherExpanded();
     expect(container.querySelector(".mobile-more-sheet")).not.toBeNull();
 
-    fireEvent.click(screen.getByTestId("mobile-nav-tab-more"));
+    toggleMoreWithOtherExpanded();
     expect(container.querySelector(".mobile-more-sheet")).toBeNull();
   });
 
@@ -733,7 +741,7 @@ describe("MobileNavBar", () => {
         shellConnectionControl={<button type="button">Manage connections</button>}
       />,
     );
-    fireEvent.click(screen.getByTestId("mobile-nav-tab-more"));
+    toggleMoreWithOtherExpanded();
 
     expect(screen.getByTestId("mobile-more-shell-connection")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Manage connections" })).toBeInTheDocument();
@@ -741,7 +749,7 @@ describe("MobileNavBar", () => {
 
   it("sheet contains expected navigation items including activity log", () => {
     render(<MobileNavBar {...createDefaultProps()} />);
-    fireEvent.click(screen.getByTestId("mobile-nav-tab-more"));
+    toggleMoreWithOtherExpanded();
 
     expect(screen.queryByTestId("mobile-more-item-mailbox")).toBeNull();
     expect(screen.getByTestId("mobile-nav-tab-mailbox")).toBeDefined();
@@ -765,7 +773,7 @@ describe("MobileNavBar", () => {
 
   it("pins omitted Settings below the More divider as the final selectable item", () => {
     const { container } = render(<MobileNavBar {...createDefaultProps()} />);
-    fireEvent.click(screen.getByTestId("mobile-nav-tab-more"));
+    toggleMoreWithOtherExpanded();
 
     const sheet = container.querySelector(".mobile-more-sheet");
     const separator = sheet?.querySelector(".mobile-more-separator");
@@ -781,13 +789,13 @@ describe("MobileNavBar", () => {
     render(<MobileNavBar {...createDefaultProps()} mobileNavPrimaryItems={["settings"]} />);
 
     expect(screen.getByTestId("mobile-nav-tab-settings")).toBeInTheDocument();
-    fireEvent.click(screen.getByTestId("mobile-nav-tab-more"));
+    toggleMoreWithOtherExpanded();
     expect(screen.queryByTestId("mobile-more-item-settings")).toBeNull();
   });
 
   it("shows the stash orphan badge on the Git Manager item instead of a Stash Recovery item", () => {
     render(<MobileNavBar {...createDefaultProps()} stashOrphanCount={8} />);
-    fireEvent.click(screen.getByTestId("mobile-nav-tab-more"));
+    toggleMoreWithOtherExpanded();
 
     const gitItem = screen.getByTestId("mobile-more-item-git");
     expect(gitItem.querySelector(".mobile-more-item-badge")?.textContent).toBe("8");
@@ -796,7 +804,7 @@ describe("MobileNavBar", () => {
 
   it("does not show legacy roadmaps in more sheet", () => {
     render(<MobileNavBar {...createDefaultProps()} experimentalFeatures={{}} />);
-    fireEvent.click(screen.getByTestId("mobile-nav-tab-more"));
+    toggleMoreWithOtherExpanded();
     expect(screen.queryByTestId("mobile-more-item-roadmaps")).toBeNull();
   });
 
@@ -818,7 +826,7 @@ describe("MobileNavBar", () => {
     expect(screen.getByTestId("mobile-nav-tab-command-center").previousElementSibling).toBeNull();
     expect(screen.queryByTestId("mobile-nav-tab-plugin-fusion-plugin-compound-engineering-compound-engineering")).toBeNull();
 
-    fireEvent.click(screen.getByTestId("mobile-nav-tab-more"));
+    toggleMoreWithOtherExpanded();
     const compoundItem = screen.getByTestId("mobile-more-item-plugin-fusion-plugin-compound-engineering-compound-engineering");
     expect(compoundItem).toBeDefined();
     expect(compoundItem.querySelector(".lucide-boxes")).not.toBeNull();
@@ -837,7 +845,7 @@ describe("MobileNavBar", () => {
     const testId = "mobile-more-item-plugin-fusion-plugin-compound-engineering-compound-engineering";
     const rendered = render(<MobileNavBar {...props} pluginDashboardViews={compoundEngineeringView} />);
 
-    fireEvent.click(screen.getByTestId("mobile-nav-tab-more"));
+    toggleMoreWithOtherExpanded();
     expect(screen.getByTestId(testId)).toBeInTheDocument();
     expect(screen.queryByTestId("mobile-nav-tab-plugin-fusion-plugin-compound-engineering-compound-engineering")).toBeNull();
 
@@ -864,19 +872,19 @@ describe("MobileNavBar", () => {
     );
 
     expect(screen.queryByTestId("mobile-nav-tab-roadmaps")).toBeNull();
-    fireEvent.click(screen.getByTestId("mobile-nav-tab-more"));
+    toggleMoreWithOtherExpanded();
     expect(screen.getByTestId("mobile-more-item-plugin-fusion-plugin-roadmap-roadmaps")).toBeInTheDocument();
   });
 
   it("shows insights in more sheet when experimentalFeatures.insights is true", () => {
     render(<MobileNavBar {...createDefaultProps()} experimentalFeatures={{ insights: true }} />);
-    fireEvent.click(screen.getByTestId("mobile-nav-tab-more"));
+    toggleMoreWithOtherExpanded();
     expect(screen.getByTestId("mobile-more-item-insights")).toBeDefined();
   });
 
   it("shows research in more sheet when experimentalFeatures.researchView is true", () => {
     render(<MobileNavBar {...createDefaultProps()} experimentalFeatures={{ researchView: true }} />);
-    fireEvent.click(screen.getByTestId("mobile-nav-tab-more"));
+    toggleMoreWithOtherExpanded();
     expect(screen.getByTestId("mobile-more-item-research")).toBeDefined();
   });
 
@@ -884,7 +892,7 @@ describe("MobileNavBar", () => {
     const props = createDefaultProps();
     const { container } = render(<MobileNavBar {...props} experimentalFeatures={{ ideationView: true }} />);
 
-    fireEvent.click(screen.getByTestId("mobile-nav-tab-more"));
+    toggleMoreWithOtherExpanded();
     fireEvent.click(screen.getByTestId("mobile-more-item-ideation"));
 
     expect(container.querySelector(".mobile-more-sheet")).toBeNull();
@@ -893,31 +901,31 @@ describe("MobileNavBar", () => {
 
   it("does not show Ideation in more sheet when ideationView is disabled", () => {
     render(<MobileNavBar {...createDefaultProps()} experimentalFeatures={{ ideationView: false }} />);
-    fireEvent.click(screen.getByTestId("mobile-nav-tab-more"));
+    toggleMoreWithOtherExpanded();
     expect(screen.queryByTestId("mobile-more-item-ideation")).toBeNull();
   });
 
   it("does not show research in more sheet when experimentalFeatures.researchView is false", () => {
     render(<MobileNavBar {...createDefaultProps()} experimentalFeatures={{ researchView: false }} />);
-    fireEvent.click(screen.getByTestId("mobile-nav-tab-more"));
+    toggleMoreWithOtherExpanded();
     expect(screen.queryByTestId("mobile-more-item-research")).toBeNull();
   });
 
   it("does not show nodes in more sheet because Nodes lives in Command Center", () => {
     render(<MobileNavBar {...createDefaultProps()} experimentalFeatures={{}} />);
-    fireEvent.click(screen.getByTestId("mobile-nav-tab-more"));
+    toggleMoreWithOtherExpanded();
     expect(screen.queryByTestId("mobile-more-item-nodes")).toBeNull();
   });
 
   it("does not show memory in more sheet when memoryView is not enabled", () => {
     render(<MobileNavBar {...createDefaultProps()} experimentalFeatures={{}} />);
-    fireEvent.click(screen.getByTestId("mobile-nav-tab-more"));
+    toggleMoreWithOtherExpanded();
     expect(screen.queryByTestId("mobile-more-item-memory")).toBeNull();
   });
 
   it("shows memory in more sheet when memoryView is enabled", () => {
     render(<MobileNavBar {...createDefaultProps()} experimentalFeatures={{ memoryView: true }} />);
-    fireEvent.click(screen.getByTestId("mobile-nav-tab-more"));
+    toggleMoreWithOtherExpanded();
     expect(screen.getByTestId("mobile-more-item-memory")).toBeDefined();
   });
 
@@ -925,7 +933,7 @@ describe("MobileNavBar", () => {
     const props = createDefaultProps();
     const { container } = render(<MobileNavBar {...props} experimentalFeatures={{ insights: true }} />);
 
-    fireEvent.click(screen.getByTestId("mobile-nav-tab-more"));
+    toggleMoreWithOtherExpanded();
     fireEvent.click(screen.getByTestId("mobile-more-item-insights"));
 
     expect(container.querySelector(".mobile-more-sheet")).toBeNull();
@@ -936,7 +944,7 @@ describe("MobileNavBar", () => {
     const props = createDefaultProps();
     const { container } = render(<MobileNavBar {...props} experimentalFeatures={{ researchView: true }} />);
 
-    fireEvent.click(screen.getByTestId("mobile-nav-tab-more"));
+    toggleMoreWithOtherExpanded();
     fireEvent.click(screen.getByTestId("mobile-more-item-research"));
 
     expect(container.querySelector(".mobile-more-sheet")).toBeNull();
@@ -946,7 +954,7 @@ describe("MobileNavBar", () => {
   it("hides evals item in more sheet when evalsView is not enabled", () => {
     render(<MobileNavBar {...createDefaultProps()} experimentalFeatures={{}} />);
 
-    fireEvent.click(screen.getByTestId("mobile-nav-tab-more"));
+    toggleMoreWithOtherExpanded();
     expect(screen.queryByTestId("mobile-more-item-evals")).toBeNull();
   });
 
@@ -954,7 +962,7 @@ describe("MobileNavBar", () => {
     const props = createDefaultProps();
     const { container } = render(<MobileNavBar {...props} experimentalFeatures={{ evalsView: true }} />);
 
-    fireEvent.click(screen.getByTestId("mobile-nav-tab-more"));
+    toggleMoreWithOtherExpanded();
     fireEvent.click(screen.getByTestId("mobile-more-item-evals"));
 
     expect(container.querySelector(".mobile-more-sheet")).toBeNull();
@@ -963,7 +971,7 @@ describe("MobileNavBar", () => {
 
   it("gates goals item in more sheet, routes to goalsView, and marks More active on goals view", () => {
     const hidden = render(<MobileNavBar {...createDefaultProps()} experimentalFeatures={{}} />);
-    fireEvent.click(screen.getByTestId("mobile-nav-tab-more"));
+    toggleMoreWithOtherExpanded();
     expect(screen.queryByTestId("mobile-more-item-goals")).toBeNull();
     hidden.unmount();
 
@@ -979,7 +987,7 @@ describe("MobileNavBar", () => {
     const moreTab = screen.getByTestId("mobile-nav-tab-more");
     expect(moreTab.className).toContain("mobile-nav-tab--active");
 
-    fireEvent.click(moreTab);
+    toggleMoreWithOtherExpanded();
     fireEvent.click(screen.getByTestId("mobile-more-item-goals"));
 
     expect(container.querySelector(".mobile-more-sheet")).toBeNull();
@@ -990,7 +998,7 @@ describe("MobileNavBar", () => {
     const props = createDefaultProps();
     const { container } = render(<MobileNavBar {...props} />);
 
-    fireEvent.click(screen.getByTestId("mobile-nav-tab-more"));
+    toggleMoreWithOtherExpanded();
     fireEvent.click(screen.getByTestId("mobile-more-item-activity"));
 
     expect(container.querySelector(".mobile-more-sheet")).toBeNull();
@@ -1001,7 +1009,7 @@ describe("MobileNavBar", () => {
     const props = createDefaultProps();
     const { container } = render(<MobileNavBar {...props} />);
 
-    fireEvent.click(screen.getByTestId("mobile-nav-tab-more"));
+    toggleMoreWithOtherExpanded();
     fireEvent.click(screen.getByTestId("mobile-more-item-settings"));
 
     expect(container.querySelector(".mobile-more-sheet")).toBeNull();
@@ -1012,7 +1020,7 @@ describe("MobileNavBar", () => {
     const props = createDefaultProps();
     const { container } = render(<MobileNavBar {...props} />);
 
-    fireEvent.click(screen.getByTestId("mobile-nav-tab-more"));
+    toggleMoreWithOtherExpanded();
     fireEvent.click(screen.getByTestId("mobile-more-item-projects"));
 
     expect(container.querySelector(".mobile-more-sheet")).toBeNull();
@@ -1026,7 +1034,7 @@ describe("MobileNavBar", () => {
     fireEvent.click(screen.getByTestId("mobile-nav-tab-chat"));
     expect(props.onChangeView).toHaveBeenCalledWith("chat");
 
-    fireEvent.click(screen.getByTestId("mobile-nav-tab-more"));
+    toggleMoreWithOtherExpanded();
     expect(container.querySelector(".mobile-more-sheet")).not.toBeNull();
     expect(screen.queryByTestId("mobile-more-item-chat")).toBeNull();
   });
@@ -1034,7 +1042,7 @@ describe("MobileNavBar", () => {
   it("closes sheet on backdrop click", () => {
     const { container } = render(<MobileNavBar {...createDefaultProps()} />);
 
-    fireEvent.click(screen.getByTestId("mobile-nav-tab-more"));
+    toggleMoreWithOtherExpanded();
     const backdrop = container.querySelector(".mobile-more-sheet-backdrop");
     expect(backdrop).not.toBeNull();
 
@@ -1045,7 +1053,7 @@ describe("MobileNavBar", () => {
   it("closes sheet on Escape", async () => {
     const { container } = render(<MobileNavBar {...createDefaultProps()} />);
 
-    fireEvent.click(screen.getByTestId("mobile-nav-tab-more"));
+    toggleMoreWithOtherExpanded();
     fireEvent.keyDown(document, { key: "Escape" });
 
     await waitFor(() => {
@@ -1055,7 +1063,7 @@ describe("MobileNavBar", () => {
 
   describe("More-sheet drag dismissal", () => {
     const openSheet = (container: HTMLElement) => {
-      fireEvent.click(screen.getByTestId("mobile-nav-tab-more"));
+      toggleMoreWithOtherExpanded();
       const sheet = container.querySelector<HTMLDivElement>(".mobile-more-sheet");
       if (!sheet) throw new Error("Expected the More sheet to open");
       Object.defineProperty(sheet, "getBoundingClientRect", {
@@ -1220,7 +1228,7 @@ describe("MobileNavBar", () => {
       vi.mocked(fetchScripts).mockResolvedValue({});
       render(<MobileNavBar {...createDefaultProps()} />);
 
-      fireEvent.click(screen.getByTestId("mobile-nav-tab-more"));
+      toggleMoreWithOtherExpanded();
       const toggle = screen.getByTestId("mobile-more-terminal-split-toggle");
       expect(toggle).toBeDefined();
 
@@ -1237,7 +1245,7 @@ describe("MobileNavBar", () => {
       });
       render(<MobileNavBar {...createDefaultProps()} />);
 
-      fireEvent.click(screen.getByTestId("mobile-nav-tab-more"));
+      toggleMoreWithOtherExpanded();
       fireEvent.click(screen.getByTestId("mobile-more-terminal-split-toggle"));
 
       await waitFor(() => {
@@ -1253,7 +1261,7 @@ describe("MobileNavBar", () => {
       const props = createDefaultProps();
       const { container } = render(<MobileNavBar {...props} />);
 
-      fireEvent.click(screen.getByTestId("mobile-nav-tab-more"));
+      toggleMoreWithOtherExpanded();
       fireEvent.click(screen.getByTestId("mobile-more-terminal-split-toggle"));
 
       await waitFor(() => {
@@ -1272,7 +1280,7 @@ describe("MobileNavBar", () => {
       const props = createDefaultProps();
       const { container } = render(<MobileNavBar {...props} />);
 
-      fireEvent.click(screen.getByTestId("mobile-nav-tab-more"));
+      toggleMoreWithOtherExpanded();
       fireEvent.click(screen.getByTestId("mobile-more-terminal-split-toggle"));
 
       await waitFor(() => {
@@ -1288,7 +1296,7 @@ describe("MobileNavBar", () => {
       vi.mocked(fetchScripts).mockResolvedValue({});
       render(<MobileNavBar {...createDefaultProps()} />);
 
-      fireEvent.click(screen.getByTestId("mobile-nav-tab-more"));
+      toggleMoreWithOtherExpanded();
       fireEvent.click(screen.getByTestId("mobile-more-terminal-split-toggle"));
 
       await waitFor(() => {
@@ -1305,7 +1313,7 @@ describe("MobileNavBar", () => {
       );
       render(<MobileNavBar {...createDefaultProps()} />);
 
-      fireEvent.click(screen.getByTestId("mobile-nav-tab-more"));
+      toggleMoreWithOtherExpanded();
       fireEvent.click(screen.getByTestId("mobile-more-terminal-split-toggle"));
 
       expect(screen.getByTestId("mobile-more-scripts-loading")).toBeDefined();
@@ -1316,5 +1324,129 @@ describe("MobileNavBar", () => {
         expect(screen.queryByTestId("mobile-more-scripts-loading")).toBeNull();
       });
     });
+  });
+});
+
+/*
+FNXC:NavigationGroups 2026-09-07-17:41:
+Surface enumeration: shared desktop/tablet sidebar expanded/rail modes (LeftSidebarNav tests),
+mobile tabs/More, optional feature flags, default/custom/duplicate/invalid shortcuts, plugin
+placements, collapsed/expanded groups, active pages, attention badges, Settings, scripts and Back.
+Symptom verification: mobile previously presented a flat unsorted More list unrelated to desktop.
+Render both surfaces and assert the same group order/membership, then navigate visible mobile rows.
+*/
+describe("navigation hierarchy parity", () => {
+  beforeEach(() => {
+    mockViewport("mobile");
+    window.localStorage.clear();
+  });
+
+  it("matches desktop AI order and alphabetizes mobile Other including every plugin placement", () => {
+    const pluginDashboardViews = [
+      { pluginId: "z", view: { viewId: "last", label: "Zulu", componentPath: "./View", placement: "primary" as const } },
+      { pluginId: "a", view: { viewId: "first", label: "Aardvark", componentPath: "./View", placement: "overflow" as const } },
+    ];
+    publishViewportMode("desktop");
+    const desktop = render(<LeftSidebarNav {...createDefaultProps()} showAgentsTab experimentalFeatures={{ memoryView: true }} pluginDashboardViews={pluginDashboardViews} />);
+    const desktopGroups = Array.from(desktop.container.querySelectorAll(".left-sidebar-nav__group-toggle"), element => element.textContent);
+    const aiContentId = screen.getByRole("button", { name: "AI" }).getAttribute("aria-controls")!;
+    const desktopAi = within(document.getElementById(aiContentId)!).getAllByRole("button").map(button => button.textContent);
+    desktop.unmount();
+
+    const mobile = render(<MobileNavBar {...createDefaultProps()} mobileNavPrimaryItems={["settings"]} experimentalFeatures={{ memoryView: true }} pluginDashboardViews={pluginDashboardViews} />);
+    fireEvent.click(screen.getByTestId("mobile-nav-tab-more"));
+    expect(Array.from(mobile.container.querySelectorAll(".mobile-more-group-toggle"), element => element.textContent)).toEqual(desktopGroups);
+    const ai = screen.getByTestId("mobile-more-group-ai");
+    expect(within(ai).getAllByRole("button").slice(1).map(button => button.textContent)).toEqual(desktopAi);
+    expect(screen.getByTestId("mobile-more-item-command-center").closest(".mobile-more-group")).toBeNull();
+    expect(screen.getByTestId("mobile-more-item-tasks").closest(".mobile-more-group")).toBe(screen.getByTestId("mobile-more-group-tasks"));
+    const other = screen.getByTestId("mobile-more-group-other");
+    expect(within(other).queryByRole("button", { name: "Aardvark" })).toBeNull();
+    fireEvent.click(within(other).getByRole("button", { name: "Other" }));
+    const labels = within(other).getAllByRole("button").slice(1).filter(button => !button.classList.contains("mobile-more-split-toggle")).map(button => button.textContent!);
+    expect(labels).toEqual([...labels].sort((a, b) => a.localeCompare(b)));
+    expect(labels).toContain("Aardvark");
+    expect(labels).toContain("Zulu");
+    expect(mobile.container.querySelector(".mobile-more-separator")).toBeNull();
+  });
+
+  it("keeps Board/List adjacent without reordering custom shortcuts or duplicating pinned destinations", () => {
+    const { container } = render(<MobileNavBar {...createDefaultProps()} mobileNavPrimaryItems={["chat", "tasks", "tasks", "invalid", "agents"]} />);
+    expect(getRenderedMobileTabs(container).map(tab => tab.dataset.testid)).toEqual([
+      "mobile-nav-tab-chat", "mobile-nav-tab-tasks", "mobile-nav-tab-list", "mobile-nav-tab-agents", "mobile-nav-tab-more",
+    ]);
+    expect(screen.getByTestId("mobile-nav-tab-tasks")).toHaveTextContent("Board");
+    fireEvent.click(screen.getByTestId("mobile-nav-tab-more"));
+    expect(screen.queryByTestId("mobile-more-group-tasks")).toBeNull();
+    expect(screen.queryByTestId("mobile-more-item-chat")).toBeNull();
+    expect(screen.queryByTestId("mobile-more-item-agents")).toBeNull();
+    expect(screen.queryByTestId("mobile-more-item-memory")).toBeNull();
+    expect(screen.getByTestId("mobile-more-item-settings")).toBeVisible();
+  });
+
+  it("omits an empty AI group and retains Settings with every group collapsed", () => {
+    render(<MobileNavBar {...createDefaultProps()} mobileNavPrimaryItems={["chat", "agents", "workflows", "memory"]} />);
+    fireEvent.click(screen.getByTestId("mobile-nav-tab-more"));
+    expect(screen.queryByTestId("mobile-more-group-ai")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Tasks" }));
+    expect(screen.queryByRole("button", { name: "Board" })).toBeNull();
+    expect(screen.getByTestId("mobile-more-item-settings")).toBeVisible();
+  });
+
+  it("keeps active and attention signals on collapsed groups and remembers toggles when reopened", () => {
+    const props = createDefaultProps();
+    render(<MobileNavBar {...props} view="planning" recommendationUnreadCount={3} />);
+    fireEvent.click(screen.getByTestId("mobile-nav-tab-more"));
+    const other = screen.getByRole("button", { name: /^Other/ });
+    expect(other).toHaveAttribute("aria-expanded", "false");
+    expect(other).toHaveClass("mobile-more-item--active");
+    expect(within(other).getByLabelText("Items need attention")).toBeVisible();
+    expect(screen.queryByRole("button", { name: "Planning" })).toBeNull();
+    fireEvent.click(other);
+    expect(screen.getByTestId("mobile-more-item-planning")).toHaveAttribute("aria-current", "page");
+    fireEvent.click(screen.getByRole("button", { name: "Planning" }));
+    expect(props.onOpenPlanning).toHaveBeenCalledOnce();
+    expect(screen.queryByTestId("mobile-more-group-other")).toBeNull();
+    fireEvent.click(screen.getByTestId("mobile-nav-tab-more"));
+    expect(screen.getByRole("button", { name: "Other" })).toHaveAttribute("aria-expanded", "true");
+  });
+
+  it.each(["command-center", "tasks", "agents", "missions", "chat", "mailbox"])("dismisses More when navigating the demoted %s shortcut", item => {
+    const props = createDefaultProps();
+    render(<MobileNavBar {...props} mobileNavPrimaryItems={["settings"]} />);
+    toggleMoreWithOtherExpanded();
+    const destination = screen.getByTestId(`mobile-more-item-${item}`);
+    expect(destination).toBeVisible();
+    fireEvent.click(destination);
+    expect(props.onChangeView).toHaveBeenCalledWith(item === "tasks" ? "board" : item);
+    expect(screen.queryByTestId("mobile-more-group-ai")).toBeNull();
+  });
+});
+
+/* FNXC:MobileNavFit 2026-09-08-06:12: Re-observe the actual DOM after viewport or modal transitions; an observer left on a removed bar strands footer spacing at the one-row fallback. */
+describe("mobile navigation observer lifecycle", () => {
+  it("publishes height when desktop becomes mobile and after closing a modal", () => {
+    const observe = vi.fn();
+    const disconnect = vi.fn();
+    vi.stubGlobal("ResizeObserver", class { observe = observe; disconnect = disconnect; });
+    try {
+      mockViewport("desktop");
+      const props = createDefaultProps();
+      const { rerender, unmount } = render(<MobileNavBar {...props} />);
+      expect(observe).not.toHaveBeenCalled();
+      expect(document.documentElement.style.getPropertyValue("--mobile-nav-height")).toBe("");
+      mockViewport("mobile");
+      fireEvent(window, new Event("resize"));
+      expect(observe).toHaveBeenCalledWith(screen.getByRole("tablist"));
+      expect(document.documentElement.style.getPropertyValue("--mobile-nav-height")).toBe("44px");
+      rerender(<MobileNavBar {...props} modalOpen />);
+      expect(disconnect).toHaveBeenCalled();
+      expect(document.documentElement.style.getPropertyValue("--mobile-nav-height")).toBe("");
+      const observedBefore = observe.mock.calls.length;
+      rerender(<MobileNavBar {...props} modalOpen={false} />);
+      expect(observe.mock.calls.length).toBeGreaterThan(observedBefore);
+      expect(document.documentElement.style.getPropertyValue("--mobile-nav-height")).toBe("44px");
+      unmount();
+    } finally { vi.unstubAllGlobals(); }
   });
 });
