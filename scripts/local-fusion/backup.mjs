@@ -1,3 +1,4 @@
+import { isDeepStrictEqual } from 'node:util';
 import * as fs from 'node:fs/promises';
 import path from 'node:path';
 import { api, checksums, copyTree, exists, ps, readJson, run, timestamp, verifyChecksums, writeJson } from './common.mjs';
@@ -37,8 +38,15 @@ export async function inventory(config, conn) {
   const migrations = await jsonSql(config, 'SELECT * FROM public.fusion_schema_migrations', conn);
   return { capturedAt: new Date().toISOString(), projects, counts, definitions, settings, migrations };
 }
-export function compareInventory(before, after) {
+export function compareInventory(before, after, { rehearsal = false } = {}) {
   const failures = [];
+  // FNXC:LocalDeployment 2026-09-08-12:54: Acceptance owns operator settings, not just row counts. Rehearsal may only enable its explicit pause/test overrides; production permits no silent setting loss.
+  if (!Array.isArray(before.settings) || !Array.isArray(after.settings)) throw new Error('Settings inventory is missing; recapture before activation');
+  for (const row of before.settings) {
+    const next = after.settings.find(candidate => candidate.project_id === row.project_id);
+    const expected = rehearsal ? { ...row.settings, enginePaused: true, testMode: true } : row.settings;
+    if (!next || !isDeepStrictEqual(expected, next.settings)) failures.push(`Changed project settings: ${row.project_id}`);
+  }
   for (const project of before.projects) {
     if (!after.projects.some(p => p.id === project.id && p.name === project.name)) failures.push(`Missing project ${project.id}`);
   }

@@ -63,7 +63,7 @@ export async function rehearse(config, release, backup, verifiedManifest) {
     },'isolated migrated dashboard',180_000);
     await assertWorkflowReferences(config,conn);
     const after = await inventory(config,conn);
-    const result = compareInventory(baseline,after);
+    const result = compareInventory(baseline,after,{rehearsal:true});
     await writeJson(path.join(root,'after-inventory.json'),after);
     const html = await fetch(`http://127.0.0.1:${uiPort}/`).then(r=>r.text());
     if (!html.includes('<script') || html.includes('Dashboard assets not built')) throw new Error('Dashboard client assets are missing');

@@ -68,7 +68,7 @@ test('commands preserve spaced arguments and report failed builds',async()=>{
   assert.equal(await run(process.execPath,['-e','process.stdout.write(process.argv[1])','literal & spaces']), 'literal & spaces');
   await assert.rejects(run(process.execPath,['-e','process.exit(7)']),/exited 7/);
 });
-function sample(){return {projects:[{id:'p',name:'Project'}],counts:{'project.tasks':2,'project.agents':1},definitions:{agents:[{id:'a',project_id:'p',name:'Agent',data:{soul:'Keep this'}}],workflows:[{id:'WF-1',project_id:'p',name:'Workflow',kind:'workflow',ir:{nodes:['agent-a']}}],workflow_steps:[]}};}
+function sample(){return {settings:[{project_id:'p',settings:{enginePaused:true,defaultWorkflowId:'WF-1',maxConcurrent:2}}],projects:[{id:'p',name:'Project'}],counts:{'project.tasks':2,'project.agents':1},definitions:{agents:[{id:'a',project_id:'p',name:'Agent',data:{soul:'Keep this'}}],workflows:[{id:'WF-1',project_id:'p',name:'Workflow',kind:'workflow',ir:{nodes:['agent-a']}}],workflow_steps:[]}};}
 test('missing records or changed authored definitions block activation',()=>{
   const before=sample();
   assert.doesNotThrow(()=>compareInventory(before,structuredClone(before)));
@@ -147,4 +147,22 @@ if(process.platform==='win32') test('project archives preserve hidden data and u
 test('archive executable is independent of Git PATH ordering',()=>{
  assert.equal(archiveExecutable('win32',{SystemRoot:'C:/Windows',PATH:'Git first'}),path.win32.join('C:/Windows','System32','tar.exe'));
  assert.equal(archiveExecutable('linux',{}),'tar');
+});
+
+test('settings loss, missing evidence and altered defaults stop acceptance',()=>{
+ const before=sample(),after=structuredClone(before);after.settings[0].settings={};
+ assert.throws(()=>compareInventory(before,after),/Changed project settings/);
+ assert.throws(()=>compareInventory(before,{...before,settings:undefined}),/Settings inventory is missing/);
+ const changed=structuredClone(before);changed.settings[0].settings.defaultWorkflowId='WF-other';
+ assert.throws(()=>compareInventory(before,changed),/Changed project settings/);
+});
+test('only exact rehearsal pause and test changes are authorized',()=>{
+ const before=sample(),after=structuredClone(before);after.settings[0].settings.testMode=true;
+ assert.doesNotThrow(()=>compareInventory(before,after,{rehearsal:true}));
+ assert.throws(()=>compareInventory(before,after),/Changed project settings/);
+ after.settings[0].settings.maxConcurrent=9;assert.throws(()=>compareInventory(before,after,{rehearsal:true}),/Changed project settings/);
+});
+test('JSON object key ordering does not constitute a settings change',()=>{
+ const before=sample(),after=structuredClone(before);after.settings[0].settings=Object.fromEntries(Object.entries(after.settings[0].settings).reverse());
+ assert.doesNotThrow(()=>compareInventory(before,after));
 });

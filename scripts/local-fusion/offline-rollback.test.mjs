@@ -11,7 +11,7 @@ async function fixture(run) {
   const config={runtime:path.join(root,'runtime'),dataHome:path.join(root,'data')}; const backup=path.join(root,'backup');
   const dist=path.join(config.runtime,'releases/old/packages/cli/dist');await fs.mkdir(dist,{recursive:true});await fs.writeFile(path.join(dist,'sentinel'),'old release');
   const release={id:'old',root:path.join(config.runtime,'releases/old'),cli:'old-cli',verified:true,artifactHashes:await checksums(dist)};
-  const inventory={projects:[],counts:{},definitions:{agents:[],workflows:[],workflow_steps:[]}};
+  const inventory={settings:[],projects:[],counts:{},definitions:{agents:[],workflows:[],workflow_steps:[]}};
   await writeJson(path.join(release.root,'local-release.json'),release);await writeJson(path.join(backup,'inventory.json'),inventory);
   await writeJson(path.join(config.runtime,'journal.json'),{phase:'failed-after-activation',previous:{id:'old'},backup});await writeJson(path.join(config.runtime,'maintenance.json'),{});
   const events=[];let started=false;
