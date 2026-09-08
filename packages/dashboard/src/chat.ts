@@ -2543,27 +2543,47 @@ export class ChatManager {
       const responder = await this.getAgentById(mention.agentId);
       if (!isCurrent()) throw new Error("Generation cancelled");
       if (!responder) continue;
+      // FNXC:ChatMentionProgress 2026-09-08-12:40: A failed responder must leave its visible text and tool evidence in history before its checkpoint is cleared or another responder begins.
+      let partial = { streamingText: "", streamingThinking: "", toolCalls: [] as ChatInFlightGenerationState["toolCalls"] };
+      let persisted = false;
+      const publishReply = (message: ChatMessage) => {
+        input.onProgress({ streamingText: "", streamingThinking: "", toolCalls: [] });
+        chatStreamManager.broadcast(input.sessionId, { type: "agent_message", data: { message: { id: message.id, sessionId: message.sessionId, role: "assistant", content: message.content, thinkingOutput: message.thinkingOutput ?? null, metadata: message.metadata ?? null, attachments: message.attachments, createdAt: message.createdAt }, senderAgentId: responder.id, senderAgentName: responder.name } }, { generationId: input.generationId });
+      };
       try {
-        const response = await this.generateMentionedAgentReply({ ...input, responder });
+        const response = await this.generateMentionedAgentReply({ ...input, responder, onProgress: (state, sender) => {
+          partial = { ...state, toolCalls: state.toolCalls.map(call => ({ ...call })) };
+          input.onProgress(state, sender);
+        } });
         if (!isCurrent()) throw new Error("Generation cancelled");
         if (isRoomSkipSentinel(response.content)) continue;
         const message = await this.chatStore.addMessage(input.sessionId, {
           role: "assistant", content: response.content, thinkingOutput: response.thinkingOutput ?? undefined,
           metadata: { senderAgentId: responder.id, senderAgentName: responder.name, toolCalls: response.toolCalls, ...(response.fallback ? { fallback: response.fallback } : {}) },
         });
+        persisted = true;
+        replies++;
+        publishReply(message);
         if (response.tokenUsage) {
           await this.chatStore.recordTokenUsage({ sourceKind: "chat", chatSessionId: input.sessionId, messageId: message.id, projectId: input.session.projectId ?? null, agentId: responder.id, createdAt: message.createdAt, ...response.tokenUsage });
         }
-        replies++;
-        input.onProgress({ streamingText: "", streamingThinking: "", toolCalls: [] });
-        chatStreamManager.broadcast(input.sessionId, {
-          type: "agent_message",
-          data: { message: { id: message.id, sessionId: message.sessionId, role: "assistant", content: message.content, thinkingOutput: message.thinkingOutput ?? null, metadata: message.metadata ?? null, attachments: message.attachments, createdAt: message.createdAt }, senderAgentId: responder.id, senderAgentName: responder.name },
-        }, { generationId: input.generationId });
       } catch (error) {
         if (!isCurrent()) throw new Error("Generation cancelled");
         diagnostics.error(`Mentioned chat responder ${responder.id} failed in ${input.sessionId}: ${error instanceof Error ? error.message : String(error)}`);
         failedAgentNames.push(responder.name);
+        if (!persisted && (partial.streamingText || partial.streamingThinking || partial.toolCalls.length)) {
+          try {
+            const message = await this.chatStore.addMessage(input.sessionId, {
+              role: "assistant", content: partial.streamingText, thinkingOutput: partial.streamingThinking || undefined,
+              metadata: { interrupted: true, senderAgentId: responder.id, senderAgentName: responder.name, toolCalls: partial.toolCalls },
+            });
+            publishReply(message);
+          } catch (persistError) {
+            const eventId = chatStreamManager.broadcast(input.sessionId, { type: "error", data: buildChatFailureInfo(persistError, "Could not save interrupted agent reply") }, { generationId: input.generationId });
+            await this.flushInFlightGenerationPersist(input.sessionId, { ...partial, status: "generating", replayFromEventId: eventId, updatedAt: new Date().toISOString() }, input.generationId).catch(checkpointError => { diagnostics.error("Could not preserve failed responder checkpoint", checkpointError); });
+            return;
+          }
+        }
       }
     }
     await this.flushInFlightGenerationPersist(input.sessionId, null, input.generationId);

@@ -674,6 +674,26 @@ describe("ChatManager.sendMessage", () => {
   });
 
   describe("mention parsing and context", () => {
+    it.each(["native", "cli-bridge"])("persists failed responder evidence before clearing its checkpoint (%s)", async runtime => {
+      const create = async (options: any) => ({ session: {
+        prompt: async () => { options.onText("Partial answer"); options.onThinking("Partial reasoning"); options.onToolStart("write", {path:"synthetic.txt"}); options.onToolEnd("write", false, "written"); throw new Error("provider interrupted"); },
+        dispose: vi.fn(), state: {messages:[]},
+      } });
+      if (runtime === "native") __setCreateFnAgent(create); else __setCreateResolvedAgentSession(create);
+      mockChatStore.addMessage.mockImplementation((sessionId,input)=>({...input,id:"saved",sessionId,createdAt:new Date().toISOString()}));
+      await createChatManager().sendMessage("chat-001", "@Avery inspect this");
+      expect(mockChatStore.addMessage).toHaveBeenLastCalledWith("chat-001",expect.objectContaining({content:"Partial answer",thinkingOutput:"Partial reasoning",metadata:expect.objectContaining({interrupted:true,senderAgentId:"agent-001",toolCalls:[expect.objectContaining({toolName:"write",status:"completed",result:"written"})]})}));
+      expect(mockChatStore.setInFlightGeneration).toHaveBeenLastCalledWith("chat-001",null);
+      expect(mockChatStore.addMessage.mock.invocationCallOrder.at(-1)).toBeLessThan(mockChatStore.setInFlightGeneration.mock.invocationCallOrder.at(-1)!);
+    });
+    it("retains the checkpoint and stops responder dispatch when history persistence fails",async()=>{
+      __setCreateResolvedAgentSession(async(options:any)=>({session:{prompt:async()=>{options.onToolStart("write",{path:"synthetic.txt"});throw new Error("provider interrupted");},dispose:vi.fn(),state:{messages:[]}}}));
+      mockChatStore.addMessage.mockImplementation((sessionId,input)=>{if(input.role==="assistant")throw new Error("database unavailable");return {...input,id:"user",sessionId};});
+      await createChatManager().sendMessage("chat-001","@Avery inspect this");
+      expect(mockChatStore.setInFlightGeneration).toHaveBeenLastCalledWith("chat-001",expect.objectContaining({toolCalls:[expect.objectContaining({toolName:"write"})]}));
+      expect(mockChatStore.setInFlightGeneration.mock.calls.some(call=>call[1]===null)).toBe(false);
+    });
+
     it.each(["native", "cli-bridge"])("streams mentioned-agent work before completion and checkpoints it (%s)", async (runtime) => {
       vi.useFakeTimers();
       const entered = Promise.withResolvers<void>();
