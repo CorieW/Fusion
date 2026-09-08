@@ -667,6 +667,10 @@ describe("CE workflow-step executor integration", () => {
 
     it("blocks the merge requester when graph traversal reaches merge before implementation steps finish", async () => {
       const store = createMockStore();
+      // Explicitly supply the foreach workflow whose incomplete proof this case exercises.
+      store.getWorkflowDefinition = vi.fn().mockResolvedValue(
+        BUILTIN_WORKFLOWS.find((workflow) => workflow.id === "builtin:coding"),
+      );
       let live = baseStepTask({
         column: "in-progress",
         status: null,
@@ -978,6 +982,36 @@ describe("CE workflow-step executor integration", () => {
 
       expect(result.outcome).toBe("success");
       expect(runCustomNode).not.toHaveBeenCalled();
+    });
+
+    it.each(["fresh", "stale", "paused", "user-paused"])("preserves skill checkpoint ownership for %s replies", async (state) => {
+      const store = createMockStore();
+      let live = baseStepTask({
+        paused: state === "paused", userPaused: state === "user-paused", status: null,
+        pausedReason: "workflow-input:plan@1782751605619: Continue planning?",
+        steeringComments: [{ text: "Yes", createdAt: state === "stale"
+          ? "2026-06-29T00:00:00.000Z" : "2026-06-29T16:47:05.075Z" }],
+      });
+      store.getTask.mockImplementation(async () => live as any);
+      store.updateTask.mockImplementation(async (_id: string, patch: Record<string, unknown>) => {
+        live = { ...live, ...patch };
+        return live as any;
+      });
+      const { executor } = makeExecutor(store);
+      const execute = vi.spyOn(executor as any, "executeWorkflowStep").mockResolvedValue({ success: true, output: "ok" });
+      const result = await (executor as any).runGraphCustomNode({
+        id: "plan", kind: "prompt", column: "in-progress",
+        config: { executor: "skill", skillName: "compound-engineering:ce-plan", prompt: "Plan the work." },
+      }, live, {}, undefined);
+      if (state === "fresh") {
+        expect(result.outcome).toBe("success");
+        expect(execute).toHaveBeenCalledOnce();
+        expect(live.pausedReason).toBeNull();
+      } else {
+        expect(result).toMatchObject({ outcome: "failure", value: "awaiting-user-input" });
+        expect(execute).not.toHaveBeenCalled();
+        expect(live.pausedReason).toBe("workflow-input:plan@1782751605619: Continue planning?");
+      }
     });
 
     it("clears stale workflow input markers when a resumed graph restarts before the original node", async () => {

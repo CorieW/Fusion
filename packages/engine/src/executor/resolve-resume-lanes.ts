@@ -30,10 +30,19 @@
  * drift this program keeps paying for. Kept separate now only to avoid a cross-branch dependency.
 */
 import type { TaskStore } from "@fusion/core";
-import { resolveLifecycleColumns, resolveWorkflowIrForTask } from "@fusion/core";
+import { columnsWithFlag, resolveLifecycleColumns, resolveWorkflowIrForTask } from "@fusion/core";
 import { declaresAnyLifecycleRole } from "./lifecycle-columns.js";
 
-export type ResumeLanes = { hold: string; wip: string; review: string; wipDeclared: boolean };
+export type ResumeLanes = { hold: string; wip: string; review: string; wipDeclared: boolean; wipColumns?: readonly string[] };
+
+/**
+ * FNXC:WorkflowCheckpointResume 2026-09-08-12:37:
+ * Resume membership includes every WIP column; the singular wip remains a move destination.
+ * Older injected lane resolvers retain their singular-column contract.
+ */
+export function isResumeWipColumn(lanes: ResumeLanes, column: string): boolean {
+  return lanes.wipColumns?.includes(column) ?? (lanes.wipDeclared !== false && column === lanes.wip);
+}
 
 export type ResolveResumeLanesDeps = {
   store: TaskStore;
@@ -56,10 +65,12 @@ export async function resolveResumeLanes(
     */
     if (memo?.lanes) return memo.lanes;
     try {
-      const lifecycle = resolveLifecycleColumns(await resolveWorkflowIrForTask(deps.store, taskId));
+      const ir = await resolveWorkflowIrForTask(deps.store, taskId);
+      const lifecycle = resolveLifecycleColumns(ir);
       const lanes = {
         hold: lifecycle?.hold ?? "todo",
         wip: lifecycle?.wip ?? "in-progress",
+        wipColumns: declaresAnyLifecycleRole(lifecycle) ? columnsWithFlag(ir, "countsTowardWip") : ["in-progress"],
         review: lifecycle?.review ?? "in-review",
         /*
         FNXC:WorkflowLifecycleColumns 2026-07-30-15:30 (PR #2760 review — greptile P1):
@@ -87,7 +98,7 @@ export async function resolveResumeLanes(
       return lanes;
     } catch {
       // IR unavailable: we cannot know, so keep the legacy board's assumption and today's behaviour.
-      const lanes = { hold: "todo", wip: "in-progress", review: "in-review", wipDeclared: true };
+      const lanes = { hold: "todo", wip: "in-progress", review: "in-review", wipDeclared: true, wipColumns: ["in-progress"] };
       if (memo) memo.lanes = lanes;
       return lanes;
     }

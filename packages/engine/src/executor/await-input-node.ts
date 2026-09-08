@@ -13,6 +13,7 @@
  */
 import type { TaskDetail, TaskStore, WorkflowIrNode } from "@fusion/core";
 import type { EngineRunContext } from "../util/run-audit.js";
+import { workflowInputNodeId } from "./workflow-input-markers.js";
 
 export type AwaitInputNodeResult = {
   outcome: "success" | "failure";
@@ -43,8 +44,8 @@ export async function runAwaitInputNode(
   // creation) must never short-circuit the pause on the node's first run —
   // otherwise the node consumes a stale comment and never asks the user.
   const pausedReason = live.pausedReason ?? "";
-  const pausedByThisNode = pausedReason.startsWith(marker);
-  if (!live.paused && pausedByThisNode) {
+  const pausedByThisNode = workflowInputNodeId(live) === node.id;
+  if (!live.paused && !live.userPaused && pausedByThisNode) {
     // Correlate the reply to THIS pause: the marker embeds a watermark
     // (`${marker}@${pauseEpochMs}: …`) recorded when the node paused. Only
     // count steering comments created at/after that watermark as the answer,
