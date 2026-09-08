@@ -24,10 +24,17 @@ export async function runGrokCommand(binary: string, args: string[], timeoutMs: 
     Windows Grok installers/npm-style shims can expose `grok.cmd` or `grok.bat` on PATH, and Node cannot direct-spawn those batch wrappers without the command shell.
     Keep Unix/macOS on direct spawn so only the known Grok CLI probe/discovery seam uses shell resolution where Windows requires it. Copied verbatim from the Cursor plugin's cli-spawn seam (FN-7705).
     */
-    const child = spawn(binary, args, {
-      stdio: ["ignore", "pipe", "pipe"],
-      shell: process.platform === "win32",
-    });
+    // FNXC:ProviderProbe 2026-09-08-18:18: Launch-policy refusals can throw before a child exists. Preserve the same failed-command result as an asynchronous spawn error, with no timer or subprocess retained.
+    let child: ReturnType<typeof spawn>;
+    try {
+      child = spawn(binary, args, {
+        stdio: ["ignore", "pipe", "pipe"],
+        shell: process.platform === "win32",
+      });
+    } catch (error) {
+      finish({ code: 127, stdout, stderr: formatSpawnError(error instanceof Error ? error : new Error(String(error))) });
+      return;
+    }
 
     timer = setTimeout(() => {
       try { child.kill("SIGKILL"); } catch {

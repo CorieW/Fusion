@@ -60,9 +60,16 @@ export async function probeClaudeCli(
     };
 
     let settled = false;
-    const child = spawn(binaryPath ?? "claude", ["--version"], {
-      stdio: ["ignore", "pipe", "pipe"],
-    });
+    // FNXC:ProviderProbe 2026-09-08-18:18: Sandboxes and launch policies can refuse spawn synchronously, before an error listener exists. Status probes must report unavailable rather than fail the entire auth endpoint.
+    let child: ReturnType<typeof spawn>;
+    try {
+      child = spawn(binaryPath ?? "claude", ["--version"], {
+        stdio: ["ignore", "pipe", "pipe"],
+      });
+    } catch (error) {
+      finish({ available: false, binaryPath, reason: error instanceof Error ? error.message : String(error) });
+      return;
+    }
 
     const timer = setTimeout(() => {
       if (settled) return;
@@ -130,7 +137,13 @@ export async function probeClaudeCli(
 async function tryResolveBinaryPath(binary: string): Promise<string | undefined> {
   return new Promise((resolvePromise) => {
     const which = process.platform === "win32" ? "where" : "which";
-    const child = spawn(which, [binary], { stdio: ["ignore", "pipe", "ignore"] });
+    let child: ReturnType<typeof spawn>;
+    try {
+      child = spawn(which, [binary], { stdio: ["ignore", "pipe", "ignore"] });
+    } catch {
+      resolvePromise(undefined);
+      return;
+    }
     let out = "";
     child.stdout?.on("data", (chunk) => {
       out += chunk.toString("utf-8");
