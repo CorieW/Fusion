@@ -57,3 +57,18 @@ describe("project duplicate route", () => {
     expect(h.res.json).not.toHaveBeenCalled();
   });
 });
+
+it('ignores an unrelated missing directory without losing overlap protection',async()=>{
+ const h=await harness();const source=(await h.central.listProjects())[0];
+ h.central.listProjects.mockResolvedValue([source,{...source,id:'offline',path:join(h.root,'Offline Project')}]);
+ await h.run(join(h.root,'New Project'));expect(h.res.status).toHaveBeenCalledWith(201);
+});
+it('a missing registered root still reserves its exact destination',async()=>{
+ const h=await harness();const source=(await h.central.listProjects())[0];const destination=join(h.root,'Offline Project');
+ h.central.listProjects.mockResolvedValue([source,{...source,id:'offline',path:destination}]);
+ await expect(h.run(destination)).rejects.toThrow('outside existing projects');expect(copy).not.toHaveBeenCalled();
+});
+it('does not hide permission failures while resolving registered roots',async()=>{
+ const {resolveRegisteredProjectPath}=await import('../../lib/project-path.js');
+ await expect(resolveRegisteredProjectPath('unreadable',async()=>{throw Object.assign(new Error('denied'),{code:'EACCES'});})).rejects.toThrow('denied');
+});

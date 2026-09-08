@@ -1,3 +1,4 @@
+import { resolveRegisteredProjectPath } from "../lib/project-path.js";
 import { copyProjectConfiguration } from "../lib/duplicate-project.js";
 import * as fsPromises from "node:fs/promises";
 import { dirname, isAbsolute, join } from "node:path";
@@ -240,7 +241,7 @@ export const registerProjectRoutes: ApiRouteRegistrar = (ctx) => {
         const parent = await fsPromises.realpath(dirname(targetPath));
         const destination = resolve(parent, (await import("node:path")).basename(targetPath));
         for (const registered of await central.listProjects()) {
-          const registeredPath = await fsPromises.realpath(registered.path);
+          const registeredPath = await resolveRegisteredProjectPath(registered.path);
           const rel = relative(registeredPath, destination);
           if (!rel || (rel.split(/[\\/]/)[0] !== ".." && !isAbsolute(rel))) throw badRequest("Choose a folder outside existing projects");
         }
