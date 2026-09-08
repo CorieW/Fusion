@@ -124,3 +124,25 @@ test('the actual preload blocks child execution and production connections befor
   const result = await promisify(execFile)(process.execPath, ['--input-type=module', '-e', script], { env, windowsHide: true });
   assert.equal(result.stdout.trim(), 'guard passed');
 });
+
+test('Git aliases, external diff, repository redirects and network commands are refused',()=>{
+ const base=path.resolve('sandbox'),opts={cwd:path.join(base,'project')};
+ for(const args of [['-c','alias.escape=!node --version','escape'],['fetch'],['clone','remote'],['diff','--ext-diff'],['log','--show-signature'],['log','--format=%G?'],['--git-dir=/outside','status'],['status','--output=/outside'],['submodule','update']]) assert.equal(developmentCommandAllowed('git',args,opts,base),false,args.join(' '));
+ for(const args of [['status','--porcelain'],['rev-parse','--show-toplevel'],['log','--oneline','-5'],['diff','--stat']]) assert.equal(developmentCommandAllowed('git',args,opts,base),true);
+});
+test('actual guard stops Git alias subprocesses and neutralizes local fsmonitor',async t=>{
+ const root=await fs.mkdtemp(path.join(os.tmpdir(),'fusion-dev-git-'));t.after(()=>fs.rm(root,{recursive:true,force:true}));
+ const source=path.join(root,'source');await fs.mkdir(source);
+ const base=path.join(root,'sandbox'),project=path.join(base,'project');
+ const env=await prepareDevIsolation({base,home:path.join(base,'home'),project},source,process.env);
+ await promisify(execFile)('git',['init'],{cwd:project,env});
+ const sentinel=path.join(base,'escaped');const hook=path.join(base,'hook.cjs');
+ await fs.writeFile(hook,`require('fs').writeFileSync(${JSON.stringify(sentinel)},'bad')`);
+ await promisify(execFile)('git',['config','core.fsmonitor',`node "${hook.split(path.sep).join('/')}"`],{cwd:project,env});
+ const guard=new URL('../lib/dev-runtime-guard.mjs',import.meta.url).href;
+ const script=`import cp from 'node:child_process';import assert from 'node:assert/strict';import fs from 'node:fs';
+ assert.throws(()=>cp.execFileSync('git',['-c','alias.escape=!node --version','escape']),/disabled/);
+ cp.execFileSync('git',['status','--porcelain']); cp.execSync('git status --porcelain');
+ assert.equal(fs.existsSync(${JSON.stringify(sentinel)}),false);console.log('isolated');`;
+ const result=await promisify(execFile)(process.execPath,['--import',guard,'--input-type=module','-e',script],{cwd:project,env});assert.equal(result.stdout.trim(),'isolated');
+});

@@ -377,3 +377,5 @@ When running engine tests with Vitest and `node:sqlite`, ensure the engine Vites
 - ❌ `pool: "vmThreads"`
 
 `node:sqlite` fails under Vitest VM contexts; using threads avoids that failure mode.
+
+Development preview Git access is limited to read-only metadata commands in the owned sandbox. Shell-form Git callers are parsed and executed without a shell. Aliases, network/submodule operations, repository redirects, external diff/text conversion, hooks, pagers, fsmonitor and inherited Git configuration overrides must not become alternate subprocess paths. Refused probes should degrade to unavailable UI information, never relax the preview boundary.

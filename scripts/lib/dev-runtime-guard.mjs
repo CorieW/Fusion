@@ -1,3 +1,4 @@
+import { isolatedGitInvocation, parseDevelopmentGitShell } from './dev-git-policy.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import net from 'node:net';
@@ -56,6 +57,8 @@ net.Socket.prototype.connect = function (...args) {
 };
 tls.connect = () => { throw new Error('Development preview blocks outbound TLS integrations.'); };
 const ownedPids = new Set();
+const originalExecFile = childProcess.execFile;
+const originalExecFileSync = childProcess.execFileSync;
 for (const name of ['spawn', 'spawnSync', 'execFile', 'execFileSync', 'exec', 'execSync', 'fork']) {
   const original = childProcess[name];
   childProcess[name] = (command, ...args) => {
@@ -65,7 +68,15 @@ for (const name of ['spawn', 'spawnSync', 'execFile', 'execFileSync', 'exec', 'e
       ? developmentGitShellAllowed(command, options, base)
       : name !== 'fork' && developmentCommandAllowed(command, argv, options, base, ownedPids);
     if (allowed) {
-      const result = original(command, ...args);
+      const shellCall = ['exec','execSync'].includes(name);
+      const gitArgs = shellCall ? parseDevelopmentGitShell(command) : argv;
+      let result;
+      if (shellCall || /^git(?:\.exe)?$/i.test(path.basename(command))) {
+        const safe=isolatedGitInvocation(gitArgs,options,base);
+        const callback=args.findLast(value=>typeof value==='function');
+        if (shellCall) result=name==='execSync' ? originalExecFileSync('git',safe.args,safe.options) : originalExecFile('git',safe.args,safe.options,callback);
+        else result=original(command,safe.args,safe.options,...(callback?[callback]:[]));
+      } else result = original(command, ...args);
       if (result?.pid && /postgres(?:\.exe)?$/i.test(command)) ownedPids.add(result.pid);
       return result;
     }

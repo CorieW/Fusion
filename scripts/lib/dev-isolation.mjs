@@ -1,3 +1,4 @@
+import { developmentGitAllowed, parseDevelopmentGitShell } from './dev-git-policy.mjs';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { randomBytes } from 'node:crypto';
@@ -117,11 +118,10 @@ export function developmentCommandAllowed(command, args, options, base, ownedPid
     const index = args.findIndex(arg => arg.toLowerCase() === '/pid');
     return index >= 0 && ownedPids.has(Number(args[index + 1])) && !args.some(arg => arg.toLowerCase() === '/im');
   }
-  return executable === 'git' && !options?.shell && inside(options?.cwd ?? process.cwd());
+  return executable === 'git' && !options?.shell && inside(options?.cwd ?? process.cwd()) && developmentGitAllowed(args);
 }
 
 export function developmentGitShellAllowed(command, options, base) {
-  return /^git(?:\.exe)?\s/i.test(command) && !/[;&|<>`$()\r\n]/.test(command)
-    && !/(?:^|\s)(?:-C|--git-dir|--work-tree|--exec-path)(?:[=\s]|$)/.test(command)
-    && path.resolve(options?.cwd ?? process.cwd()).toLowerCase().startsWith(path.resolve(base).toLowerCase() + path.sep);
+  const args=parseDevelopmentGitShell(command);
+  return !!args && developmentCommandAllowed('git',args,options,base);
 }
