@@ -4683,3 +4683,26 @@ describe("WorkflowNodeEditor simplified view modes", () => {
     expect(localStorage.getItem("fusion:wf-mobile-graph-style")).toBe("list");
   });
 });
+
+describe('workflow duplication protects unsaved edits',()=>{
+ beforeEach(()=>{vi.clearAllMocks();vi.mocked(fetchTraits).mockResolvedValue(TRAIT_CATALOG);vi.mocked(fetchStepParsers).mockResolvedValue(['step-headings','json-steps']);vi.mocked(fetchModels).mockResolvedValue({models:[]});});
+ afterEach(()=>cleanup());
+ it.each(['desktop','mobile'] as const)('cancel retains the dirty graph; confirmed discard copies saved state on %s',async mode=>{
+  mockWorkflowEditorViewport(mode);const original=v2Def();vi.mocked(fetchWorkflows).mockResolvedValue([original]);
+  vi.mocked(createWorkflow).mockResolvedValue({...original,id:'WF-copy',name:'Custom (copy)'});
+  renderWithConfirm(<WorkflowNodeEditor isOpen onClose={()=>{}} addToast={()=>{}} />);
+  if(mode==='mobile'){fireEvent.click(await screen.findByRole('button',{name:original.name}));fireEvent.click(await screen.findByTestId('wf-mobile-tab-columns'));}
+  const column=(await screen.findAllByLabelText(/Column name/i))[0];fireEvent.change(column,{target:{value:'Unsaved lane'}});
+  if(mode==='mobile')fireEvent.click(await screen.findByTestId('wf-mobile-tab-actions'));
+  fireEvent.click(await screen.findByRole('button',{name:'Duplicate',exact:true}));
+  let dialog=await screen.findByRole('dialog',{name:/Discard unsaved changes/i});expect(createWorkflow).not.toHaveBeenCalled();
+  fireEvent.click(within(dialog).getByRole('button',{name:/Cancel/i}));
+  await waitFor(()=>expect(screen.queryByRole('dialog',{name:/Discard unsaved changes/i})).not.toBeInTheDocument());
+  if(mode==='mobile')fireEvent.click(await screen.findByTestId('wf-mobile-tab-columns'));
+  expect((await screen.findAllByLabelText(/Column name/i))[0]).toHaveValue('Unsaved lane');
+  if(mode==='mobile')fireEvent.click(await screen.findByTestId('wf-mobile-tab-actions'));
+  fireEvent.click(await screen.findByRole('button',{name:'Duplicate',exact:true}));dialog=await screen.findByRole('dialog',{name:/Discard unsaved changes/i});
+  fireEvent.click(within(dialog).getByRole('button',{name:/Discard/i}));
+  await waitFor(()=>expect(createWorkflow).toHaveBeenCalledTimes(1));expect(vi.mocked(createWorkflow).mock.calls[0][0].ir).toEqual(original.ir);
+ });
+});

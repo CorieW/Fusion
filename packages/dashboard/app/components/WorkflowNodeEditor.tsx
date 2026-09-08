@@ -2737,6 +2737,11 @@ function InnerEditor({
     [isDirty, confirm, t],
   );
 
+  // FNXC:WorkflowDuplicate 2026-09-08-12:30: Copying selects the saved copy, so every duplicate affordance must protect unsaved editor changes just like switching workflows.
+  const requestDuplicate = useCallback(() => {
+    guardedDismiss(() => { void handleDuplicate(); });
+  }, [guardedDismiss, handleDuplicate]);
+
   const requestClose = useCallback(() => {
     guardedDismiss(onClose);
   }, [guardedDismiss, onClose]);
@@ -3562,7 +3567,7 @@ function InnerEditor({
                               <button className="wf-editor-action" data-testid="wf-mobile-export" onClick={handleExport}>
                                 <Download size={15} /> {t("workflows.export", "Export")}
                               </button>
-                              <button className="wf-editor-save wf-editor-duplicate-primary" data-testid="wf-mobile-duplicate" onClick={handleDuplicate} disabled={duplicating}>
+                              <button className="wf-editor-save wf-editor-duplicate-primary" data-testid="wf-mobile-duplicate" onClick={requestDuplicate} disabled={duplicating}>
                                 <Plus size={15} /> {t("workflows.duplicateToCustomize", "Duplicate to customize")}
                               </button>
                             </>
@@ -3622,7 +3627,7 @@ function InnerEditor({
                               <button className="wf-editor-action" data-testid="wf-mobile-export" onClick={handleExport} disabled={isDirty}>
                                 <Download size={15} /> {t("workflows.export", "Export")}
                               </button>
-                              <button className="wf-editor-action" onClick={handleDuplicate} disabled={duplicating}>
+                              <button className="wf-editor-action" onClick={requestDuplicate} disabled={duplicating}>
                                 <Copy size={13} /> {t("common.duplicate", "Duplicate")}
                               </button>
                               <button className="wf-editor-delete" data-testid="wf-mobile-delete" onClick={handleDeleteWorkflow}>
@@ -3654,7 +3659,7 @@ function InnerEditor({
                     >
                       <Download size={13} /> {t("workflows.export", "Export")}
                     </button>
-                    <button className="wf-editor-save wf-editor-duplicate-primary" onClick={handleDuplicate} disabled={duplicating}>
+                    <button className="wf-editor-save wf-editor-duplicate-primary" onClick={requestDuplicate} disabled={duplicating}>
                       <Plus size={13} /> {t("workflows.duplicateToCustomize", "Duplicate to customize")}
                     </button>
                   </div>
@@ -3739,7 +3744,7 @@ function InnerEditor({
                           </div>
                         )}
                       </div>
-                      <button className="wf-editor-action" onClick={handleDuplicate} disabled={duplicating}>
+                      <button className="wf-editor-action" onClick={requestDuplicate} disabled={duplicating}>
                         <Copy size={13} /> {t("common.duplicate", "Duplicate")}
                       </button>
                       <button className="wf-editor-delete" onClick={handleDeleteWorkflow}>
@@ -3859,7 +3864,7 @@ function InnerEditor({
                       >
                         <Download size={13} /> {t("workflows.export", "Export")}
                       </button>
-                      <button className="wf-editor-action" onClick={handleDuplicate} disabled={duplicating}>
+                      <button className="wf-editor-action" onClick={requestDuplicate} disabled={duplicating}>
                         <Copy size={13} /> {t("common.duplicate", "Duplicate")}
                       </button>
                       <button className="wf-editor-delete" onClick={handleDeleteWorkflow}>
