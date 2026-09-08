@@ -1,9 +1,9 @@
-import { createContext, useContext, useEffect, useMemo, useRef } from "react";
+import { createContext, useContext, useEffect, useMemo } from "react";
 import {
   ReactFlow,
   ReactFlowProvider,
   useReactFlow,
-  useNodesInitialized,
+  useStore,
   Background,
   BackgroundVariant,
   Controls,
@@ -322,48 +322,30 @@ off-screen to the left. Refit whenever the set of rendered nodes changes
 (workflow switch, add/insert/delete), on the next frame so React Flow has
 measured the new nodes.
 */
-function SimpleCanvasAutoFit({
-  signature,
-  containerRef,
-}: {
-  signature: string;
-  containerRef: React.RefObject<HTMLDivElement | null>;
-}) {
+/**
+ * FNXC:WorkflowViewport 2026-09-08-18:18:
+ * A hidden or transitioning canvas can initialize nodes before React Flow publishes its viewport dimensions. Fitting against zero dimensions moves nodes outside the canvas under nearby controls. Subscribe to the owning Flow store's measured viewport and node bounds instead of guessing readiness with a delayed timer or a competing ResizeObserver.
+ */
+export function SimpleCanvasAutoFit() {
   const { fitView } = useReactFlow();
-  // Nodes have no dimensions until React Flow measures them; fitView before
-  // that is a no-op (seen as a mis-centered mobile canvas on first mount).
-  const nodesInitialized = useNodesInitialized();
+  // FNXC:WorkflowViewport 2026-09-08-18:36: This read-only controlled canvas does not feed dimension changes back through onNodesChange, so Flow's cached nodesInitialized flag can remain false after DOM measurement. Read the actual internal measurements instead.
+  const nodesInitialized = useStore((state) => {
+    const visibleNodes = Array.from(state.nodeLookup.values()).filter((node) => !node.hidden);
+    return visibleNodes.length > 0 && visibleNodes.every((node) => (node.measured?.width ?? 0) > 0 && (node.measured?.height ?? 0) > 0);
+  });
+  const width = useStore((state) => state.width);
+  const height = useStore((state) => state.height);
+  const nodeBoundsKey = useStore((state) => Array.from(state.nodeLookup.values())
+    .filter((node) => !node.hidden)
+    .map((node) => [node.id, node.measured?.width, node.measured?.height, node.internals.positionAbsolute.x, node.internals.positionAbsolute.y].join(":"))
+    .join("|"));
   useEffect(() => {
-    if (!nodesInitialized) return;
-    let frame = requestAnimationFrame(() => {
+    if (!nodesInitialized || width <= 0 || height <= 0) return;
+    const frame = requestAnimationFrame(() => {
       void fitView({ padding: 0.15, maxZoom: 1 });
     });
-    // Second pass: container children and fonts can measure after the first
-    // fit (and mobile stage transitions animate the container), shifting the
-    // graph bounds without a node-set change. One settled refit covers it.
-    const settle = window.setTimeout(() => {
-      void fitView({ padding: 0.15, maxZoom: 1 });
-    }, 250);
-    // The canvas region also resizes without a graph change (inspector
-    // opening/closing, sidebar collapse, window resize) — refit then too so
-    // the flow stays centered instead of drifting off-screen.
-    const el = containerRef.current;
-    const observer =
-      typeof ResizeObserver === "undefined" || !el
-        ? null
-        : new ResizeObserver(() => {
-            cancelAnimationFrame(frame);
-            frame = requestAnimationFrame(() => {
-              void fitView({ padding: 0.15, maxZoom: 1 });
-            });
-          });
-    if (observer && el) observer.observe(el);
-    return () => {
-      cancelAnimationFrame(frame);
-      window.clearTimeout(settle);
-      observer?.disconnect();
-    };
-  }, [signature, fitView, containerRef, nodesInitialized]);
+    return () => cancelAnimationFrame(frame);
+  }, [nodeBoundsKey, fitView, nodesInitialized, width, height]);
   return null;
 }
 
@@ -410,7 +392,6 @@ export function WorkflowSimpleCanvas({
   onEdgesDelete,
 }: WorkflowSimpleCanvasProps) {
   const { t } = useTranslation("app");
-  const containerRef = useRef<HTMLDivElement | null>(null);
 
   const displayNodes = useMemo(() => {
     const positions = simpleVerticalLayout(nodes, edges);
@@ -451,7 +432,7 @@ export function WorkflowSimpleCanvas({
   );
 
   return (
-    <div className="wf-simple-canvas" data-testid="wf-simple-canvas" ref={containerRef}>
+    <div className="wf-simple-canvas" data-testid="wf-simple-canvas">
       {/* FNXC:WorkflowSimpleView 2026-07-10-12:00: OWN provider, deliberately
           nested inside the editor's ReactFlowProvider. The editor keeps its
           advanced canvas mounted (CSS-hidden) in list/mobile presentations;
@@ -473,13 +454,11 @@ export function WorkflowSimpleCanvas({
         onNodeClick={(_, node) => onSelectNode(node.id)}
         onEdgeClick={(_, edge) => onSelectEdge(edge.id)}
         onPaneClick={onClearSelection}
-        fitView
-        fitViewOptions={{ padding: 0.15, maxZoom: 1 }}
         minZoom={0.25}
         maxZoom={1.75}
         proOptions={{ hideAttribution: false }}
       >
-        <SimpleCanvasAutoFit signature={displayNodes.map((n) => n.id).join("|")} containerRef={containerRef} />
+        <SimpleCanvasAutoFit />
         <Background variant={BackgroundVariant.Dots} gap={22} size={1.5} className="wf-simple-canvas-bg" />
         <Controls showInteractive={false} className="wf-simple-controls" />
         {editable && (

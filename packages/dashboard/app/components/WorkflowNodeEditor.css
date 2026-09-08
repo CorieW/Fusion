@@ -53,7 +53,8 @@ embedded view.
   min-height: 0;
 }
 
-.wf-editor-modal--embedded {
+/* FNXC:WorkflowViewport 2026-09-08-18:36: Embedded editors fill their content pane, not the viewport. Outrank the shared mobile .modal:not(.confirm-dialog) fullscreen rule so banners and navigation cannot clip the graph or inspector. */
+.modal.wf-editor-modal.wf-editor-modal--embedded {
   width: 100%;
   height: 100%;
   max-width: none;
@@ -2458,9 +2459,10 @@ Column trait toggles are left-sidebar workflow controls; keep their enabled and 
     display: none;
   }
 
+  /* FNXC:WorkflowViewport 2026-09-08-18:48: Short panes must scroll the complete editor stage instead of shrinking the graph panel to zero below its toolbars. The existing body scroller owns overflow; inspector detail stages still replace the canvas. */
   .wf-editor-body--editor-stage .wf-editor-canvas-wrap {
     display: flex;
-    flex: 0 1 auto;
+    flex: 0 0 auto;
     width: 100%;
     min-width: 0;
     min-height: 0;
