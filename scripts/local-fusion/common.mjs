@@ -95,14 +95,18 @@ export async function copyTree(from, to, excludes = []) {
   await fs.mkdir(to, { recursive: true });
   await run('robocopy.exe', [from, to, '/E', '/MT:16', '/COPY:DAT', '/DCOPY:DAT', '/R:1', '/W:1', '/XJ', '/SL', '/NFL', '/NDL', '/NJH', '/NJS', '/NP', ...(excludes.length ? ['/XD', ...excludes] : [])], { codes: [0,1,2,3,4,5,6,7] });
 }
+// FNXC:LocalDeployment 2026-09-08-12:44: Git Bash may put GNU tar first in PATH; use Windows tar explicitly so drive-qualified archive paths remain local filenames.
+export function archiveExecutable(platform = process.platform, env = process.env) {
+  return platform === 'win32' ? path.win32.join(env.SystemRoot ?? env.WINDIR ?? 'C:/Windows','System32','tar.exe') : 'tar';
+}
 export async function archiveTree(from, archive) {
   await fs.mkdir(path.dirname(archive),{recursive:true});
-  await run('tar.exe',['-cf',archive,'-C',from,'.']);
+  await run(archiveExecutable(),['-cf',archive,'-C',from,'.']);
 }
 export async function restoreSnapshot(copy, backup, target, stateOnly=false) {
   if(copy.archive) {
     await fs.mkdir(target,{recursive:true});
-    await run('tar.exe',['-xf',contained(backup,path.join(backup,copy.archive)),'-C',target,...(stateOnly?['./.fusion']:[])]);
+    await run(archiveExecutable(),['-xf',contained(backup,path.join(backup,copy.archive)),'-C',target,...(stateOnly?['./.fusion']:[])]);
   } else {
     await copyTree(contained(backup,path.join(backup,copy.destination,stateOnly?'.fusion':'')),stateOnly?path.join(target,'.fusion'):target);
   }

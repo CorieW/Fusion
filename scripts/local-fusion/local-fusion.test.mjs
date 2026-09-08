@@ -4,7 +4,7 @@ import * as fs from 'node:fs/promises';
 import path from 'node:path';
 import os from 'node:os';
 import { pathToFileURL } from 'node:url';
-import { acquireLock, archiveTree, checksums, contained, exists, here, isSourceFile, restoreSnapshot, run, verifyChecksums, waitUntil, writeJson } from './common.mjs';
+import { acquireLock, archiveExecutable, archiveTree, checksums, contained, exists, here, isSourceFile, restoreSnapshot, run, verifyChecksums, waitUntil, writeJson } from './common.mjs';
 import { compareInventory } from './backup.mjs';
 import { build } from './build.mjs';
 import { main, restoreCopies } from './manage.mjs';
@@ -142,4 +142,9 @@ if(process.platform==='win32') test('project archives preserve hidden data and u
     const displaced=(await fs.readdir(root)).find(name=>name.startsWith('live project.before-fusion-restore-'));
     assert.equal(await fs.readFile(path.join(root,displaced,'working file.txt'),'utf8'),'new work after backup');
   }finally{await fs.rm(root,{recursive:true,force:true});}
+});
+
+test('archive executable is independent of Git PATH ordering',()=>{
+ assert.equal(archiveExecutable('win32',{SystemRoot:'C:/Windows',PATH:'Git first'}),path.win32.join('C:/Windows','System32','tar.exe'));
+ assert.equal(archiveExecutable('linux',{}),'tar');
 });
