@@ -1,4 +1,4 @@
-import { developmentGitAllowed, parseDevelopmentGitShell } from './dev-git-policy.mjs';
+import { developmentGitAllowed, developmentGitTarget, parseDevelopmentGitShell } from './dev-git-policy.mjs';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { randomBytes } from 'node:crypto';
@@ -118,7 +118,8 @@ export function developmentCommandAllowed(command, args, options, base, ownedPid
     const index = args.findIndex(arg => arg.toLowerCase() === '/pid');
     return index >= 0 && ownedPids.has(Number(args[index + 1])) && !args.some(arg => arg.toLowerCase() === '/im');
   }
-  return executable === 'git' && !options?.shell && inside(options?.cwd ?? process.cwd()) && developmentGitAllowed(args);
+  if (executable !== 'git' || options?.shell) return false;
+  try { const target=developmentGitTarget(args,options); return inside(target.options?.cwd ?? process.cwd()) && developmentGitAllowed(target.args); } catch { return false; }
 }
 
 export function developmentGitShellAllowed(command, options, base) {

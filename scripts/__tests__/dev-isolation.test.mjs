@@ -5,7 +5,7 @@ import path from 'node:path';
 import os from 'node:os';
 import { devPort, isolatedDashboardArgs, isolatedEnvironment, prepareDevIsolation, devProxyConfiguration, verifyDevBackend, developmentRequestAllowed, developmentCommandAllowed } from '../lib/dev-isolation.mjs';
 import { parseDevWrapperArgs, buildDevNodeArgs } from '../dev-with-memory-lib.mjs';
-import { pathToFileURL, URL } from 'node:url';
+import { pathToFileURL, fileURLToPath, URL } from 'node:url';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 
@@ -145,4 +145,25 @@ test('actual guard stops Git alias subprocesses and neutralizes local fsmonitor'
  cp.execFileSync('git',['status','--porcelain']); cp.execSync('git status --porcelain');
  assert.equal(fs.existsSync(${JSON.stringify(sentinel)}),false);console.log('isolated');`;
  const result=await promisify(execFile)(process.execPath,['--import',guard,'--input-type=module','-e',script],{cwd:project,env});assert.equal(result.stdout.trim(),'isolated');
+});
+
+// FNXC:DevIsolation 2026-09-08-17:25: A fresh preview must register its owned synthetic project without granting Git write commands to the application.
+test('trusted bootstrap prepares a baseline; guarded canonical readiness remains read-only',async t=>{
+ const root=await fs.mkdtemp(path.join(os.tmpdir(),'fusion-dev-bootstrap-'));t.after(()=>fs.rm(root,{recursive:true,force:true}));
+ const source=path.resolve(new URL('../../',import.meta.url).pathname.replace(/^\/(\w:)/,'$1'));
+ const base=path.join(root,'sandbox'),project=path.join(base,'project');
+ const env=await prepareDevIsolation({base,home:path.join(base,'home'),project},source,process.env);
+ const execute=promisify(execFile),bootstrap=path.join(source,'scripts/dev-git-seed.mjs');
+ const {createRequire}=await import('node:module');const require=createRequire(import.meta.url);const loader=pathToFileURL(require.resolve('tsx')).href;
+ await execute(process.execPath,['--import',loader,bootstrap],{cwd:project,env});
+ const head=(await execute('git',['rev-parse','HEAD'],{cwd:project,env})).stdout;
+ await execute(process.execPath,['--import',loader,bootstrap],{cwd:project,env});
+ assert.equal((await execute('git',['rev-parse','HEAD'],{cwd:project,env})).stdout,head);
+ const guard=new URL('../lib/dev-runtime-guard.mjs',import.meta.url).href;
+ const readiness=new URL('../../packages/core/src/git/git-repository.ts',import.meta.url).href;
+ const script=`import assert from 'node:assert/strict';import cp from 'node:child_process';import {ensureProjectGitReadiness} from ${JSON.stringify(readiness)};
+ assert.equal((await ensureProjectGitReadiness(process.cwd())).outcome,'existing');
+ for(const args of [['commit','--allow-empty','-m','escape'],['symbolic-ref','HEAD','refs/heads/escape'],['-C',${JSON.stringify(source)},'status']]) assert.throws(()=>cp.execFileSync('git',args),/disabled/);
+ console.log('readiness passed');`;
+ const result=await execute(process.execPath,['--import',loader,'--import',guard,'--input-type=module','-e',script],{cwd:project,env});assert.equal(result.stdout.trim(),'readiness passed');
 });

@@ -9,6 +9,12 @@ export function parseDevelopmentGitShell(command) {
   if (!tokens || tokens.join(' ').replace(/\s+/g,' ') !== command.trim().replace(/\s+/g,' ')) return undefined;
   return tokens.slice(1).map(value => /^['"]/.test(value) ? value.slice(1,-1) : value);
 }
+// FNXC:DevIsolation 2026-09-08-17:25: Core metadata probes use argv-level -C. Resolve it into the checked cwd, never permit arbitrary Git global options.
+export function developmentGitTarget(args, options) {
+  if (args[0] !== '-C') return { args, options };
+  if (typeof args[1] !== 'string' || !args[1] || args.length < 3) throw new Error('Invalid development Git directory');
+  return { args: args.slice(2), options: { ...options, cwd: path.resolve(options?.cwd ?? process.cwd(), args[1]) } };
+}
 export function developmentGitAllowed(args) {
   if (!Array.isArray(args) || args.some(arg => typeof arg !== 'string' || /[\0\r\n]/.test(arg))) return false;
   if (args.length === 1 && args[0] === '--version') return true;
@@ -16,6 +22,8 @@ export function developmentGitAllowed(args) {
   const flags = {
     status: /^(?:--porcelain(?:=[12])?|--short|--branch|--untracked-files=(?:all|normal|no)|--ignored(?:=(?:traditional|matching|no))?|-z)$/,
     'rev-parse': /^(?:--git-dir|--git-common-dir|--show-toplevel|--show-prefix|--is-inside-work-tree|--is-bare-repository|--verify|--abbrev-ref|--symbolic-full-name|--short(?:=\d+)?|--show-object-format)$/,
+    'symbolic-ref': /^(?:--quiet|--short|-q)$/,
+    'for-each-ref': /^(?:--format=%(refname:short)|--count=d+)$/,
     'ls-files': /^(?:--cached|--others|--exclude-standard|--stage|--deleted|--modified|-z)$/,
     branch: /^(?:--show-current|--list|--all|-a|--no-color)$/,
     log: /^(?:--oneline|--no-color|--no-decorate|--all|--first-parent|--max-count=\d+|-\d+|--format=(?:[^%]|%[HhsaenctidbrpP%x0-9])+|--pretty=(?:oneline|short|medium|full|fuller))$/,
@@ -23,9 +31,11 @@ export function developmentGitAllowed(args) {
     diff: /^(?:--stat|--shortstat|--numstat|--name-only|--name-status|--no-color|--cached|--staged|--quiet|--exit-code|--no-renames|-z)$/,
   };
   if (!flags[operation]) return false;
+  if (operation === 'symbolic-ref' && rest.filter(arg => !arg.startsWith('-')).length !== 1) return false;
   return rest.every(arg => flags[operation].test(arg) || (operation !== 'branch' && /^[\w./~^:@{}-]+$/.test(arg) && !arg.startsWith('-') && !arg.includes('..')));
 }
 export function isolatedGitInvocation(args, options, base) {
+  ({args,options}=developmentGitTarget(args,options));
   const inside = value => path.resolve(value).toLowerCase().startsWith(path.resolve(base).toLowerCase() + path.sep);
   const cwd = fs.realpathSync(options?.cwd ?? process.cwd());
   if (!inside(cwd)) throw new Error('Development Git directory must remain inside the sandbox');
@@ -38,7 +48,7 @@ export function isolatedGitInvocation(args, options, base) {
   const env=Object.fromEntries(Object.entries(options?.env ?? process.env).filter(([key])=>!/^GIT_|^SSH_AUTH_SOCK$/.test(key)));
   Object.assign(env,{GIT_CONFIG_NOSYSTEM:'1',GIT_CONFIG_GLOBAL:devNull,GIT_CONFIG_COUNT:'0',GIT_CEILING_DIRECTORIES:base,GIT_TERMINAL_PROMPT:'0',GIT_OPTIONAL_LOCKS:'0'});
   const [operation,...rest]=args;
-  const protections=['--no-pager','-c','core.fsmonitor=false','-c',`core.hooksPath=${path.join(base,'disabled-hooks')}`,'-c','protocol.allow=never','-c','credential.helper='];
+  const protections=['--no-pager','-c','core.fsmonitor=false','-c','core.hooksPath=/dev/null','-c','protocol.allow=never','-c','credential.helper='];
   const diffProtection=['diff','show','log'].includes(operation)?['--no-ext-diff','--no-textconv']:[];
   return { args:[...protections,operation,...diffProtection,...rest],options:{...options,cwd,env,shell:false} };
 }

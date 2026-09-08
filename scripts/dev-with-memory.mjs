@@ -76,12 +76,6 @@ if (isolated) {
   isolatedEnv = await prepareDevIsolation(isolatedPaths, process.cwd());
   fsMkdirSync(isolatedPaths.home, { recursive: true });
   fsMkdirSync(isolatedPaths.project, { recursive: true });
-  if (!fsExistsSync(pathJoin(isolatedPaths.project, ".git"))) {
-    // Short, deterministic git plumbing — the engine-wide execSync ban targets user-configured
-    // commands, not this.
-    const initialized = spawnSync("git", ["init", "-q"], { cwd: isolatedPaths.project, env: isolatedEnv, stdio: "ignore", windowsHide: true });
-    if (initialized.status !== 0) throw new Error('Could not initialize the development project.');
-  }
   console.log(`[fusion:dev] isolated instance — database ${isolatedPaths.home}/.fusion, project ${isolatedPaths.project}`);
 }
 if (watchSource && forwardedArgs[0] !== "dashboard") {
@@ -105,14 +99,17 @@ const PRELOAD = path.join(tsxDir, "dist", "preflight.cjs");
 const LOADER = path.join(tsxDir, "dist", "loader.mjs");
 const ENTRY = path.resolve(process.cwd(), "packages/cli/src/bin.ts");
 if (forwardedArgs[0] === 'dashboard' && !fsExistsSync(pathJoin(isolatedPaths.project, '.fusion/project.json'))) {
-  await new Promise((resolve, reject) => {
-    const child = spawn(process.execPath, buildDevNodeArgs({
-      inspectFlags: ['--import', pathToFileURL(pathResolve('scripts/lib/dev-runtime-guard.mjs')).href],
-      preload: PRELOAD, loader: LOADER, entry: pathResolve('scripts/dev-seed.mjs'),
-    }), { cwd: isolatedPaths.project, env: isolatedEnv, stdio: 'inherit', windowsHide: true });
-    child.on('error', reject);
-    child.on('exit', code => code === 0 ? resolve() : reject(new Error('Development project bootstrap failed.')));
-  });
+  // FNXC:DevIsolation 2026-09-08-17:25: The trusted launcher provisions the owned repository before the read-only application guard; runtime Git writes remain forbidden.
+  for (const [entry, guarded] of [['scripts/dev-git-seed.mjs', false], ['scripts/dev-seed.mjs', true]]) {
+    await new Promise((resolve, reject) => {
+      const child = spawn(process.execPath, buildDevNodeArgs({
+        inspectFlags: guarded ? ['--import', pathToFileURL(pathResolve('scripts/lib/dev-runtime-guard.mjs')).href] : [],
+        preload: PRELOAD, loader: LOADER, entry: pathResolve(entry),
+      }), { cwd: isolatedPaths.project, env: isolatedEnv, stdio: 'inherit', windowsHide: true });
+      child.on('error', reject);
+      child.on('exit', code => code === 0 ? resolve() : reject(new Error('Development project bootstrap failed: ' + entry)));
+    });
+  }
 }
 
 // Spawn node directly (no shell) so the inspector attaches to the real app
