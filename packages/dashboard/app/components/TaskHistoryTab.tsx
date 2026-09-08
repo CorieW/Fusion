@@ -4,7 +4,7 @@ import remarkGfm from "remark-gfm";
 import type { Components } from "react-markdown";
 import { useTranslation } from "react-i18next";
 import type { TaskDetail, WorkflowStepResult } from "@fusion/core";
-import { linkifyFilePaths, linkifyReactChildren } from "../utils/filePathLinkify";
+import { MarkdownFileAnchor, linkifyFilePaths, linkifyReactChildren } from "../utils/filePathLinkify";
 import { buildTaskHistory, type TaskHistoryLabel } from "../utils/taskHistory";
 import { formatDurationMs } from "../utils/taskTiming";
 import "./TaskHistoryTab.css";
@@ -26,7 +26,8 @@ const markdownCode: NonNullable<Components["code"]> = ({ children, ...props }) =
   return <code {...props}>{linkedChildren}</code>;
 };
 
-const markdownComponents: Components = {
+export const markdownComponents: Components = {
+  a: MarkdownFileAnchor,
   p: ({ children, ...props }) => <p {...props}>{linkifyReactChildren(children)}</p>,
   li: ({ children, ...props }) => <li {...props}>{linkifyReactChildren(children)}</li>,
   code: markdownCode,

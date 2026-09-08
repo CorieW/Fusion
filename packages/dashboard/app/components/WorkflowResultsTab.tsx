@@ -22,13 +22,14 @@ import { ProviderIcon } from "./ProviderIcon";
 import { irToFlow } from "./workflow-flow-mapping";
 import { workflowNodeTypes } from "./nodes/WorkflowNodeTypes";
 import type { Components } from "react-markdown";
-import { linkifyFilePaths, linkifyReactChildren } from "../utils/filePathLinkify";
+import { MarkdownFileAnchor, linkifyFilePaths, linkifyReactChildren } from "../utils/filePathLinkify";
 import { workflowResultTextsAreEquivalent } from "../utils/workflowResultText";
 import { resolveEffectiveExecutor, resolveEffectivePlanning, resolveEffectiveValidator } from "./effective-model-resolution";
 import { isWorkflowStepNotRun } from "../utils/taskProgress";
 
 // Markdown rendering components for workflow output
-const markdownComponents: Components = {
+export const markdownComponents: Components = {
+  a: MarkdownFileAnchor,
   p: ({ children, ...props }) => <p {...props}>{linkifyReactChildren(children)}</p>,
   li: ({ children, ...props }) => <li {...props}>{linkifyReactChildren(children)}</li>,
   code: ({ children, ...props }) => <code {...props}>{linkifyReactChildren(children)}</code>,

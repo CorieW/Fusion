@@ -6,7 +6,7 @@ import remarkGfm from "remark-gfm";
 import { ArrowUpToLine, Bot, File, Pencil, Reply, Send, TriangleAlert } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import type { ChatMessageInfo, FailureInfo, ToolCallInfo } from "../hooks/chatTypes";
-import { linkifyFilePaths, linkifyReactChildren } from "../utils/filePathLinkify";
+import { MarkdownFileAnchor, linkifyFilePaths, linkifyReactChildren } from "../utils/filePathLinkify";
 import { parseQuestionToolCall } from "../utils/parseQuestionToolCall";
 import { ChatQuestionResponse } from "./ChatQuestionResponse";
 import { ProviderIcon } from "./ProviderIcon";
@@ -463,13 +463,15 @@ function renderMarkdownBlockWithNativeStructurePreviews(
 /*
 FNXC:ChatStreaming 2026-08-19-13:52:
 Ordinary Chat Markdown links must preserve ReactMarkdown's sanitized href while opening in a separate tab with an explicit reverse-tabnabbing policy. Native structure references remain previews instead of becoming ordinary anchors.
+FNXC:MarkdownFileLinks 2026-09-08-06:39:
+Local report destinations use the file browser through the shared anchor; external links retain their sanitized href and separate-tab policy.
 */
 function NativeStructureMarkdownAnchor({ children, href, ...props }: React.ComponentProps<"a">) {
   const structureRef = href ? parseNativeStructureChatRef(href) : null;
   if (structureRef) return <NativeStructurePreview ref={structureRef} onOpen={openNativeStructure} />;
   /* FNXC:ChatStreaming 2026-08-19-13:52: ReactMarkdown clears unsafe hrefs; do not leave an empty interactive shell. */
   if (!href) return <span>{children}</span>;
-  return <a {...props} href={href} target="_blank" rel="noopener noreferrer">{children}</a>;
+  return <MarkdownFileAnchor {...props} href={href} target="_blank" rel="noopener noreferrer">{children}</MarkdownFileAnchor>;
 }
 
 function NativeStructureMarkdownCode({ children, ...props }: React.ComponentProps<"code">) {

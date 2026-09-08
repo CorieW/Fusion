@@ -86,7 +86,7 @@ import { extractDependencyDeleteConflict, extractLineageDeleteConflict } from ".
 import { MAX_AUTO_MERGE_RETRIES, computeBlockerFanoutMap, type BlockerFanoutColumnFlags } from "../hooks/useBlockerFanout";
 import { resolveEffectiveGithubRepoDefault } from "./githubTracking";
 import type { TFunction } from "i18next";
-import { linkifyFilePaths, linkifyReactChildren } from "../utils/filePathLinkify";
+import { MarkdownFileAnchor, linkifyFilePaths, linkifyReactChildren } from "../utils/filePathLinkify";
 import { getInReviewStallCopy, shouldShowInReviewStallBadge } from "../utils/inReviewStallCopy";
 import { getUnifiedTaskProgress } from "../utils/taskProgress";
 import { getStalePausedReviewCopy, shouldShowStalePausedReviewBadge } from "../utils/stalePausedReviewCopy";
@@ -186,7 +186,8 @@ const markdownLinkifyCodeComponent: NonNullable<Components["code"]> = ({ childre
   return <code {...props}>{linkedChildren}</code>;
 };
 
-const markdownLinkifyComponents: Components = {
+export const markdownLinkifyComponents: Components = {
+  a: MarkdownFileAnchor,
   p: ({ children, ...props }) => <p {...props}>{linkifyReactChildren(children)}</p>,
   li: ({ children, ...props }) => <li {...props}>{linkifyReactChildren(children)}</li>,
   // Mermaid fences render as diagrams; all other code falls through to file-path linkify.

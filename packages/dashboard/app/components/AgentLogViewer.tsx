@@ -11,7 +11,7 @@ import remarkGfm from "remark-gfm";
 import type { Components } from "react-markdown";
 import { Maximize2, Minimize2, Loader2, ChevronDown, ChevronRight } from "lucide-react";
 import "./AgentLogViewer.css";
-import { linkifyFilePaths, linkifyReactChildren } from "../utils/filePathLinkify";
+import { MarkdownFileAnchor, linkifyFilePaths, linkifyReactChildren } from "../utils/filePathLinkify";
 import { getRelativeTimeBucket } from "../utils/relativeTimeAgo";
 import { ToolCallDetails, TOOL_CALL_PREVIEW_MAX_CHARS, TOOL_CALL_PREVIEW_MAX_LINES } from "./ToolCallDetails";
 import { ThinkingTrace } from "./ThinkingTrace";
@@ -67,6 +67,7 @@ function formatTimestamp(iso: string, t: TFunction<"app">): string {
 }
 
 export const markdownComponents: Components = {
+  a: MarkdownFileAnchor,
   p: ({ children, ...props }) => <p {...props}>{linkifyReactChildren(children)}</p>,
   li: ({ children, ...props }) => <li {...props}>{linkifyReactChildren(children)}</li>,
   code: ({ children, ...props }) => {

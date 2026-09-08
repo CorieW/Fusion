@@ -1,5 +1,5 @@
 import "./filePathLinkify.css";
-import React, { cloneElement, isValidElement } from "react";
+import React, { cloneElement, createContext, isValidElement, useContext } from "react";
 import type { ReactElement, ReactNode } from "react";
 import { useFileBrowser } from "../context/FileBrowserContext";
 
@@ -9,6 +9,56 @@ export const FILE_PATH_REGEX = /(?<![\w@-])((?:[A-Za-z0-9_./@-]+\/)+[A-Za-z0-9_.
 
 const EXCLUDED_PROTOCOLS = ["http://", "https://", "mailto:", "git@", "ftp://"];
 const WELL_KNOWN_ROOT_FILES = new Set(["Dockerfile", "Makefile", "AGENTS.md", "README.md", "README"]);
+const FileLinkLabelContext = createContext(false);
+
+/**
+ * FNXC:MarkdownFileLinks 2026-09-08-06:39:
+ * Agent report links belong in the file browser, including relative Markdown destinations and
+ * dashboard /output URLs that have no static route. Preserve external sites, API URLs, dashboard
+ * navigation, and other localhost services. File-service workspace containment remains authoritative.
+ */
+export function parseMarkdownFileHref(href: string | undefined): { path: string; line?: number; col?: number } | null {
+  if (!href || href.startsWith("#") || href.startsWith("?")) return null;
+  let path = href;
+  if (/^(?:[a-z][a-z\d+.-]*:|\/\/)/i.test(href)) {
+    if (typeof window === "undefined") return null;
+    try {
+      const url = new URL(href, window.location.href);
+      if (!["http:", "https:"].includes(url.protocol) || url.username || url.password) return null;
+      const isDashboardOutput = ["localhost", "127.0.0.1", "[::1]"].includes(url.hostname)
+        && url.port === "4040" && url.pathname.startsWith("/output/");
+      if (url.origin !== window.location.origin && !isDashboardOutput) return null;
+      path = url.pathname + url.search + url.hash;
+    } catch {
+      return null;
+    }
+  }
+  // Query-bearing destinations can be application routes even when they end in a file extension.
+  if (path.includes("?") || /^\/?api\//i.test(path)) return null;
+  const [encodedPath, fragment] = path.split("#", 2);
+  try {
+    path = decodeURIComponent(encodedPath);
+  } catch {
+    return null;
+  }
+  if (path.includes("\\") || Array.from(path).some((character) => character.charCodeAt(0) < 32)) return null;
+  const parsed = parseFilePathMatch(path.replace(/^\//, ""));
+  if (!/\.[a-z\d]{1,8}$/i.test(parsed.path) && !WELL_KNOWN_ROOT_FILES.has(parsed.path)) return null;
+  const lineFragment = fragment?.match(/^L?(\d+)(?:C(\d+))?(?:-L?\d+)?$/i);
+  return {
+    ...parsed,
+    ...(lineFragment ? { line: Number(lineFragment[1]), col: lineFragment[2] ? Number(lineFragment[2]) : undefined } : {}),
+  };
+}
+
+export function MarkdownFileAnchor({ children, href, node: _node, ...props }: React.ComponentPropsWithoutRef<"a"> & { node?: unknown }) {
+  const fileBrowser = useFileBrowser();
+  const target = parseMarkdownFileHref(href);
+  const label = <FileLinkLabelContext.Provider value={true}>{children}</FileLinkLabelContext.Provider>;
+  if (fileBrowser && target) return <FilePathLink {...target}>{label}</FilePathLink>;
+  if (!href) return <span>{label}</span>;
+  return <a {...props} href={href}>{label}</a>;
+}
 
 function parseFilePathMatch(value: string): { path: string; line?: number; col?: number } {
   const match = /^(.*?)(?::(\d+)(?::(\d+))?)?$/.exec(value);
@@ -61,8 +111,9 @@ export function FilePathLink({
   children?: ReactNode;
 }) {
   const fileBrowser = useFileBrowser();
+  const insideLink = useContext(FileLinkLabelContext);
 
-  if (!fileBrowser) {
+  if (!fileBrowser || insideLink) {
     return <span>{children ?? path}</span>;
   }
 
@@ -135,11 +186,11 @@ export function linkifyReactChildren(children: ReactNode): ReactNode {
     return React.Children.map(children, (child) => linkifyReactChildren(child));
   }
 
-  if (!isValidElement<{ children?: ReactNode }>(children)) {
+  if (!isValidElement<{ children?: ReactNode; href?: string }>(children)) {
     return children;
   }
 
-  if (typeof children.type === "string" && ["button", "code", "pre"].includes(children.type)) {
+  if (children.props.href !== undefined || (typeof children.type === "string" && ["a", "button", "code", "pre"].includes(children.type))) {
     return children;
   }
 

@@ -229,10 +229,8 @@ describe("MailboxMessageContent", () => {
   it("strips javascript: URLs and event handlers from raw HTML", () => {
     const content = '<a href="javascript:alert(1)" onclick="alert(2)">click</a>';
     const { container } = render(<MailboxMessageContent content={content} />);
-    const link = container.querySelector("a");
-    // sanitize drops the javascript: href and the onclick handler.
-    expect(link?.getAttribute("href") ?? "").not.toContain("javascript:");
-    expect(link?.getAttribute("onclick")).toBeNull();
+    expect(screen.getByText("click")).toBeInTheDocument();
+    expect(container.querySelector("a, button, [onclick], [href]")).toBeNull();
   });
 
   it("renders a ```mermaid block as the MermaidDiagram container", async () => {

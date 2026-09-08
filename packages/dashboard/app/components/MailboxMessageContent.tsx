@@ -4,7 +4,7 @@ import remarkGfm from "remark-gfm";
 import type { Components } from "react-markdown";
 import type { PluggableList } from "unified";
 import { isMobileViewport } from "../hooks/useViewportMode";
-import { linkifyReactChildren } from "../utils/filePathLinkify";
+import { MarkdownFileAnchor, linkifyReactChildren } from "../utils/filePathLinkify";
 import { sharedRehypePlugins, createMermaidCodeComponent } from "./markdownPipeline";
 
 /*
@@ -66,10 +66,11 @@ function MailboxMarkdownAnchor({ children, ...props }: MailboxMarkdownAnchorProp
   if (!taskId) {
     /*
     FNXC:MailboxTaskLinks 2026-08-01-07:34:
-    Only verified same-origin task deep links stay in the dashboard. Markdown sanitization makes all
-    remaining hrefs safe, while external and non-task links retain their established new-tab behavior.
+    Verified same-origin task deep links use task navigation. Markdown sanitization keeps all hrefs safe.
+    FNXC:MarkdownFileLinks 2026-09-08-06:39:
+    Local report destinations use the shared file browser; remaining links retain new-tab behavior.
     */
-    return <a {...props} target="_blank" rel="noopener noreferrer">{children}</a>;
+    return <MarkdownFileAnchor {...props} target="_blank" rel="noopener noreferrer">{children}</MarkdownFileAnchor>;
   }
 
   if (!onOpenTask) return <a {...props}>{children}</a>;
