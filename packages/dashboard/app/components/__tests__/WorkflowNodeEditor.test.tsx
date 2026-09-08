@@ -4423,6 +4423,62 @@ describe("WorkflowNodeEditor — U6 column agents", () => {
     expect(note).toHaveTextContent(/Overridden by column agent/i);
     expect(note).toHaveTextContent("Reviewer");
   });
+
+  it.each(["desktop", "mobile"] as const)("loads project agents on %s before selecting an imported agent node", async (viewport) => {
+    mockWorkflowEditorViewport(viewport);
+    const definition = boundDef("override", "kit-coder");
+    const step = definition.ir.nodes.find((node) => node.id === "step")!;
+    step.config = { ...step.config, name: "Parity pass", executor: "agent", agentId: "kit-coder" };
+    const kitAgents = [
+      { id: "kit-coder", name: "Kit Parity Coder" },
+      { id: "kit-reviewer", name: "Kit Parity Reviewer" },
+      { id: "kit-tester", name: "Kit Parity Tester" },
+    ] as Agent[];
+    vi.mocked(fetchWorkflows).mockResolvedValue([definition]);
+    vi.mocked(fetchAgents).mockImplementation(async (_filter, projectId) =>
+      projectId === "invertase" ? kitAgents : [{ id: "foreign-agent", name: "Other Project Agent" } as Agent],
+    );
+    render(<WorkflowNodeEditor isOpen onClose={() => {}} addToast={() => {}} projectId="invertase" initialWorkflowId={definition.id} />);
+    const node = viewport === "mobile"
+      ? await screen.findByRole("button", { name: /^prompt Parity pass/ })
+      : await screen.findByText("Parity pass");
+    await act(async () => {});
+    fireEvent.click(node);
+    const picker = await screen.findByRole("combobox", { name: /^Agent/ });
+    await waitFor(() => expect(within(picker).getByRole("option", { name: "Kit Parity Coder" })).toBeInTheDocument());
+    for (const agent of kitAgents) expect(within(picker).getByRole("option", { name: agent.name })).toBeInTheDocument();
+    expect(within(picker).queryByRole("option", { name: "Other Project Agent" })).not.toBeInTheDocument();
+    expect(screen.queryByTestId("wf-node-agent-stale")).not.toBeInTheDocument();
+    expect(screen.getByTestId("wf-node-overridden-by-column-agent")).toHaveTextContent("Kit Parity Coder");
+  });
+
+  it.each(["desktop", "mobile"] as const)("ignores a previous project's late agent responses on %s", async (viewport) => {
+    mockWorkflowEditorViewport(viewport);
+    const definition = boundDef("override", "shared-agent-id");
+    const step = definition.ir.nodes.find((node) => node.id === "step")!;
+    step.config = { ...step.config, name: "Parity pass", executor: "agent", agentId: "shared-agent-id" };
+    vi.mocked(fetchWorkflows).mockResolvedValue([definition]);
+    const pending: Array<(agents: Agent[]) => void> = [];
+    vi.mocked(fetchAgents).mockImplementation((_filter, projectId) => projectId === "previous"
+      ? new Promise<Agent[]>((resolve) => pending.push(resolve))
+      : Promise.resolve([{ id: "shared-agent-id", name: "Current Project Coder" } as Agent]));
+    const props = { isOpen: true, onClose: () => {}, addToast: () => {}, initialWorkflowId: definition.id };
+    const editor = render(<WorkflowNodeEditor {...props} projectId="previous" />);
+    fireEvent.click(viewport === "mobile"
+      ? await screen.findByRole("button", { name: /^prompt Parity pass/ })
+      : await screen.findByText("Parity pass"));
+    await screen.findByTestId("wf-node-agent-stale");
+    editor.rerender(<WorkflowNodeEditor {...props} projectId="current" />);
+    await waitFor(() => expect(within(screen.getByRole("combobox", { name: /^Agent/ }))
+      .getByRole("option", { name: "Current Project Coder" })).toBeInTheDocument());
+    await act(async () => {
+      for (const resolve of pending) resolve([{ id: "shared-agent-id", name: "Previous Project Coder" } as Agent]);
+    });
+    const picker = screen.getByRole("combobox", { name: /^Agent/ });
+    expect(within(picker).getByRole("option", { name: "Current Project Coder" })).toBeInTheDocument();
+    expect(within(picker).queryByRole("option", { name: "Previous Project Coder" })).not.toBeInTheDocument();
+    expect(screen.getByTestId("wf-node-overridden-by-column-agent")).toHaveTextContent("Current Project Coder");
+  });
 });
 
 /*

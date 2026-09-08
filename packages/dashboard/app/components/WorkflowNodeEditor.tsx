@@ -2555,7 +2555,8 @@ function InnerEditor({
         if (!cancelled && res?.models) setModels(res.models);
       })
       .catch(() => {});
-    Promise.resolve(fetchAgents())
+    // FNXC:WorkflowAgentScope 2026-09-07-16:40: Prefetch must use the editor project; a foreign catalog makes valid imported agents look missing and suppresses later scoped loads.
+    Promise.resolve(fetchAgents(undefined, projectId))
       .then((res) => {
         if (!cancelled && Array.isArray(res)) setAgents(res);
       })
@@ -2672,29 +2673,31 @@ function InnerEditor({
 
   useEffect(() => {
     // step-review offers an optional review model picker (KTD-4).
+    let cancelled = false;
     if (selectedNode?.data.kind === "step-review" && models.length === 0) {
-      fetchModels().then((res) => setModels(res.models)).catch((err) => {
-        addToast(getErrorMessage(err) || t("workflowEditor.modelsLoadFailed", "Failed to load models"), "error");
+      fetchModels().then((res) => { if (!cancelled) setModels(res.models); }).catch((err) => {
+        if (!cancelled) addToast(getErrorMessage(err) || t("workflowEditor.modelsLoadFailed", "Failed to load models"), "error");
       });
-      return;
+      return () => { cancelled = true; };
     }
     if (!selectedNode || (selectedNode.data.kind !== "prompt" && selectedNode.data.kind !== "gate")) return;
     if (currentExecutor === "model" && models.length === 0) {
-      fetchModels().then((res) => setModels(res.models)).catch((err) => {
-        addToast(getErrorMessage(err) || t("workflowEditor.modelsLoadFailed", "Failed to load models"), "error");
+      fetchModels().then((res) => { if (!cancelled) setModels(res.models); }).catch((err) => {
+        if (!cancelled) addToast(getErrorMessage(err) || t("workflowEditor.modelsLoadFailed", "Failed to load models"), "error");
       });
     } else if (currentExecutor === "agent" && agents.length === 0) {
       // Project-scoped, matching WorkflowColumnPanel's fetchAgents(undefined,
       // projectId) — an unscoped fetch returns the wrong registry in
       // multi-project deployments (PR #1432 review).
-      fetchAgents(undefined, projectId).then(setAgents).catch((err) => {
-        addToast(getErrorMessage(err) || t("workflowEditor.agentsLoadFailed", "Failed to load agents"), "error");
+      fetchAgents(undefined, projectId).then((list) => { if (!cancelled) setAgents(list); }).catch((err) => {
+        if (!cancelled) addToast(getErrorMessage(err) || t("workflowEditor.agentsLoadFailed", "Failed to load agents"), "error");
       });
     } else if (currentExecutor === "skill" && skills.length === 0) {
-      fetchDiscoveredSkills(projectId).then(setSkills).catch((err) => {
-        addToast(getErrorMessage(err) || t("workflowEditor.skillsLoadFailed", "Failed to load skills"), "error");
+      fetchDiscoveredSkills(projectId).then((list) => { if (!cancelled) setSkills(list); }).catch((err) => {
+        if (!cancelled) addToast(getErrorMessage(err) || t("workflowEditor.skillsLoadFailed", "Failed to load skills"), "error");
       });
     }
+    return () => { cancelled = true; };
   }, [
     currentExecutor,
     selectedNode?.id,
