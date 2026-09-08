@@ -281,7 +281,7 @@ export async function buildBoardWorkflowsPayload(
   try {
     const definitions = await store.listWorkflowDefinitions();
     for (const definition of definitions) {
-      if (definition.kind === "fragment") continue;
+      if (definition.kind !== "workflow") continue;
       selectableWorkflowIds.add(definition.id);
       referenced.add(definition.id);
     }

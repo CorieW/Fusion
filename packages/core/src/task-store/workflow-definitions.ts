@@ -232,7 +232,7 @@ export async function listWorkflowDefinitionsImpl(store: TaskStore,
   ): Promise<WorkflowDefinition[]> {
     const all = await store.readAllWorkflowDefinitions();
     // FNXC:CustomWorkflows 2026-09-07-01:09: Historical snapshots are addressable by id, never offered as templates, even by former management-list callers.
-    return all.filter(wf => !isBuiltinWorkflowId(wf.id) && (!options?.kind || wf.kind === options.kind));
+    return all.filter(wf => wf.kind !== "historical" && !isBuiltinWorkflowId(wf.id) && (!options?.kind || wf.kind === options.kind));
 }
 
 export async function readAllWorkflowDefinitionsImpl(store: TaskStore): Promise<WorkflowDefinition[]> {
@@ -633,6 +633,7 @@ export async function materializeExplicitWorkflowStepsImpl(store: TaskStore,
     if (isBuiltinWorkflowId(workflowId)) throw new Error("Retired workflows are available only in task history. Choose a custom workflow.");
     const def = await store.getWorkflowDefinition(workflowId);
     if (!def) throw new Error(`Workflow '${workflowId}' not found`);
+    if (def.kind === "historical") throw new Error("Deleted workflows are available only in task history");
     if (def.kind === "fragment") {
       throw new Error(`Workflow '${workflowId}' is a fragment and cannot be selected for a task`);
     }

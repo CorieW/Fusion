@@ -935,6 +935,7 @@ export async function updateWorkflowPromptOverridesImpl(store: TaskStore,
      * FNXC:WorkflowModelLanes 2026-07-14-16:26:
      * Keep PostgreSQL prompt override patches on the same authoritative transaction path as workflow settings; a backend sync-default read must never erase sibling overrides.
      */
+    if ((await store.getWorkflowDefinition(workflowId))?.kind === "historical") throw new Error("Deleted workflow prompts cannot be edited");
         const layer = store.asyncLayer!;
     return layer.transactionImmediate(async (tx) => {
       const rows = await tx

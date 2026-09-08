@@ -189,8 +189,8 @@ function createMockStore(
   // configured (non-builtin) `aiUndoTaskWorkflowId`; default to "unknown" so
   // tests must explicitly declare a custom id as known via `knownWorkflowIds`.
   const getWorkflowDefinition = vi.fn().mockImplementation(async (id: string) => {
-    if (opts?.workflowIr && id === "wf-renamed") return { id, name: id, ir: opts.workflowIr };
-    return (opts?.knownWorkflowIds ?? []).includes(id) ? { id, name: id, ir: {} } : undefined;
+    if (opts?.workflowIr && id === "wf-renamed") return { id, name: id, kind: "workflow", ir: opts.workflowIr };
+    return (opts?.knownWorkflowIds ?? []).includes(id) ? { id, name: id, kind: "workflow", ir: {} } : undefined;
   });
   const selectionReaders = opts?.workflowIr
     ? {

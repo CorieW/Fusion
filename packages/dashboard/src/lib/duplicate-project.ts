@@ -38,7 +38,7 @@ export async function copyProjectConfiguration(source: TaskStore, target: TaskSt
   }
   const workflows = await source.listWorkflowDefinitions();
   for (const workflow of workflows) {
-    const copy = await target.createWorkflowDefinition({ name: workflow.name, description: workflow.description, icon: workflow.icon, kind: workflow.kind,
+    const copy = await target.createWorkflowDefinition({ name: workflow.name, description: workflow.description, icon: workflow.icon, kind: workflow.kind === "fragment" ? "fragment" : "workflow",
       ir: remapConfiguration(workflow.ir, ids, source.getRootDir(), target.getRootDir()), layout: workflow.layout });
     ids.set(workflow.id, copy.id);
   }

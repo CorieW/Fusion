@@ -443,7 +443,7 @@ export async function resolveOriginWorkflowOverrideIdImpl(
 
   try {
     const def = await store.getWorkflowDefinition(candidate);
-    if (!def || def.kind === "fragment") return undefined;
+    if (!def || def.kind !== "workflow") return undefined;
     return candidate;
   } catch {
     return undefined;

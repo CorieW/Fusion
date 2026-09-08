@@ -12,7 +12,8 @@ export interface WorkflowNodeLayout {
  *  "fragment" template (workflow-editor-consolidation U1, KTD-1). Fragments are
  *  excluded from task workflow pickers, default-workflow selection, and the
  *  compile/selection paths; both kinds are stored as parseable full IRs. */
-export type WorkflowDefinitionKind = "workflow" | "fragment";
+/** FNXC:WorkflowDeletion 2026-09-08-12:54: Historical definitions retain deleted-task identity and authored state but are excluded from catalogs and new selections. */
+export type WorkflowDefinitionKind = "workflow" | "fragment" | "historical";
 
 export const MAX_WORKFLOW_ICON_LENGTH = 16;
 
@@ -90,7 +91,7 @@ export interface WorkflowDefinitionInput {
   layout?: Record<string, WorkflowNodeLayout>;
   /** Discriminates full workflows from reusable fragment templates (KTD-1).
    *  Defaults to "workflow" when omitted. */
-  kind?: WorkflowDefinitionKind;
+  kind?: Exclude<WorkflowDefinitionKind, "historical">;
 }
 
 /** Partial update for an existing workflow definition. */

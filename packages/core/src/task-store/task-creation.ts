@@ -634,7 +634,8 @@ export async function _createTaskInternalBackendImpl(store: TaskStore, input: Ta
         Intake may not turn a client-named missing workflow into an owned default-workflow task, so
         prove the requested definition exists before compiling it at this universal insert boundary.
         */
-        const exists = (await store.getWorkflowDefinition(workflowId)) !== undefined;
+        const definition = await store.getWorkflowDefinition(workflowId);
+        const exists = definition !== undefined && definition.kind !== "historical";
         workflow = exists ? await resolveWorkflowIrById(store, workflowId) : "unresolvable";
       } catch {
         workflow = "unresolvable";

@@ -20,7 +20,7 @@ import {fromJson} from "../db/db.js";
 import {__setTaskActivityLogLimitsForTesting} from "../task-store/comments.js";
 import * as schema from "../postgres/schema/index.js";
 import {readProjectConfig, writeProjectConfig} from "../task-store/async/async-settings.js";
-import {and, eq, inArray} from "drizzle-orm";
+import {and, eq, inArray, isNull} from "drizzle-orm";
 import {projectScopeFor, type AsyncDataLayer} from "../postgres/data-layer.js";
 
 export async function createWorkflowStepImpl(store: TaskStore, input: import("../types.js").WorkflowStepInput): Promise<import("../types.js").WorkflowStep> {
@@ -288,6 +288,7 @@ export async function updateWorkflowDefinitionImpl(store: TaskStore, id: string,
     const saved = await store.withConfigLock(async () => {
       const existing = await store.getWorkflowDefinition(id);
       if (!existing) throw new Error(`Workflow '${id}' not found`);
+      if (existing.kind === "historical") throw new Error("Deleted workflows cannot be edited");
 
       const name = updates.name !== undefined ? updates.name.trim() : existing.name;
       if (!name) throw new Error("Workflow name is required");
@@ -364,14 +365,22 @@ export async function deleteWorkflowDefinitionImpl(store: TaskStore, id: string)
   const settings = await store.getSettings();
   if (settings.defaultWorkflowId === id) throw new Error("Choose another project default workflow or clear the default before deleting this workflow");
   const layer = store.asyncLayer!;
-  /* FNXC:CustomWorkflows 2026-09-07-01:09: There is no bundled workflow to receive orphaned tasks. Preserve saved selections and their history; workflows in use require explicit reassignment before deletion. */
+  /* FNXC:WorkflowDeletion 2026-09-08-12:54: Only live tasks block removal. Deleted-task references retain the original definition ID, graph, settings and prompt overrides as a hidden historical record; operators must not resurrect deleted tasks merely to remove a workflow. */
   await layer.db.transaction(async (db) => {
-    const references = await db.select({taskId:schema.project.taskWorkflowSelection.taskId})
-      .from(schema.project.taskWorkflowSelection).where(and(
-        eq(schema.project.taskWorkflowSelection.workflowId,id),
-        projectScopeFor(schema.project.taskWorkflowSelection.projectId,layer.projectId),
-      )).limit(1);
-    if (references.length) throw new Error("This workflow is used by saved tasks. Reassign them before deleting it.");
+    const scope=and(eq(schema.project.workflows.id,id),projectScopeFor(schema.project.workflows.projectId,layer.projectId));
+    const [existing]=await db.select().from(schema.project.workflows).where(scope).for("update").limit(1);
+    if (!existing) throw new Error(`Workflow '${id}' not found`);
+    if (existing.kind === "historical") return;
+    const referenceScope=and(eq(schema.project.taskWorkflowSelection.workflowId,id),projectScopeFor(schema.project.taskWorkflowSelection.projectId,layer.projectId));
+    const live=await db.select({taskId:schema.project.taskWorkflowSelection.taskId}).from(schema.project.taskWorkflowSelection)
+      .innerJoin(schema.project.tasks,and(eq(schema.project.tasks.id,schema.project.taskWorkflowSelection.taskId),eq(schema.project.tasks.projectId,schema.project.taskWorkflowSelection.projectId)))
+      .where(and(referenceScope,isNull(schema.project.tasks.deletedAt))).limit(1);
+    if (live.length) throw new Error("This workflow is used by saved tasks. Reassign the live tasks before deleting it.");
+    const references=await db.select({taskId:schema.project.taskWorkflowSelection.taskId}).from(schema.project.taskWorkflowSelection).where(referenceScope).limit(1);
+    if (references.length) {
+      await db.update(schema.project.workflows).set({kind:"historical",updatedAt:new Date().toISOString()}).where(scope);
+      return;
+    }
     const deleted = await db.delete(schema.project.workflows).where(and(
       eq(schema.project.workflows.id,id),projectScopeFor(schema.project.workflows.projectId,layer.projectId),
     )).returning();
@@ -397,6 +406,7 @@ export async function setDefaultWorkflowIdImpl(store: TaskStore, requestedWorkfl
       if (isBuiltinWorkflowId(workflowId)) throw new Error("Choose a custom default workflow; bundled workflows have been removed.");
       const exists = await store.getWorkflowDefinition(workflowId);
       if (!exists) throw new Error(`Workflow '${workflowId}' not found`);
+      if (exists.kind === "historical") throw new Error("Deleted workflows cannot be set as the project default");
       // KTD-1/R6: a fragment is a reusable palette piece, not a selectable
       // workflow. Reject it at the write boundary so a fragment can never be
       // persisted as the project default (the read-side skip in
@@ -421,6 +431,7 @@ export async function selectTaskWorkflowImpl(store: TaskStore, taskId: string, r
     return store.withTaskLock(taskId, async () => {
       const def = await store.getWorkflowDefinition(workflowId);
       if (!def) throw new Error(`Workflow '${workflowId}' not found`);
+      if (def.kind === "historical") throw new Error("Deleted workflows cannot be selected for a task");
       // KTD-1/R6: fragments are reusable single-node palette templates, not
       // selectable workflows. Reject them from task selection with a clear error
       // rather than materializing a degenerate single-step task.

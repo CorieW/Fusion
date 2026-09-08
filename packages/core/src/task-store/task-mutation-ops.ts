@@ -1021,6 +1021,7 @@ export async function updateWorkflowSettingValuesImpl(store: TaskStore, workflow
     PostgreSQL installations take the transaction-backed journal branch below;
     legacy projects retain their supported write behavior during migration.
     */
+    if ((await store.getWorkflowDefinition(workflowId))?.kind === "historical") throw new Error("Deleted workflow settings cannot be edited");
     const declarations = await store.resolveWorkflowSettingDeclarations(workflowId);
     const result = validateSettingValuePatch(declarations, patch);
     if (result.rejections.length > 0) {

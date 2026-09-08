@@ -84,3 +84,5 @@ Run recovery yourself in an external PowerShell terminal, never through a Fusion
 ```
 
 This path requires the failed activation journal, its exact verified cold backup, matching installation paths and verified previous-release artifacts. It restores without calling the failed dashboard API. Existing directories are renamed and preserved by restoration, not overwritten. Failure keeps the maintenance fence and records the recovery phase; only successful startup and inventory checks resume the saved project state. Never manually point an older binary at migrated data without restoring its matching backup.
+
+Deleting a custom workflow is blocked only by its project-default assignment or live task references. If only deleted tasks reference it, deletion hides it from the workflow catalog while retaining the same ID, graph, settings and prompts as a historical record. Historical records remain available to task history but cannot be edited, chosen as defaults, or assigned to new tasks. No task must be restored merely to remove its workflow from active use.

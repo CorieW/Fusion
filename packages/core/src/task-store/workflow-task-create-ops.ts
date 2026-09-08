@@ -586,7 +586,7 @@ export function toWorkflowDefinitionImpl(store: TaskStore, row: StoredWorkflowRo
       description: row.description,
       icon: row.icon || undefined,
       // Legacy rows (pre-migration-109) have no kind column; default to "workflow".
-      kind: row.kind === "fragment" ? "fragment" : "workflow",
+      kind: row.kind === "historical" ? "historical" : row.kind === "fragment" ? "fragment" : "workflow",
       ir: parseWorkflowIr(row.ir),
       layout: store.parseWorkflowLayout(row.layout),
       createdAt: row.createdAt,
@@ -601,7 +601,7 @@ export async function materializeDefaultWorkflowStepsImpl(store: TaskStore): Pro
     if (!def) return undefined;
     // KTD-1/R6: a fragment must never act as a project default (it is not a
     // selectable workflow); fall back to no default rather than materializing it.
-    if (def.kind === "fragment") return undefined;
+    if (def.kind !== "workflow") return undefined;
     // FNXC:LegacyWorkflowEngineRemoval 2026-07-02-00:00:
     // FN-7360 removed the legacy linear workflow step compiler; the graph
     // interpreter is the sole executor. Validation is now parseWorkflowIr

@@ -2762,7 +2762,7 @@ export function registerTaskWorkflowRoutes(ctx: ApiRoutesContext, deps: TaskWork
       let aiUndoWorkflowId: string | undefined;
       if (configuredAiUndoWorkflowId) {
         const definition = isBuiltinWorkflowId(configuredAiUndoWorkflowId) ? undefined : await scopedStore.getWorkflowDefinition(configuredAiUndoWorkflowId);
-        const exists = definition && definition.kind !== "fragment";
+        const exists = definition && definition.kind === "workflow";
         if (exists) {
           aiUndoWorkflowId = configuredAiUndoWorkflowId;
         } else {
