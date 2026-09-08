@@ -19,6 +19,11 @@ export async function jsonSql(config, query, conn) {
   const value = await sql(config, `SELECT COALESCE(json_agg(row_to_json(q)), '[]'::json) FROM (${query}) q;`, conn);
   return JSON.parse(value || '[]');
 }
+// FNXC:LocalDeployment 2026-09-08-12:30: Refuse upgrades before downtime when saved workflow references have no private definition snapshot. Never invent a replacement graph.
+export async function assertWorkflowReferences(config, conn, read = jsonSql) {
+  const missing = await read(config, `SELECT s.project_id,s.task_id,s.workflow_id FROM project.task_workflow_selection s LEFT JOIN project.workflows w ON w.project_id=s.project_id AND w.id=s.workflow_id WHERE w.id IS NULL ORDER BY s.project_id,s.task_id`, conn);
+  if (missing.length) throw new Error(`Missing historical workflow snapshots (${missing.length} saved references): ${missing.slice(0,5).map(row => `${row.project_id}/${row.workflow_id}`).join(', ')}. Restore these private definitions from the previous release before activation; keep saved task selections intact.`);
+}
 export async function inventory(config, conn) {
   const tables = await jsonSql(config, "SELECT table_schema,table_name FROM information_schema.tables WHERE table_type='BASE TABLE' AND table_schema NOT IN ('pg_catalog','information_schema') ORDER BY 1,2", conn);
   const counts = {};

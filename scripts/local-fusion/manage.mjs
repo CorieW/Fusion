@@ -3,7 +3,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { acquireLock, api, checksums, contained, exists, here, ps, readJson, restoreSnapshot, run, timestamp, verifyChecksums, waitUntil, writeJson } from './common.mjs';
-import { assertIdle, compareInventory, createBackup, inventory, pauseProjects, resumeProjects, verifyBackup } from './backup.mjs';
+import { assertIdle, assertWorkflowReferences, compareInventory, createBackup, inventory, pauseProjects, resumeProjects, verifyBackup } from './backup.mjs';
 import { build } from './build.mjs';
 import { rehearse } from './rehearse.mjs';
 import { verify } from './verify.mjs';
@@ -165,6 +165,7 @@ export async function main(argv=process.argv.slice(2)) {
     if (action==='rollback'&&!argv.includes('--restore-data')) {
       if (!previous.schemaHashes || JSON.stringify(previous.schemaHashes)!==JSON.stringify(release.schemaHashes)) throw new Error('Schema compatibility is unproven. Use --restore-data with an explicit matching backup.');
     }
+    if (action === 'activate' || action === 'deploy') await assertWorkflowReferences(config);
     const projects=await api(config.url,'/projects');
     const pauseSettings=[];
     // FNXC:LocalDeployment 2026-09-06-21:29: Soft engine pause prevents fresh timer dispatch while existing work finishes; project engines are stopped only after the idle checks pass.

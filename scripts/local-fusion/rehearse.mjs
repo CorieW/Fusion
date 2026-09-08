@@ -3,7 +3,7 @@ import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
 import { api, contained, copyTree, here, ps, readJson, restoreSnapshot, run, timestamp, waitUntil, writeJson } from './common.mjs';
-import { compareInventory, inventory, literal, sql, verifyBackup } from './backup.mjs';
+import { assertWorkflowReferences, compareInventory, inventory, literal, sql, verifyBackup } from './backup.mjs';
 
 // FNXC:LocalDeployment 2026-09-06-20:56: Rehearse the exact candidate against a restored database, separate Windows home and remapped projects before touching live data.
 // process-supervisor-allowlist: isolated standalone deployment rehearsal; attached dashboard receives a graceful stop marker in finally.
@@ -61,6 +61,7 @@ export async function rehearse(config, release, backup, verifiedManifest) {
       if (child.exitCode !== null) throw new Error(`Rehearsal exited ${child.exitCode}: ${root}/dashboard.log`);
       try { return (await api(`http://127.0.0.1:${uiPort}`,'/health')).status === 'ok'; } catch { return false; }
     },'isolated migrated dashboard',180_000);
+    await assertWorkflowReferences(config,conn);
     const after = await inventory(config,conn);
     const result = compareInventory(baseline,after);
     await writeJson(path.join(root,'after-inventory.json'),after);
