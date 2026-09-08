@@ -2756,25 +2756,13 @@ export function registerTaskWorkflowRoutes(ctx: ApiRoutesContext, deps: TaskWork
         granularity = requestedGranularity;
       }
 
-      /*
-      FNXC:TaskRevert 2026-07-05-00:00 (FN-7556):
-      `settings` is fetched HERE (before `createAiUndoResult` is defined/used)
-      because the `mode === "ai"` early-return path below uses the closure
-      before the git-path `settings` fetch that used to follow it. AI-undo
-      tasks default to the `aiUndoTaskWorkflowId` project setting (default
-      `builtin:review-heavy` — a stricter review posture than ordinary new
-      work, since these tasks reverse already-shipped code). A blank/whitespace
-      value means inherit the project default workflow; a non-blank value that
-      does not resolve to a real workflow (custom or builtin) is logged and
-      falls back to inherit too — a misconfigured id must never break AI-undo
-      task creation.
-      */
+      /* FNXC:TaskRevert 2026-09-08-12:44: AI undo may select only a live custom workflow. Retired snapshot IDs, fragments and stale settings inherit the project default; historical task definitions remain readable without becoming new selections. */
       const settings = await scopedStore.getSettingsFast();
       const configuredAiUndoWorkflowId = settings.aiUndoTaskWorkflowId?.trim();
       let aiUndoWorkflowId: string | undefined;
       if (configuredAiUndoWorkflowId) {
-        const exists =
-          isBuiltinWorkflowId(configuredAiUndoWorkflowId) || Boolean(await scopedStore.getWorkflowDefinition(configuredAiUndoWorkflowId));
+        const definition = isBuiltinWorkflowId(configuredAiUndoWorkflowId) ? undefined : await scopedStore.getWorkflowDefinition(configuredAiUndoWorkflowId);
+        const exists = definition && definition.kind !== "fragment";
         if (exists) {
           aiUndoWorkflowId = configuredAiUndoWorkflowId;
         } else {

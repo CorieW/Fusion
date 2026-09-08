@@ -607,15 +607,19 @@ describe("POST /tasks/:id/revert — FN-7524 mode + AI-undo fallback", () => {
     expect(store.createTask as ReturnType<typeof vi.fn>).not.toHaveBeenCalled();
   });
 
-  it("(FN-7556) forwards the configured aiUndoTaskWorkflowId (default review-heavy) into the created AI-undo task", async () => {
+  it.each([false,true])("retired AI undo settings inherit even when a historical definition exists (%s)", async snapshotExists => {
     const task = makeTask({ id: "FN-970", column: "done" });
-    const store = createMockStore(task, { aiUndoTaskWorkflowId: "builtin:review-heavy" });
-
+    const store = createMockStore(task, { aiUndoTaskWorkflowId: "builtin:review-heavy", knownWorkflowIds: snapshotExists ? ["builtin:review-heavy"] : [] });
     const res = await POST_JSON(createApp(store), `/api/tasks/${task.id}/revert`, { mode: "ai" });
     expect(res.status).toBe(200);
-    expect(store.createTask as ReturnType<typeof vi.fn>).toHaveBeenCalledTimes(1);
-    const createInput = (store.createTask as ReturnType<typeof vi.fn>).mock.calls[0][0] as { workflowId?: string };
-    expect(createInput.workflowId).toBe("builtin:review-heavy");
+    expect((store.createTask as ReturnType<typeof vi.fn>).mock.calls[0][0]).not.toHaveProperty("workflowId");
+  });
+  it("uses a valid custom AI undo workflow",async()=>{
+    const task=makeTask({id:"FN-970",column:"done"});
+    const store=createMockStore(task,{aiUndoTaskWorkflowId:"WF-custom",knownWorkflowIds:["WF-custom"]});
+    const res=await POST_JSON(createApp(store),`/api/tasks/${task.id}/revert`,{mode:"ai"});
+    expect(res.status).toBe(200);
+    expect(store.createTask).toHaveBeenCalledWith(expect.objectContaining({workflowId:"WF-custom"}));
   });
 
   it("(FN-7556) a blank/unset aiUndoTaskWorkflowId omits workflowId so the task inherits the project default", async () => {
