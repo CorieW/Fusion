@@ -208,10 +208,16 @@ describe("workspace gate repository context", () => {
       };
     });
 
-    await runGraphCustomNode(harness as never, CODE_REVIEW_NODE as never, row, {} as Settings);
+    await runGraphCustomNode(harness as never, {
+      ...CODE_REVIEW_NODE,
+      config: { ...CODE_REVIEW_NODE.config, workflowRole: "reviewer" },
+    } as never, row, {} as Settings, undefined, { "workflow:principal-agent-id": "kit-reviewer" });
 
     expect(harness.executeWorkflowStep.mock.calls.map((call) => call[2])).toEqual([paths.repo1, paths.repo2]);
     expect(harness.executeWorkflowStep.mock.calls.map((call) => call[5]?.dispatchLabel)).toEqual(["repo1", "repo2"]);
+    for (const call of harness.executeWorkflowStep.mock.calls) {
+      expect(call[5]).toMatchObject({ activityRole: "reviewer", principalAgentId: "kit-reviewer" });
+    }
   });
 
   it("fans out Code Review from the authoritative scope after the initial graph snapshot becomes stale", async () => {

@@ -118,6 +118,20 @@ describe("useMultiAgentLogs", () => {
     });
   });
 
+  it("preserves distinct same-role agents across history and live events", async () => {
+    const coder = { timestamp: "2026-01-01T00:00:00Z", taskId: "FN-001", text: "Done", type: "text" as const, agent: "executor" as const, agentId: "coder", agentName: "Kit Parity Coder" };
+    const tester = { ...coder, agentId: "tester", agentName: "Kit Parity Tester" };
+    const otherTester = { ...tester, agentId: "another-tester" };
+    mockFetchAgentLogsWithMeta.mockResolvedValue({ entries: [coder], total: 1, hasMore: false });
+    const { result } = renderHook(() => useMultiAgentLogs(["FN-001"]));
+    await waitFor(() => expect(result.current["FN-001"].entries).toEqual([coder]));
+    act(() => {
+      getConnection("FN-001")!._emit("agent:log", tester);
+      getConnection("FN-001")!._emit("agent:log", otherTester);
+    });
+    await waitFor(() => expect(result.current["FN-001"].entries).toEqual([coder, tester, otherTester]));
+  });
+
   it("merges live SSE events with historical entries", async () => {
     const historical = [
       { timestamp: "2026-01-01T00:00:00Z", taskId: "FN-001", text: "old", type: "text" as const },

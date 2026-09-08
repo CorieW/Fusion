@@ -24,3 +24,11 @@ Resolve the log role from the graph's existing role classifier and capture the r
 - **Original symptom:** Coding (Kit Parity) activity displayed Reviewer even though the coding agent ran.
 - **Exact reproduction:** Run the workflow-step principal test with Kit Parity Coder, Reviewer, and Tester identities and record an emitted session text event. Before the fix, the three new cases failed because entries had the hardcoded reviewer role and no agent identity.
 - **Assertion it is gone:** Execution tests assert each entry's role, agent ID, and name. Persistence tests assert identical attribution in live events and reloaded history. React tests render the resulting entry shape and assert the Coder, Reviewer, and Tester labels, separate same-role/duplicate-name groups, and historical role fallbacks. Reconciliation tests assert that distinct agents' otherwise identical messages are retained.
+
+## Browser acceptance
+
+Playwright acceptance used the isolated Development Sandbox, with automation disabled. A workflow and task were created through the UI. The real AgentLogger and JSONL writer recorded synthetic Coder, Reviewer, and Tester output, including tool calls/results, two testers with the same name, and a historical entry without identity. The real task-log API and dashboard rendered those records at 1440px desktop and 390px mobile widths.
+
+Checks covered Live and Raw views, tool-result expansion, reload and reopening the task, distinct duplicate-name groups, and legacy labels. A controlled SSE response separately verified that a new live coder entry retained its name in the real browser. External agent execution was not enabled in the preview; execution identity is covered by engine tests. Screenshots and the local acceptance scripts are saved under `output/playwright/` in the verification worktree.
+
+The extended engine run also exposed two older tool-injection tests that lacked the workflow definition and routing roster required to reach an implementation session. Their fixtures now provide both through the existing routing-agent helper, preserving the assertions that completion remains mandatory and the removed review tool stays absent.

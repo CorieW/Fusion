@@ -143,6 +143,24 @@ describe("useAgentLogs", () => {
     });
   });
 
+  it("preserves agent identity through history, live events, and reconnect", async () => {
+    const coder = { timestamp: "2026-01-01T00:00:00Z", taskId: "FN-001", text: "Done", type: "text" as const, agent: "executor" as const, agentId: "coder", agentName: "Kit Parity Coder" };
+    const tester = { ...coder, agentId: "tester", agentName: "Kit Parity Tester" };
+    const otherTester = { ...tester, agentId: "another-tester" };
+    mockFetchAgentLogsWithMeta.mockResolvedValueOnce({ entries: [coder], total: 1, hasMore: false });
+    const { result } = renderHook(() => useAgentLogs("FN-001", true));
+    await waitFor(() => expect(result.current.entries).toEqual([coder]));
+    const es = MockEventSource.instances[0];
+    act(() => {
+      es._fire("open");
+      es._emit("agent:log", tester);
+    });
+    expect(result.current.entries).toEqual([coder, tester]);
+    mockFetchAgentLogsWithMeta.mockResolvedValueOnce({ entries: [coder, tester, otherTester], total: 3, hasMore: false });
+    act(() => es._fire("open"));
+    await waitFor(() => expect(result.current.entries).toEqual([coder, tester, otherTester]));
+  });
+
   it("appends live SSE entries to historical entries", async () => {
     mockFetchAgentLogsWithMeta.mockResolvedValueOnce({
       entries: [
