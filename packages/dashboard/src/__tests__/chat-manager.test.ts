@@ -99,6 +99,7 @@ const mockChatStore = {
 
 const mockAgentStore = {
   init: vi.fn(),
+  close: vi.fn(),
   getAgent: vi.fn(),
   listAgents: vi.fn(),
 };
@@ -200,6 +201,30 @@ describe("ChatManager.sendMessage", () => {
     __setChatDiagnostics(null);
     vi.useRealTimers();
     vi.restoreAllMocks();
+  });
+
+  it("sends model chat through replacement persistence and initializes the new agent store", async () => {
+    __setCreateResolvedAgentSession(async () => ({
+      session: {
+        prompt: vi.fn().mockResolvedValue(undefined), dispose: vi.fn(),
+        model: { provider: "anthropic", id: "claude-test" },
+        state: { messages: [{ role: "assistant", content: "done" }] },
+      },
+    }) as any);
+    const oldChatStore = { ...mockChatStore, getSession: vi.fn(() => ({ id: "chat-001", agentId: "agent-001", status: "active" })) };
+    const oldAgentStore = { ...mockAgentStore, init: vi.fn().mockResolvedValue(undefined), close: vi.fn() };
+    const manager = new ChatManager(oldChatStore as any, "/tmp/test", oldAgentStore as any);
+    await manager.sendMessage("chat-001", "before pause");
+    expect(oldAgentStore.init).toHaveBeenCalledTimes(1);
+    oldChatStore.getSession.mockImplementation(() => { throw new Error("write CONNECTION_ENDED"); });
+    const newTaskStore = { getRootDir: () => "/tmp/test", getSettings: vi.fn().mockResolvedValue({}), emitUsageEvent: vi.fn() };
+    manager.setProjectStores(newTaskStore as any, mockChatStore as any, mockAgentStore as any);
+    await manager.sendMessage("chat-001", "after pause");
+    expect(oldAgentStore.close).toHaveBeenCalledTimes(1);
+    expect(mockAgentStore.init).toHaveBeenCalledTimes(1);
+    expect(mockChatStore.addMessage).toHaveBeenCalledWith("chat-001", expect.objectContaining({ role: "user", content: "after pause" }));
+    expect(newTaskStore.getSettings).toHaveBeenCalled();
+    expect(newTaskStore.emitUsageEvent).toHaveBeenCalledWith(expect.objectContaining({ kind: "user_message" }));
   });
 
   it("emits one content-free usage event after persisting a human chat turn", async () => {

@@ -248,7 +248,7 @@ export function registerChatRoutes(ctx: ApiRoutesContext, deps: ChatRouteDeps): 
     Prefer the engine plugin runner when available; otherwise the host runner
     (e.g. Grok ACP 0.2) so CLI runtimes still resolve.
     */
-    const engine = contextEngine ?? options?.engineManager?.getEngine(projectId);
+    const engine = contextEngine;
     const projectPluginRunner = engine?.getPluginRunner?.();
     const pluginRunner = projectPluginRunner ?? options?.pluginRunner;
     return getOrCreateScopedChatManager(scopedStore, chatStore, pluginRunner, Boolean(projectPluginRunner), engine?.getMessageStore());
@@ -1508,7 +1508,7 @@ export function registerChatRoutes(ctx: ApiRoutesContext, deps: ChatRouteDeps): 
     let chatManager: Awaited<ReturnType<typeof resolveScopedChatManager>> | undefined;
     const sessionId = String(req.params.id);
     try {
-      const { store: scopedStore, projectId } = await getProjectContext(req);
+      const { store: scopedStore, projectId, engine } = await getProjectContext(req);
       const { chatStore } = await resolveProjectChatContext({
         projectId,
         defaultStore: store,
@@ -1587,7 +1587,6 @@ export function registerChatRoutes(ctx: ApiRoutesContext, deps: ChatRouteDeps): 
         if (!options?.chatManager) throw new ApiError(503, "Chat manager not available");
         chatManager = options.chatManager;
       } else {
-        const engine = options?.engineManager?.getEngine(projectId);
         const projectPluginRunner = engine?.getPluginRunner?.();
         chatManager = getOrCreateScopedChatManager(
           scopedStore,

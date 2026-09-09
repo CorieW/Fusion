@@ -15,7 +15,7 @@ vi.mock("../chat-project-services.js", () => ({
   getOrCreateScopedChatManager: mockGetOrCreateScopedChatManager,
 }));
 
-function makeApp(manager: { cancelGeneration: ReturnType<typeof vi.fn> }) {
+function makeApp(manager: { cancelGeneration: ReturnType<typeof vi.fn> }, options: Record<string, unknown> = {}) {
   const router = express.Router();
   const app = express();
   app.use(express.json());
@@ -24,7 +24,7 @@ function makeApp(manager: { cancelGeneration: ReturnType<typeof vi.fn> }) {
   registerChatRoutes({
     router,
     store: {} as any,
-    options: { chatManager: manager } as any,
+    options: { chatManager: manager, ...options } as any,
     runtimeLogger: {} as any,
     planningLogger: {} as any,
     chatLogger: { error: vi.fn(), warn: vi.fn(), log: vi.fn() } as any,
@@ -66,6 +66,20 @@ describe("POST /api/chat/sessions/:id/cancel", () => {
   });
 
   let currentManager: { cancelGeneration: ReturnType<typeof vi.fn> };
+
+  it("does not borrow services from a stopping engine excluded by canonical project context", async () => {
+    currentManager = { cancelGeneration: vi.fn().mockResolvedValue({ success: true, interrupted: false }) };
+    const oldRunner = {};
+    const oldMessages = {};
+    const fallbackRunner = {};
+    const getEngine = vi.fn(() => ({ getPluginRunner: () => oldRunner, getMessageStore: () => oldMessages }));
+    const response = await request(makeApp(currentManager, {
+      engineManager: { getEngine }, pluginRunner: fallbackRunner,
+    }), "POST", "/api/chat/sessions/chat-1/cancel?projectId=project-a");
+    expect(response.status).toBe(200);
+    expect(mockGetOrCreateScopedChatManager).toHaveBeenCalledWith(expect.anything(), expect.anything(), fallbackRunner, false, undefined);
+    expect(getEngine).not.toHaveBeenCalled();
+  });
 
   it("awaits the scoped manager's durable result before responding", async () => {
     let resolveCancellation!: (value: unknown) => void;

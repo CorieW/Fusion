@@ -644,7 +644,19 @@ export function createSSE(
     let lastDeliveredSeq = "0";
     const activityLayer = store.getAsyncLayer();
 
+    /*
+    FNXC:ChatDatabaseLifecycle 2026-09-09-06:03:
+    Engine pause can close this stream's store. End the response so EventSource reconnects through
+    the canonical resolver; polling the ended pool forever cannot recover or deliver new chat events.
+    */
+    const closeIfStoreClosing = (): boolean => {
+      if (!store.closing) return false;
+      closeConnection("close");
+      return true;
+    };
+
     const sendAgentActivityFrame = (payload: unknown): boolean => {
+      if (closeIfStoreClosing()) return false;
       if (activityClosed) return false;
       send(`event: agent:activity\ndata: ${JSON.stringify(payload)}\n\n`);
       // send() synchronously runs cleanup for dead/backpressured sockets.
@@ -652,6 +664,7 @@ export function createSSE(
     };
 
     const drainAgentActivity = async (): Promise<void> => {
+      if (closeIfStoreClosing()) return;
       if (!activityLayer || activityClosed || !activityInitialized) return;
       if (activityDraining) {
         activityRerun = true;
@@ -687,6 +700,7 @@ export function createSSE(
 
         // The periodic tick resumes a capped backlog without monopolizing this request's event loop.
       } catch (error) {
+        if (closeIfStoreClosing()) return;
         // FNXC:AgentActivityStream 2026-08-09-09:38: polling failure is retryable monitoring loss, never permission to optimistically advance the durable cursor.
         sseLog.warn(`agent activity tail failed for connection ${connectionId}; will retry`, error);
       } finally {
@@ -699,6 +713,7 @@ export function createSSE(
     };
 
     const initializeAgentActivityTail = async (): Promise<void> => {
+      if (closeIfStoreClosing()) return;
       if (!activityLayer || activityClosed || activityInitialized || activityInitializing) return;
       activityInitializing = true;
       try {
@@ -730,6 +745,7 @@ export function createSSE(
           void drainAgentActivity();
         }
       } catch (error) {
+        if (closeIfStoreClosing()) return;
         // Do not seed from "0" after a failed read: that would replay unbounded history.
         sseLog.warn(`agent activity tail could not establish initial cursor for connection ${connectionId}`, error);
       } finally {
@@ -1251,7 +1267,6 @@ export function createSSE(
     store.on("agent:log", onAgentLog);
     // Subscribe before seeding so an in-process append cannot be lost in the seed-query window.
     store.on("agent:activity", onAgentActivityNudge);
-    void initializeAgentActivityTail();
     store.on("artifact:registered", onArtifactRegistered);
     store.on("artifact:updated", onArtifactUpdated);
     store.on("workflow:setting-values-updated", onWorkflowSettingValuesUpdated);
@@ -1413,5 +1428,7 @@ export function createSSE(
         socket.on("error", () => closeConnection("error"));
       }
     }
+    // Cleanup must be fully wired before a closing store can end initialization synchronously.
+    void initializeAgentActivityTail();
   };
 }

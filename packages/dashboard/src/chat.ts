@@ -1618,6 +1618,21 @@ export class ChatManager {
   ) {}
 
   /**
+   * FNXC:ChatDatabaseLifecycle 2026-09-09-06:03:
+   * Engine pause/restart can replace a project's backend without ending interactive chats.
+   * Preserve generation ownership while refreshing persistence and replacement AgentStore readiness.
+   */
+  setProjectStores(taskStore: TaskStore, chatStore: ChatStore, agentStore: AgentStore): void {
+    this.agentStore?.close();
+    this.taskStore = taskStore;
+    this.chatStore = chatStore;
+    this.agentStore = agentStore;
+    this.agentStoreReady = undefined;
+    this.rootDir = taskStore.getRootDir();
+    this.getSettings = () => taskStore.getSettings();
+  }
+
+  /**
    * FNXC:ProjectChatRuntime 2026-07-05-18:10:
    * Project chat managers can be created before a project engine finishes booting. Refreshing the plugin runner after construction prevents early requests from permanently binding Hermes/runtime hints to the global fallback runner; callers must only refresh from a confirmed project runner so transient engine unavailability cannot downgrade a scoped manager.
    */
@@ -2790,7 +2805,17 @@ export class ChatManager {
     const broadcastOptions = { generationId };
     const generationState = this.activeGenerations.get(sessionId);
 
-    const session = await this.chatStore.getSession(sessionId);
+    let session: ChatSession | undefined;
+    try {
+      session = await this.chatStore.getSession(sessionId);
+    } catch (error) {
+      /* FNXC:ChatDatabaseLifecycle 2026-09-09-06:03: A lookup racing backend shutdown must release its generation before retry; this read precedes both provider branches' finally blocks. */
+      if (this.activeGenerations.get(sessionId)?.generationId === generationId) {
+        this.activeGenerations.delete(sessionId);
+      }
+      generationState?.resolveSettled();
+      throw error;
+    }
 
     // CLI-agent-backed chat: a session that selected a cli-agent executor brokers
     // its composer sends to the live PTY (via the runner) rather than running the

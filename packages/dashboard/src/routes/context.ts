@@ -152,15 +152,9 @@ Given an ALREADY-resolved id (request id → launch id folded in by the caller):
   3. id === launch project id → reuse the injected registry-bound store (no duplicate pool),
   4. else → getOrCreateProjectStore(id).
 
-FNXC:CentralProjectIdentity 2026-07-14-00:15 (F6 caveat):
-Launch-store reuse (step 3) assumes the injected store belongs to a live launch engine.
-When an engineManager is present but getEngine(launchId) is undefined, this cannot
-distinguish a launch engine that was never started (store still valid) from one that was
-explicitly stopped/paused (store may be closed). ProjectEngineManager exposes no synchronous
-engine-liveness/paused introspection (getEngine returns undefined for a stopped engine since
-it is deleted from the engines map, and paused status lives async in CentralCore), so no
-correct fall-through to getOrCreateProjectStore(launchId) is implementable here without
-inventing an API. Behavior is preserved; a live engine store (step 2) always wins first.
+FNXC:ChatDatabaseLifecycle 2026-09-09-06:03:
+TaskStore.closing becomes true before backend teardown. Never reuse a closing engine or launch store:
+dashboard reads need the resolver-owned replacement even while engine stop is still draining.
 */
 export async function resolveStoreForProjectId(
   resolvedId: string | undefined,
@@ -176,14 +170,15 @@ export async function resolveStoreForProjectId(
   if (engineManager) {
     const engine = engineManager.getEngine(resolvedId);
     if (engine) {
-      return engine.getTaskStore();
+      const engineStore = engine.getTaskStore();
+      if (!engineStore.closing) return engineStore;
     }
   }
 
   // Launch project: the injected store is already registry-bound to this id, so
   // reuse it instead of booting a duplicate connection pool via
-  // getOrCreateProjectStore. See the F6 caveat above.
-  if (options?.engine?.getProjectId?.() === resolvedId) {
+  // getOrCreateProjectStore while it remains open.
+  if (options?.engine?.getProjectId?.() === resolvedId && !store.closing) {
     return store;
   }
 
@@ -235,17 +230,20 @@ export async function getProjectContext(
       engineManager.onProjectAccessed(projectId);
     }
     if (engine) {
-      return { store: engine.getTaskStore(), engine, projectId };
+      const engineStore = engine.getTaskStore();
+      if (!engineStore.closing) return { store: engineStore, engine, projectId };
     }
   }
 
-  // Launch project: reuse the live launch engine + its registry-bound store
+  // Without a manager, reuse the launch engine and its registry-bound store.
+  // A manager's absence of an engine is authoritative after pause, even if an externally owned store stays open.
   // rather than a duplicate boot. The resolved projectId is returned explicitly
   // (never undefined) so downstream context is always attributable to a
   // central-registry id.
-  if (options?.engine && options.engine.getProjectId?.() === projectId) {
+  if (!engineManager && options?.engine && options.engine.getProjectId?.() === projectId) {
     try {
-      return { store: options.engine.getTaskStore(), engine: options.engine, projectId };
+      const engineStore = options.engine.getTaskStore();
+      if (!engineStore.closing) return { store: engineStore, engine: options.engine, projectId };
     } catch {
       // Fall back to scoped store resolution.
     }

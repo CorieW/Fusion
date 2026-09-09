@@ -48,6 +48,36 @@ describe("routes/context central project identity seam", () => {
     vi.spyOn(projectStoreResolver, "getOrCreateProjectStore").mockResolvedValue(boundStore);
   });
 
+  it.each(["launch", "secondary"])("replaces a closing %s store across API and realtime resolution", async (kind) => {
+    const closingStore = Object.assign(tag("closing"), { closing: true });
+    const projectId = kind === "launch" ? "launch-proj" : "secondary-proj";
+    const engine = makeEngine(projectId, closingStore);
+    const options = {
+      engine: kind === "launch" ? engine : makeEngine("launch-proj", rawLaunchStore),
+      engineManager: { getEngine: vi.fn(() => engine), onProjectAccessed: vi.fn() },
+    } as unknown as ServerOptions;
+    for (const registered of [true, false]) {
+      vi.mocked(options.engineManager!.getEngine).mockReturnValue(registered ? engine : undefined);
+      expect(await getScopedStore(makeReq(projectId), closingStore, options)).toBe(boundStore);
+      const context = await getProjectContext(makeReq(projectId), closingStore, options);
+      expect(context.store).toBe(boundStore);
+      expect(context.engine).toBeUndefined();
+      expect(await resolveScopedStore(projectId, closingStore, options.engineManager, "launch-proj", options)).toBe(boundStore);
+    }
+  });
+
+  it("keeps an externally owned launch store open without returning its stopped engine", async () => {
+    const openStore = Object.assign(tag("externally-owned"), { closing: false });
+    const options = {
+      engine: makeEngine("launch-proj", openStore),
+      engineManager: { getEngine: () => undefined, onProjectAccessed: vi.fn() },
+    } as unknown as ServerOptions;
+    const context = await getProjectContext(makeReq("launch-proj"), openStore, options);
+    expect(context.store).toBe(openStore);
+    expect(context.engine).toBeUndefined();
+    expect(projectStoreResolver.getOrCreateProjectStore).not.toHaveBeenCalled();
+  });
+
   it("(c) no request id and no engine → raw launch-dir store with a one-time warn (legacy)", async () => {
     const warn = vi.fn();
     const options = { runtimeLogger: { warn, info: vi.fn(), error: vi.fn(), child: vi.fn(), scope: "t" } } as unknown as ServerOptions;

@@ -31,6 +31,19 @@ describe("ChatManager.sendMessage — cli-agent send branch", () => {
     vi.clearAllMocks();
   });
 
+  it("releases generation ownership when the session lookup races backend shutdown", async () => {
+    mockChatStore.getSession.mockRejectedValueOnce(new Error("write CONNECTION_ENDED"));
+    const manager = makeManager();
+    const send = vi.fn(async () => "sent" as const);
+    manager.setCliChatRunner({ ensureSession: async () => "cli-1", send });
+    await expect(manager.sendMessage("chat-retry", "first attempt")).rejects.toThrow("CONNECTION_ENDED");
+    expect(manager.isGenerating("chat-retry")).toBe(false);
+    mockChatStore.getSession.mockResolvedValue({ id: "chat-retry", cliExecutorAdapterId: "codex", projectId: "project-a" });
+    await manager.sendMessage("chat-retry", "retry");
+    expect(send).toHaveBeenCalledWith("chat-retry", "retry");
+    expect(manager.isGenerating("chat-retry")).toBe(false);
+  });
+
   it("routes a cli-executor chat session's composer send to runner.send", async () => {
     mockChatStore.getSession.mockReturnValue({
       id: "chat-cli",

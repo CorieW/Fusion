@@ -75,6 +75,55 @@ describe("agent activity SSE tail", () => {
     getMaxAgentActivitySeq.mockReset();
   });
 
+  it.each(["before seed", "after seed"])("closes an ended project stream %s so the browser can reconnect", async (phase) => {
+    vi.useFakeTimers();
+    const layer = { projectId: "project-a" };
+    const store = Object.assign(new EventEmitter(), {
+      closing: phase === "before seed",
+      getAsyncLayer: () => layer,
+      getResearchStore: () => ({ on: vi.fn(), off: vi.fn() }),
+    });
+    getMaxAgentActivitySeq.mockResolvedValue("0");
+    queryAgentActivityEvents.mockResolvedValue({ events: [], nextCursor: null });
+    const socket = new MockSocket();
+    const request = Object.assign(new EventEmitter(), { query: {}, socket, headers: {} }) as Request;
+    const response = new MockResponse(socket);
+    try {
+      createSSE(store as never)(request, response as unknown as Response);
+      await vi.advanceTimersByTimeAsync(0);
+      store.closing = true;
+      const queriesBeforeClose = getMaxAgentActivitySeq.mock.calls.length;
+      await vi.advanceTimersByTimeAsync(60_000);
+      expect(response.writableEnded).toBe(true);
+      expect(getMaxAgentActivitySeq).toHaveBeenCalledTimes(queriesBeforeClose);
+      expect(store.listenerCount("agent:activity")).toBe(0);
+      expect(store.listenerCount("task:updated")).toBe(0);
+    } finally {
+      response.emit("close");
+      vi.useRealTimers();
+    }
+  });
+
+  it("cleans up when an in-flight query rejects during store shutdown", async () => {
+    let rejectQuery!: (error: Error) => void;
+    getMaxAgentActivitySeq.mockImplementationOnce(() => new Promise<string>((_resolve, reject) => { rejectQuery = reject; }));
+    const store = Object.assign(new EventEmitter(), {
+      closing: false,
+      getAsyncLayer: () => ({ projectId: "project-a" }),
+      getResearchStore: () => ({ on: vi.fn(), off: vi.fn() }),
+    });
+    const socket = new MockSocket();
+    const request = Object.assign(new EventEmitter(), { query: {}, socket, headers: {} }) as Request;
+    const response = new MockResponse(socket);
+    createSSE(store as never)(request, response as unknown as Response);
+    store.closing = true;
+    rejectQuery(new Error("write CONNECTION_ENDED"));
+    await settle();
+    expect(response.writableEnded).toBe(true);
+    expect(store.listenerCount("agent:activity")).toBe(0);
+    expect(queryAgentActivityEvents).not.toHaveBeenCalled();
+  });
+
   it("delivers a durable nudge racing the seed without replaying prior history", async () => {
     let resolveInitialSeq: ((seq: string) => void) | undefined;
     getMaxAgentActivitySeq

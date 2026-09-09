@@ -3,7 +3,13 @@ import type { ProjectEngineManager } from "@fusion/engine";
 import { ChatManager } from "./chat.js";
 import { requireAsyncLayer } from "./require-async-layer.js";
 
-const scopedChatStoreCache = new Map<string, ChatStore>();
+type ChatStoreBinding = {
+  store: TaskStore;
+  layer: ReturnType<TaskStore["getAsyncLayer"]> | undefined;
+  chatStore: ChatStore;
+};
+
+const scopedChatStoreCache = new Map<string, ChatStoreBinding>();
 
 function cacheKeyForStore(store: TaskStore): string {
   return store.getFusionDir();
@@ -11,18 +17,18 @@ function cacheKeyForStore(store: TaskStore): string {
 
 export function getOrCreateScopedChatStore(store: TaskStore, fallbackChatStore?: ChatStore): ChatStore {
   const key = cacheKeyForStore(store);
+  const layer = store.getAsyncLayer?.();
   if (fallbackChatStore) {
-    scopedChatStoreCache.set(key, fallbackChatStore);
+    scopedChatStoreCache.set(key, { store, layer, chatStore: fallbackChatStore });
     return fallbackChatStore;
   }
 
   const cached = scopedChatStoreCache.get(key);
-  if (cached) return cached;
+  if (cached?.store === store && cached.layer === layer) return cached.chatStore;
 
   /* FNXC:PostgresSatelliteCutover 2026-07-14-17:30: Project-scoped chat stores require the authoritative PostgreSQL layer; missing wiring must not create SQLite state. */
-  const layer = requireAsyncLayer(store, "Scoped ChatStore");
-  const chatStore = new ChatStore(layer);
-  scopedChatStoreCache.set(key, chatStore);
+  const chatStore = new ChatStore(requireAsyncLayer(store, "Scoped ChatStore"));
+  scopedChatStoreCache.set(key, { store, layer, chatStore });
   return chatStore;
 }
 
@@ -42,11 +48,13 @@ export async function resolveProjectChatContext(options: {
   its synthetic task session load another project's task context or report it missing.
   */
   if (requestStore) {
+    const engine = projectId ? engineManager?.getEngine(projectId) : undefined;
+    const engineChatStore = engine?.getTaskStore?.() === requestStore ? engine.getChatStore?.() : undefined;
     return {
       store: requestStore,
       chatStore: getOrCreateScopedChatStore(
         requestStore,
-        requestStore === defaultStore ? defaultChatStore : undefined,
+        engineChatStore ?? (requestStore === defaultStore ? defaultChatStore : undefined),
       ),
     };
   }
@@ -105,7 +113,7 @@ export function __resetScopedChatStoreCache(): void {
   scopedChatStoreCache.clear();
 }
 
-const scopedChatManagerCache = new Map<string, ChatManager>();
+const scopedChatManagerCache = new Map<string, ChatStoreBinding & { manager: ChatManager }>();
 
 export function getOrCreateScopedChatManager(
   store: TaskStore,
@@ -115,19 +123,32 @@ export function getOrCreateScopedChatManager(
   messageStore?: MessageStore,
 ): ChatManager {
   const key = store.getFusionDir();
+  const layer = requireAsyncLayer(store, "Scoped ChatManager");
   const cached = scopedChatManagerCache.get(key);
   if (cached) {
+    /*
+    FNXC:ChatDatabaseLifecycle 2026-09-09-06:03:
+    A project pause closes the engine's pool while dashboard requests acquire a replacement store at the same path.
+    Rebind persistence together, retaining generation/cancel state and the injected CLI runner.
+    Replacement backends also release stale engine plugin/message services when their new values are absent.
+    */
+    if (cached.store !== store || cached.layer !== layer || cached.chatStore !== chatStore) {
+      cached.manager.setProjectStores(store, chatStore, new AgentStore({ rootDir: store.getFusionDir(), asyncLayer: layer }));
+      cached.manager.setPluginRunner(pluginRunner);
+      cached.manager.setMessageStore(messageStore);
+      scopedChatManagerCache.set(key, { store, layer, chatStore, manager: cached.manager });
+    }
     if (refreshPluginRunner && pluginRunner) {
-      cached.setPluginRunner(pluginRunner);
+      cached.manager.setPluginRunner(pluginRunner);
     }
     if (messageStore) {
-      cached.setMessageStore(messageStore);
+      cached.manager.setMessageStore(messageStore);
     }
-    return cached;
+    return cached.manager;
   }
   // FNXC:PostgresCutover 2026-07-05-20:10: keep the backend AsyncDataLayer on
   // the chat AgentStore (merge union with main's Hermes plugin-runner refresh).
-  const agentStore = new AgentStore({ rootDir: store.getFusionDir(), asyncLayer: store.getAsyncLayer() ?? undefined });
+  const agentStore = new AgentStore({ rootDir: store.getFusionDir(), asyncLayer: layer });
   /*
    * FNXC:ProjectChatRuntime 2026-07-12-11:00:
    * Project/agent chat must expose the same tool schema over desktop and browser transports. The scoped manager is cached by fusion dir, so lazy engine boot must upgrade the cached MessageStore instead of leaving fn_send_message/fn_read_messages stale-missing after the first pre-engine resolution.
@@ -141,7 +162,7 @@ export function getOrCreateScopedChatManager(
     messageStore,
     store,
   );
-  scopedChatManagerCache.set(key, manager);
+  scopedChatManagerCache.set(key, { store, layer, chatStore, manager });
   return manager;
 }
 

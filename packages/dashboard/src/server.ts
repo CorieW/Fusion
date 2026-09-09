@@ -1296,7 +1296,8 @@ export function createServer(store: TaskStore, options?: ServerOptions): ReturnT
       immediately available, which separated its EventEmitter from mutations.
       */
       if (engineManager) {
-        const engine = engineManager.getEngine(projectId);
+        const candidate = engineManager.getEngine(projectId);
+        const engine = candidate?.getTaskStore() === scopedStore ? candidate : undefined;
         scopedChatStore = getOrCreateScopedChatStore(scopedStore, engine?.getChatStore?.());
         // Use the engine's auxiliary stores when available.
         agentStore = engine?.getAgentStore();
