@@ -2,9 +2,27 @@ import { describe, expect, it } from "vitest";
 import { DEFAULT_MOBILE_NAV_PRIMARY_ITEMS, MOBILE_NAV_SELECTABLE_ITEMS, resolveMobileNavPrimaryItems } from "../board/mobile-nav-primary-items.js";
 
 describe("resolveMobileNavPrimaryItems", () => {
-  it("uses the existing six-tab order for unset or empty values", () => {
+  it("uses desktop order for unset or empty values", () => {
     expect(resolveMobileNavPrimaryItems()).toMatchObject({ primaryItems: DEFAULT_MOBILE_NAV_PRIMARY_ITEMS });
     expect(resolveMobileNavPrimaryItems({ mobileNavPrimaryItems: [] })).toMatchObject({ primaryItems: DEFAULT_MOBILE_NAV_PRIMARY_ITEMS });
+  });
+
+  it("moves Missions/Mailbox to More and upgrades the saved previous default", () => {
+    const previous = ["command-center", "tasks", "agents", "missions", "chat", "mailbox"];
+    for (const settings of [undefined, { mobileNavPrimaryItems: previous }]) {
+      const result = resolveMobileNavPrimaryItems(settings);
+      expect(result.primaryItems).toEqual(["command-center", "tasks", "chat", "agents", "workflows", "memory"]);
+      expect(result.omittedItems).toEqual(expect.arrayContaining(["missions", "mailbox"]));
+      expect(result.omittedItems).not.toContain("workflows");
+    }
+    expect(previous).toEqual(["command-center", "tasks", "agents", "missions", "chat", "mailbox"]);
+  });
+
+  it("allows unpinning Memory without restoring it or changing custom shortcuts", () => {
+    const custom = DEFAULT_MOBILE_NAV_PRIMARY_ITEMS.filter(id => id !== "memory");
+    const result = resolveMobileNavPrimaryItems({ mobileNavPrimaryItems: custom });
+    expect(result.primaryItems).toEqual(custom);
+    expect(result.omittedItems).toContain("memory");
   });
 
   it("accepts newly eligible destinations, preserves order, and routes omitted destinations to More", () => {

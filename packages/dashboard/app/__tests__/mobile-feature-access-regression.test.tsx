@@ -204,13 +204,13 @@ describe("Mobile Feature Access Regression Guard", () => {
 
     toggleMoreWithOtherExpanded();
 
-    expect(screen.getByTestId("mobile-nav-tab-mailbox")).toBeDefined();
-    expect(screen.queryByTestId("mobile-more-item-mailbox")).toBeNull();
+    expect(screen.getByTestId("mobile-more-item-mailbox")).toBeDefined();
+    expect(screen.queryByTestId("mobile-nav-tab-mailbox")).toBeNull();
     expect(screen.getByTestId("mobile-more-item-git")).toBeDefined();
     expect(screen.getByTestId("mobile-more-item-terminal")).toBeDefined();
     expect(screen.getByTestId("mobile-more-item-files")).toBeDefined();
     expect(screen.getByTestId("mobile-more-item-planning")).toBeDefined();
-    expect(screen.getByTestId("mobile-more-item-workflow")).toBeDefined();
+    expect(screen.getByTestId("mobile-nav-tab-workflows")).toBeDefined();
     expect(screen.getByTestId("mobile-more-item-schedules")).toBeDefined();
     expect(screen.getByTestId("mobile-more-item-github")).toBeDefined();
     expect(screen.getByTestId("mobile-more-item-usage")).toBeDefined();

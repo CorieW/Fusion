@@ -147,19 +147,20 @@ describe("MobileNavBar", () => {
     vi.useRealTimers();
   });
 
-  it("renders eight top-level tab buttons including dedicated List and keeps skills in More when showSkillsTab is true", () => {
+  it("renders seven tabs when Memory is disabled and keeps skills in More", () => {
     render(<MobileNavBar {...createDefaultProps()} showSkillsTab={true} />);
 
     expect(screen.getByTestId("mobile-nav-tab-command-center")).toBeDefined();
     expect(screen.getByTestId("mobile-nav-tab-tasks")).toBeDefined();
     expect(screen.getByTestId("mobile-nav-tab-agents")).toBeDefined();
-    expect(screen.getByTestId("mobile-nav-tab-missions")).toBeDefined();
+    expect(screen.queryByTestId("mobile-nav-tab-missions")).toBeNull();
     expect(screen.getByTestId("mobile-nav-tab-chat")).toBeDefined();
-    expect(screen.getByTestId("mobile-nav-tab-mailbox")).toBeDefined();
+    expect(screen.queryByTestId("mobile-nav-tab-mailbox")).toBeNull();
     expect(screen.getByTestId("mobile-nav-tab-list")).toBeDefined();
     expect(screen.queryByTestId("mobile-nav-tab-skills")).toBeNull();
     expect(screen.queryByTestId("mobile-nav-tab-roadmaps")).toBeNull();
     expect(screen.getByTestId("mobile-nav-tab-more")).toBeDefined();
+    expect(screen.getByRole("tablist").textContent).toBe("DashboardBoardListChatAgentsWorkflowsMore");
 
     toggleMoreWithOtherExpanded();
     expect(screen.getByTestId("mobile-more-item-skills")).toBeDefined();
@@ -276,6 +277,7 @@ describe("MobileNavBar", () => {
         view="command-center"
         chatHasUnreadResponse={true}
         mailboxUnreadCount={7}
+        mobileNavPrimaryItems={["command-center", "tasks", "chat", "agents", "workflows", "mailbox"]}
         mailboxPendingApprovalCount={2}
       />,
     );
@@ -295,6 +297,7 @@ describe("MobileNavBar", () => {
         view="skills"
         chatHasUnreadResponse={true}
         mailboxUnreadCount={101}
+        mobileNavPrimaryItems={["command-center", "tasks", "chat", "agents", "workflows", "mailbox"]}
         mailboxPendingApprovalCount={1}
       />,
     );
@@ -318,7 +321,7 @@ describe("MobileNavBar", () => {
         ]}
       />,
     );
-    expectUniformMobileNavColumns(pluginVariantRender.container, 8);
+    expectUniformMobileNavColumns(pluginVariantRender.container, 7);
     expect(screen.queryByTestId("mobile-nav-tab-plugin-fusion-plugin-spacing-check-wide")).toBeNull();
     toggleMoreWithOtherExpanded();
     expect(screen.getByTestId("mobile-more-item-plugin-fusion-plugin-spacing-check-wide")).toBeDefined();
@@ -352,8 +355,8 @@ describe("MobileNavBar", () => {
     expect(props.onChangeView).toHaveBeenCalledWith("plugin:fusion-plugin-todos:todos");
   });
 
-  it("Mailbox is a primary tab and is not duplicated in the More sheet", () => {
-    render(<MobileNavBar {...createDefaultProps()} mailboxUnreadCount={3} mailboxPendingApprovalCount={1} />);
+  it("explicitly pinned Mailbox is a primary tab and is not duplicated in the More sheet", () => {
+    render(<MobileNavBar {...createDefaultProps()} mobileNavPrimaryItems={["mailbox"]} mailboxUnreadCount={3} mailboxPendingApprovalCount={1} />);
 
     expect(screen.getByTestId("mobile-nav-tab-mailbox")).toBeInTheDocument();
 
@@ -408,13 +411,15 @@ describe("MobileNavBar", () => {
     expect(props.onChangeView).toHaveBeenCalledWith("secrets");
   });
 
-  it("shows mailbox pending-approval indicator when mailbox tab is inactive", () => {
+  it("shows mailbox pending-approval indicator when mailbox More item is inactive", () => {
     render(<MobileNavBar {...createDefaultProps()} mailboxPendingApprovalCount={2} />);
+    toggleMoreWithOtherExpanded();
     expect(screen.getByLabelText("Pending approvals")).toBeInTheDocument();
   });
 
-  it("hides mailbox pending-approval indicator when mailbox tab is active", () => {
+  it("hides mailbox pending-approval indicator when mailbox More item is active", () => {
     render(<MobileNavBar {...createDefaultProps()} mailboxPendingApprovalCount={2} view="mailbox" />);
+    toggleMoreWithOtherExpanded();
     expect(screen.queryByLabelText("Pending approvals")).toBeNull();
   });
 
@@ -518,15 +523,17 @@ describe("MobileNavBar", () => {
     expect(screen.queryByTestId("mobile-nav-tab-plugin-fusion-plugin-dependency-graph-graph")).toBeNull();
   });
 
-  it("active tab is highlighted for mailbox", () => {
+  it("active More item is highlighted for mailbox", () => {
     render(<MobileNavBar {...createDefaultProps()} view="mailbox" />);
-    expect(screen.getByTestId("mobile-nav-tab-mailbox").className).toContain("mobile-nav-tab--active");
+    toggleMoreWithOtherExpanded();
+    expect(screen.getByTestId("mobile-more-item-mailbox").className).toContain("mobile-more-item--active");
   });
 
-  it("mailbox tab calls onChangeView with 'mailbox'", () => {
+  it("mailbox More item calls onChangeView with 'mailbox'", () => {
     const props = createDefaultProps();
     render(<MobileNavBar {...props} view="board" />);
-    fireEvent.click(screen.getByTestId("mobile-nav-tab-mailbox"));
+    toggleMoreWithOtherExpanded();
+    fireEvent.click(screen.getByTestId("mobile-more-item-mailbox"));
     expect(props.onChangeView).toHaveBeenCalledWith("mailbox");
   });
 
@@ -547,18 +554,17 @@ describe("MobileNavBar", () => {
       />,
     );
 
-    const mailboxTab = screen.getByTestId("mobile-nav-tab-mailbox");
     const commandCenterTab = screen.getByTestId("mobile-nav-tab-command-center");
     // Command Center is now the first top-level tab, before Tasks.
     expect(commandCenterTab).toBe(container.querySelector(".mobile-nav-bar > .mobile-nav-tab"));
     expect(commandCenterTab.previousElementSibling).toBeNull();
-    expect(mailboxTab.querySelector(".mobile-nav-tab-badge")?.textContent).toBe("3");
     expect(screen.queryByTestId("mobile-nav-tab-plugin-fusion-plugin-compound-engineering-compound-engineering")).toBeNull();
 
     fireEvent.click(commandCenterTab);
     expect(props.onChangeView).toHaveBeenCalledWith("command-center");
 
     toggleMoreWithOtherExpanded();
+    expect(screen.getByTestId("mobile-more-item-mailbox").querySelector(".mobile-more-item-badge")).toHaveTextContent("3");
     expect(screen.queryByTestId("mobile-more-item-command-center")).toBeNull();
     expect(screen.getByTestId("mobile-more-item-plugin-fusion-plugin-compound-engineering-compound-engineering")).toBeDefined();
   });
@@ -577,13 +583,14 @@ describe("MobileNavBar", () => {
 
   it("shows mailbox unread badge when mailboxUnreadCount > 0", () => {
     render(<MobileNavBar {...createDefaultProps()} mailboxUnreadCount={5} />);
-    const badge = screen.getByTestId("mobile-nav-tab-mailbox").querySelector(".mobile-nav-tab-badge");
+    toggleMoreWithOtherExpanded();
+    const badge = screen.getByTestId("mobile-more-item-mailbox").querySelector(".mobile-more-item-badge");
     expect(badge).toBeDefined();
     expect(badge?.textContent).toBe("5");
   });
 
-  it("keeps mailbox unread badge on the primary tab only", () => {
-    render(<MobileNavBar {...createDefaultProps()} mailboxUnreadCount={7} />);
+  it("explicitly pinned keeps mailbox unread badge on the primary tab only", () => {
+    render(<MobileNavBar {...createDefaultProps()} mobileNavPrimaryItems={["mailbox"]} mailboxUnreadCount={7} />);
 
     const tabBadge = screen.getByTestId("mobile-nav-tab-mailbox").querySelector(".mobile-nav-tab-badge");
     expect(tabBadge).toBeDefined();
@@ -630,22 +637,25 @@ describe("MobileNavBar", () => {
     expect(props.onChangeView).toHaveBeenCalledWith("list");
   });
 
-  it("missions tab calls onChangeView with 'missions'", () => {
+  it("missions More item calls onChangeView with 'missions'", () => {
     const props = createDefaultProps();
     render(<MobileNavBar {...props} view="board" />);
+    toggleMoreWithOtherExpanded();
 
-    fireEvent.click(screen.getByTestId("mobile-nav-tab-missions"));
+    fireEvent.click(screen.getByTestId("mobile-more-item-missions"));
     expect(props.onChangeView).toHaveBeenCalledWith("missions");
   });
 
-  it("missions tab is active when view is 'missions'", () => {
+  it("missions More item is active when view is 'missions'", () => {
     render(<MobileNavBar {...createDefaultProps()} view="missions" />);
-    expect(screen.getByTestId("mobile-nav-tab-missions").className).toContain("mobile-nav-tab--active");
+    toggleMoreWithOtherExpanded();
+    expect(screen.getByTestId("mobile-more-item-missions").className).toContain("mobile-more-item--active");
   });
 
-  it("missions tab is not active when view is 'board'", () => {
+  it("missions More item is not active when view is 'board'", () => {
     render(<MobileNavBar {...createDefaultProps()} view="board" />);
-    expect(screen.getByTestId("mobile-nav-tab-missions").className).not.toContain("mobile-nav-tab--active");
+    toggleMoreWithOtherExpanded();
+    expect(screen.getByTestId("mobile-more-item-missions").className).not.toContain("mobile-more-item--active");
   });
 
   it("shows chat unread indicator when chatHasUnreadResponse is true and chat tab is inactive", () => {
@@ -751,15 +761,15 @@ describe("MobileNavBar", () => {
     render(<MobileNavBar {...createDefaultProps()} />);
     toggleMoreWithOtherExpanded();
 
-    expect(screen.queryByTestId("mobile-more-item-mailbox")).toBeNull();
-    expect(screen.getByTestId("mobile-nav-tab-mailbox")).toBeDefined();
+    expect(screen.getByTestId("mobile-more-item-mailbox")).toBeVisible();
+    expect(screen.queryByTestId("mobile-nav-tab-mailbox")).toBeNull();
     expect(screen.getByTestId("mobile-more-item-activity")).toBeDefined();
     expect(screen.getByTestId("mobile-more-item-git")).toBeDefined();
     expect(screen.queryByTestId("mobile-more-item-stash-recovery")).toBeNull();
     expect(screen.getByTestId("mobile-more-item-terminal")).toBeDefined();
     expect(screen.getByTestId("mobile-more-item-files")).toBeDefined();
     expect(screen.getByTestId("mobile-more-item-planning")).toBeDefined();
-    expect(screen.getByTestId("mobile-more-item-workflow")).toBeDefined();
+    expect(screen.getByTestId("mobile-nav-tab-workflows")).toBeDefined();
     expect(screen.getByTestId("mobile-more-item-schedules")).toBeDefined();
     expect(screen.getByTestId("mobile-more-item-github")).toBeDefined();
     expect(screen.getByTestId("mobile-more-item-usage")).toBeDefined();
@@ -923,8 +933,8 @@ describe("MobileNavBar", () => {
     expect(screen.queryByTestId("mobile-more-item-memory")).toBeNull();
   });
 
-  it("shows memory in more sheet when memoryView is enabled", () => {
-    render(<MobileNavBar {...createDefaultProps()} experimentalFeatures={{ memoryView: true }} />);
+  it("keeps Memory in More when a custom footer omits it", () => {
+    render(<MobileNavBar {...createDefaultProps()} mobileNavPrimaryItems={["command-center", "tasks", "chat", "agents", "workflows"]} experimentalFeatures={{ memoryView: true }} />);
     toggleMoreWithOtherExpanded();
     expect(screen.getByTestId("mobile-more-item-memory")).toBeDefined();
   });
@@ -1449,4 +1459,60 @@ describe("mobile navigation observer lifecycle", () => {
       unmount();
     } finally { vi.unstubAllGlobals(); }
   });
+});
+
+/* FNXC:MobileNavigationDefaults 2026-09-09-03:37: Surface enumeration covers unset and persisted defaults, desktop order, Workflows entry, More-only Missions/Mailbox, and closed/collapsed unread signals without duplicate controls. */
+describe("desktop-aligned default shortcuts", () => {
+  it.each([undefined, ["command-center", "tasks", "agents", "missions", "chat", "mailbox"]])("normalizes default shortcuts and retains secondary navigation (%j)", (mobileNavPrimaryItems) => {
+    mockViewport("mobile");
+    const props = createDefaultProps();
+    render(<MobileNavBar {...props} mobileNavPrimaryItems={mobileNavPrimaryItems} experimentalFeatures={{ memoryView: true }} />);
+    expect(screen.getAllByRole("tab").map(tab => tab.textContent)).toEqual(["Dashboard", "Board", "List", "Chat", "Agents", "Workflows", "Memory", "More"]);
+    fireEvent.click(screen.getByTestId("mobile-nav-tab-workflows"));
+    expect(props.onOpenWorkflowEditor).toHaveBeenCalledOnce();
+    fireEvent.click(screen.getByTestId("mobile-nav-tab-memory"));
+    expect(props.onChangeView).toHaveBeenCalledWith("memory");
+    toggleMoreWithOtherExpanded();
+    expect(screen.queryByTestId("mobile-more-item-memory")).toBeNull();
+    expect(screen.getByTestId("mobile-more-item-mailbox")).toBeVisible();
+    expect(screen.getByTestId("mobile-more-item-missions")).toBeVisible();
+    expect(screen.queryByTestId("mobile-more-item-workflow")).toBeNull();
+  });
+
+  it.each([{ mailboxUnreadCount: 4 }, { mailboxPendingApprovalCount: 1 }])("keeps hidden Mailbox attention visible on More (%j)", (attention) => {
+    mockViewport("mobile");
+    render(<MobileNavBar {...createDefaultProps()} {...attention} />);
+    expect(within(screen.getByTestId("mobile-nav-tab-more")).getByLabelText("Items need attention")).toBeVisible();
+    fireEvent.click(screen.getByTestId("mobile-nav-tab-more"));
+    const other = screen.getByRole("button", { name: /^Other/ });
+    expect(other).toHaveAttribute("aria-expanded", "false");
+    expect(within(other).getByLabelText("Items need attention")).toBeVisible();
+  });
+});
+
+/* FNXC:MobileNavigationDefaults 2026-09-09-03:37: Pin the visible footer to real desktop output, not a second hand-maintained ordering fixture. */
+it("keeps default footer order aligned with desktop and retains both secondary destinations", () => {
+  mockViewport("mobile");
+  const mobile = render(<MobileNavBar {...createDefaultProps()} experimentalFeatures={{ memoryView: true }} />);
+  const order = screen.getAllByRole("tab").map(tab => tab.textContent).filter(label => label !== "More");
+  mobile.unmount();
+  mockViewport("desktop");
+  const desktop = render(<LeftSidebarNav {...createDefaultProps()} showAgentsTab experimentalFeatures={{ memoryView: true }} />);
+  const corresponding = Array.from(desktop.container.querySelectorAll('[data-testid^="sidebar-nav-"]'), node => node.textContent).filter(label => order.includes(label));
+  expect(corresponding).toEqual(order);
+  expect(screen.getByTestId("sidebar-nav-mailbox")).toBeInTheDocument();
+  expect(screen.getByTestId("sidebar-nav-missions")).toBeInTheDocument();
+});
+
+/* FNXC:MobileNavigationDefaults 2026-09-11-18:43: Cover Memory's selected state and feature-gate transitions, in addition to default migration, custom overflow, and desktop/mobile ordering above. */
+it("selects Memory in the footer and removes its controls when disabled", () => {
+  mockViewport("mobile");
+  const props = createDefaultProps();
+  const { rerender } = render(<MobileNavBar {...props} view="memory" experimentalFeatures={{ memoryView: true }} />);
+  expect(screen.getByTestId("mobile-nav-tab-memory")).toHaveAttribute("aria-selected", "true");
+  expect(screen.getByTestId("mobile-nav-tab-more")).not.toHaveClass("mobile-nav-tab--active");
+  rerender(<MobileNavBar {...props} experimentalFeatures={{ memoryView: false }} />);
+  expect(screen.queryByTestId("mobile-nav-tab-memory")).toBeNull();
+  toggleMoreWithOtherExpanded();
+  expect(screen.queryByTestId("mobile-more-item-memory")).toBeNull();
 });

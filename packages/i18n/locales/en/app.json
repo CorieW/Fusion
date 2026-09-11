@@ -6115,7 +6115,7 @@
       "learnMore": "Learn more",
       "loweringThisWindowMeansReliabilityMetricsChartsAnd": " Lowering this window means Reliability metrics/charts and the Activity feed will not show history older than the selected range. Per-task task detail history is unaffected. Default: 30 days. ",
       "mobileNavPrimaryItems": "Mobile footer quick actions",
-      "mobileNavPrimaryItemsHint": "Default: Dashboard, Tasks, Agents, Missions, Chat, Mailbox. Add eligible destinations; unselected destinations remain in More.",
+      "mobileNavPrimaryItemsHint": "Default: {{defaultItems}}. Add eligible destinations; unselected destinations remain in More.",
       "addNavItem": "Add quick action",
       "selectNavItem": "Choose a destination",
       "removeNavItem": "Remove {{item}}",

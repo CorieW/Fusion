@@ -505,6 +505,8 @@ export function MobileNavBar({
   };
   const effectivePrimaryItems = primaryItems.filter((item) => destinationRegistry[item].isAvailable);
   const effectiveOmittedItems = omittedItems.filter((item) => destinationRegistry[item].isAvailable);
+  // FNXC:MobileNavigationDefaults 2026-09-09-03:37: Mailbox attention must remain visible while More is closed.
+  const moreNeedsAttention = effectiveOmittedItems.some(item => destinationRegistry[item].indicator || (destinationRegistry[item].badge ?? 0) > 0);
   const isMoreActive = effectiveOmittedItems.some((item) => destinationRegistry[item].isActive)
     || view === "graph"
     || (isPluginViewId(view) && !topLevelPrimaryPluginViews.some((entry) => buildPluginTaskViewId(entry.pluginId, entry.view.viewId) === view));
@@ -698,8 +700,8 @@ export function MobileNavBar({
         >
           <span className="mobile-nav-tab-icon-wrapper">
             <MoreHorizontal />
-            {planningNeedsInput && view !== "planning" && !isMoreOpen && (
-              <span className="status-dot status-dot--pending mobile-nav-chat-unread-dot" aria-label={t("nav.planningNeedsInputAriaLabel", "Planning needs your input")} />
+            {((planningNeedsInput && view !== "planning") || moreNeedsAttention) && !isMoreOpen && (
+              <span className="status-dot status-dot--pending mobile-nav-chat-unread-dot" aria-label={planningNeedsInput && view !== "planning" ? t("nav.planningNeedsInputAriaLabel", "Planning needs your input") : t("nav.groupNeedsAttention", "Items need attention")} />
             )}
           </span>
           <span className="mobile-nav-tab-label">{t("nav.more", "More")}</span>

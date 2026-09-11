@@ -77,8 +77,12 @@ export const MOBILE_NAV_PRIMARY_SELECTABLE_ITEMS = MOBILE_NAV_SELECTABLE_ITEMS.f
   (item): item is Exclude<MobileNavSelectableItem, "ideation"> => item !== "ideation",
 );
 
-export const DEFAULT_MOBILE_NAV_PRIMARY_ITEMS: MobileNavSelectableItem[] = [
+/* FNXC:MobileNavigationDefaults 2026-09-11-18:43: The phone bar follows desktop order: Dashboard, Board/List, Chat, Agents, Workflows, Memory. Missions and Mailbox remain in Other. Upgrade the legacy Missions/Mailbox default without reordering custom shortcuts; Memory still respects its feature gate and can be unpinned. */
+const LEGACY_DEFAULT_MOBILE_NAV_PRIMARY_ITEMS = [
   "command-center", "tasks", "agents", "missions", "chat", "mailbox",
+];
+export const DEFAULT_MOBILE_NAV_PRIMARY_ITEMS: MobileNavSelectableItem[] = [
+  "command-center", "tasks", "chat", "agents", "workflows", "memory",
 ];
 
 export const MAX_MOBILE_NAV_PRIMARY_ITEMS = 6;
@@ -103,6 +107,8 @@ export function resolveMobileNavPrimaryItems(settings?: Pick<ProjectSettings, "m
     }
     return items;
   }, []);
-  const resolved = primaryItems.length > 0 ? primaryItems : [...DEFAULT_MOBILE_NAV_PRIMARY_ITEMS];
+  const isLegacyDefault = primaryItems.length === LEGACY_DEFAULT_MOBILE_NAV_PRIMARY_ITEMS.length
+    && primaryItems.every((id, index) => id === LEGACY_DEFAULT_MOBILE_NAV_PRIMARY_ITEMS[index]);
+  const resolved = primaryItems.length > 0 && !isLegacyDefault ? primaryItems : [...DEFAULT_MOBILE_NAV_PRIMARY_ITEMS];
   return { primaryItems: resolved, omittedItems: MOBILE_NAV_SELECTABLE_ITEMS.filter((id) => !resolved.includes(id)) };
 }

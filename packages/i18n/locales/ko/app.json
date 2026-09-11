@@ -6111,7 +6111,7 @@
       "restartUnavailable": "",
       "restarting": "",
       "mobileNavPrimaryItems": "모바일 하단 빠른 작업",
-      "mobileNavPrimaryItemsHint": "기본값: 대시보드, 작업, 에이전트, 미션, 채팅, 메일함. 가능한 대상을 추가하세요. 선택하지 않은 항목은 더보기에 유지됩니다.",
+      "mobileNavPrimaryItemsHint": "기본값: {{defaultItems}}. 가능한 대상을 추가하세요. 선택하지 않은 항목은 더보기에 유지됩니다.",
       "addNavItem": "빠른 작업 추가",
       "selectNavItem": "대상 선택",
       "removeNavItem": "{{item}} 제거",

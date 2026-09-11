@@ -6277,7 +6277,7 @@ export default interface Resources {
         "maxRecommendationsPerTask": "Maximum recommendations per task",
         "maxRecommendationsPerTaskHelp": "Default: 3. Set 0 to disable recommendations; choose a whole number from 1 to 20 to cap each completed task.",
         "mobileNavPrimaryItems": "Mobile footer quick actions",
-        "mobileNavPrimaryItemsHint": "Default: Dashboard, Tasks, Agents, Missions, Chat, Mailbox. Add eligible destinations; unselected destinations remain in More.",
+        "mobileNavPrimaryItemsHint": "Default: {{defaultItems}}. Add eligible destinations; unselected destinations remain in More.",
         "moveNavItemEarlier": "Move {{item}} earlier",
         "moveNavItemLater": "Move {{item}} later",
         "newTasksInheritThisCustomWorkflowsStepsOverridable": "New tasks inherit this custom workflow's steps (overridable per task). No default — unset (built-in default workflow).",

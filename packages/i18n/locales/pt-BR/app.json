@@ -6040,7 +6040,7 @@
       "learnMore": "Saiba mais",
       "loweringThisWindowMeansReliabilityMetricsChartsAnd": " Reduzir esta janela significa que as métricas/gráficos de Confiabilidade e o feed de Atividade não mostrarão histórico mais antigo que o intervalo selecionado. O histórico de detalhes de cada tarefa individual não é afetado. Padrão: 30 dias. ",
       "mobileNavPrimaryItems": "Ações rápidas do rodapé móvel",
-      "mobileNavPrimaryItemsHint": "Padrão: Painel, Tarefas, Agentes, Missões, Chat, Caixa de Entrada. Adicione destinos elegíveis; os destinos não selecionados permanecem em Mais.",
+      "mobileNavPrimaryItemsHint": "Padrão: {{defaultItems}}. Adicione destinos elegíveis; os destinos não selecionados permanecem em Mais.",
       "addNavItem": "Adicionar ação rápida",
       "selectNavItem": "Escolha um destino",
       "removeNavItem": "Remover {{item}}",

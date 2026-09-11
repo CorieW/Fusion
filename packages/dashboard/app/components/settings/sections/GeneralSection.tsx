@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { isLocale, SUPPORTED_LOCALES, type ReportActionType, type ReportTarget, type WorkflowDefinition } from "@fusion/core";
-import { DEFAULT_MOBILE_NAV_PRIMARY_ITEMS, MAX_MOBILE_NAV_PRIMARY_ITEMS, MOBILE_NAV_PRIMARY_SELECTABLE_ITEMS, MOBILE_NAV_SELECTABLE_ITEM_LABEL_KEYS } from "../../../../../core/src/board/mobile-nav-primary-items";
+import { DEFAULT_MOBILE_NAV_PRIMARY_ITEMS, resolveMobileNavPrimaryItems, MAX_MOBILE_NAV_PRIMARY_ITEMS, MOBILE_NAV_PRIMARY_SELECTABLE_ITEMS, MOBILE_NAV_SELECTABLE_ITEM_LABEL_KEYS } from "../../../../../core/src/board/mobile-nav-primary-items";
 import { SettingsFieldRow } from "../SettingsFieldRow";
 import { SettingsToggleRow } from "../SettingsToggleRow";
 import { SettingsSelectRow } from "../SettingsSelectRow";
@@ -455,14 +455,13 @@ export function GeneralSection({ form, setForm, projectId, addToast, prefixError
       <SettingsFieldRow
         htmlFor="mobileNavPrimaryItems"
         label={t("settings.general.mobileNavPrimaryItems", "Mobile footer quick actions")}
-        help={t("settings.general.mobileNavPrimaryItemsHint", "Default: Dashboard, Tasks, Agents, Missions, Chat, Mailbox. Add eligible destinations; unselected destinations remain in More.")}
+        help={t("settings.general.mobileNavPrimaryItemsHint", "Default: {{defaultItems}}. Add eligible destinations; unselected destinations remain in More.", { defaultItems: DEFAULT_MOBILE_NAV_PRIMARY_ITEMS.map(item => t(MOBILE_NAV_SELECTABLE_ITEM_LABEL_KEYS[item], item)).join(", ") })}
         scope="project"
       >
         <div role="group" aria-label={t("settings.general.mobileNavPrimaryItems", "Mobile footer quick actions")}>
           {(() => {
-            const selectedItems = Array.isArray(form.mobileNavPrimaryItems) && form.mobileNavPrimaryItems.length > 0
-              ? form.mobileNavPrimaryItems.filter((item): item is typeof MOBILE_NAV_PRIMARY_SELECTABLE_ITEMS[number] => MOBILE_NAV_PRIMARY_SELECTABLE_ITEMS.includes(item as typeof MOBILE_NAV_PRIMARY_SELECTABLE_ITEMS[number]))
-              : [...DEFAULT_MOBILE_NAV_PRIMARY_ITEMS];
+            // FNXC:MobileNavigationDefaults 2026-09-09-03:37: Show the same normalized saved/default shortcuts as the live bar; editing another setting must not resurrect the old Missions/Mailbox defaults.
+            const selectedItems = resolveMobileNavPrimaryItems({ mobileNavPrimaryItems: form.mobileNavPrimaryItems }).primaryItems;
             const updateItems = (nextItems: string[]) => {
               setForm((current) => ({ ...current, mobileNavPrimaryItems: nextItems }));
               onMobileNavPrimaryItemsChange?.(nextItems);
