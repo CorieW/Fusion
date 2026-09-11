@@ -13,6 +13,7 @@ import {
   PERMANENT_AGENT_TASK_MUTATION_TOOLS,
   READONLY_BUILTIN_TOOLS,
   READONLY_FN_TOOLS,
+  WORKFLOW_AUTHORIZED_TOOLS,
   REVIEW_GATE_BYPASS_FN_TOOLS,
   isGitWriteCommand,
 } from "../execution/gating-classifications.js";
@@ -135,7 +136,7 @@ export function classifyPermanentAgentToolCall(
   if (NETWORK_API_TOOLS.has(toolName)) {
     return { category: "network_api", recognized: true };
   }
-  if (READONLY_FN_TOOLS.has(toolName) || /^fn_(?:list|show|get|read|browse)_/.test(toolName)) {
+  if (READONLY_FN_TOOLS.has(toolName) || WORKFLOW_AUTHORIZED_TOOLS.has(toolName) || /^fn_(?:list|show|get|read|browse)_/.test(toolName)) {
     return { category: "none", recognized: true };
   }
 

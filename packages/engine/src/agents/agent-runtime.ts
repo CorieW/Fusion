@@ -97,6 +97,7 @@ export interface AgentRuntimeOptions {
   sessionPurpose?: string;
   /** True only when this session is executing a board task (FN-125). */
   taskExecutionSession?: boolean;
+  problemReportingSessionId?: string;
   /**
    * Optional structured prompt layers for cross-session caching.
    * When present, runtimes that support prompt caching use the `stable`

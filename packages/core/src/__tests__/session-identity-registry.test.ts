@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { mkdtempSync, realpathSync, rmSync, symlinkSync } from "node:fs";
+import { mkdtempSync, realpathSync, rmSync, rmdirSync, symlinkSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { isTaskExecutionSessionPrincipal } from "../agents/task-execution-task-creation.js";
@@ -104,7 +104,8 @@ describe("session identity registry", () => {
   it("resolves a symlink alias and its real path to one key", () => {
     const real = realpathSync(mkdtempSync(join(tmpdir(), "fusion-idreg-")));
     const alias = `${real}-alias`;
-    symlinkSync(real, alias, "dir");
+    // FNXC:ProblemReporting 2026-09-11-12:09: Exercise real directory aliases on Windows without requiring the machine-wide symlink privilege.
+    symlinkSync(real, alias, process.platform === "win32" ? "junction" : "dir");
     try {
       const dispose = registerFusionSessionIdentity(alias, { agentId: "agent-real" });
       const viaReal = resolveFusionSessionPrincipal(real);
@@ -118,7 +119,8 @@ describe("session identity registry", () => {
       expect(resolveFusionSessionPrincipal(real)).toEqual({ kind: "operator" });
       expect(resolveFusionSessionPrincipal(alias)).toEqual({ kind: "operator" });
     } finally {
-      rmSync(alias, { force: true });
+      if (process.platform === "win32") rmdirSync(alias);
+      else rmSync(alias, { force: true });
       rmSync(real, { recursive: true, force: true });
     }
   });

@@ -43,7 +43,8 @@ List all tasks on the Fusion board, grouped by column.
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| `column` | string(enum) | — | Filter to a specific column |
+| `column` | string | — | Exact workflow column ID, including custom columns |
+| `after` | string | — | Continue a specific column after nextCursorByColumn[column] |
 | `limit` | number | — | Max tasks to show per column (default: 10) |
 
 ### fn_task_show
@@ -817,6 +818,12 @@ Show a single insight-generation run by ID.
 | `id` | string | ✓ | Insight run ID (e.g. INSR-XXXXX) |
 
 ## Other Tools
+
+### fn_problem_report
+
+Structured workflow-authorized problem reporting. Preflight before testing; report demonstrated findings; finish with every requestId (or explicit []). Supports paginated list/read of both problem columns.
+
+No parameters.
 
 ### fn_web_fetch
 

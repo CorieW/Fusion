@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { join } from "node:path";
 import {
   parseStepFileScopes,
   normalizeAuthoredStepScopes,
@@ -1200,15 +1201,6 @@ vi.mock("../errors/usage-limit-detector.js", () => ({
   isUsageLimitError: (message: string) => /usage limit|rate limit|\b429\b/i.test(message),
 }));
 
-// Mock worktree-names
-vi.mock("../worktree/worktree-names.js", async () => {
-  const actual = await vi.importActual<typeof import("../worktree/worktree-names.js")>("../worktree/worktree-names.js");
-  return {
-    ...actual,
-    generateWorktreeName: vi.fn().mockReturnValue("test-worktree"),
-  };
-});
-
 // Route async `exec` through the `execSync` mock so existing tests keep working.
 vi.mock("node:child_process", async () => {
   const { promisify } = await import("node:util");
@@ -1242,14 +1234,19 @@ vi.mock("node:child_process", async () => {
         }
       });
     });
-  return { execSync: execSyncFn, exec: execFn, execFile: vi.fn() };
+  // FNXC:ProblemReporting 2026-09-11-14:27: Native worktree cleanup now awaits execFile; a no-op mock leaves parallel-step tests pending forever. Route both async process seams through the same synthetic git responses.
+  const execFileFn: any = vi.fn((file: string, args: string[], opts: any, cb: any) =>
+    execFn([file, ...args].join(" "), opts, cb),
+  );
+  execFileFn[promisify.custom] = (file: string, args: string[], opts?: any) =>
+    execFn[promisify.custom]([file, ...args].join(" "), opts);
+  return { execSync: execSyncFn, exec: execFn, execFile: execFileFn };
 });
 vi.mock("node:fs", () => ({
   existsSync: vi.fn().mockReturnValue(true),
 }));
 
 import { createFnAgent } from "../pi.js";
-import { generateWorktreeName } from "../worktree/worktree-names.js";
 import { execSync } from "node:child_process";
 import { AgentSemaphore } from "../concurrency/concurrency.js";
 import { createLogger } from "../logger.js";
@@ -1259,7 +1256,6 @@ const mockedCreateFnAgent = vi.mocked(createFnAgent);
 const mockedResolveExecutorSessionModel = vi.mocked(resolveExecutorSessionModel);
 const mockedExecSync = vi.mocked(execSync);
 const mockedInstallTaskWorktreeIdentityGuard = vi.mocked(installTaskWorktreeIdentityGuard);
-const mockedGenerateWorktreeName = vi.mocked(generateWorktreeName);
 const mockedCreateLogger = vi.mocked(createLogger);
 
 const getStepSessionLogger = () => mockedCreateLogger("step-session-executor") as {
@@ -1301,8 +1297,6 @@ describe("StepSessionExecutor", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.useFakeTimers({ shouldAdvanceTime: true });
-    // Default: generateWorktreeName returns predictable names
-    mockedGenerateWorktreeName.mockReturnValue("test-worktree");
   });
 
   afterEach(() => {
@@ -2509,10 +2503,6 @@ describe("StepSessionExecutor", () => {
         });
         const settings = makeSettings({ maxParallelSteps: 2 });
 
-        mockedGenerateWorktreeName
-          .mockImplementationOnce(() => "wt-step-0")
-          .mockImplementationOnce(() => "wt-step-1");
-
         let worktreeAddCount = 0;
         mockedExecSync.mockImplementation((cmd: string) => {
           if (cmd.includes("git worktree add")) {
@@ -2531,7 +2521,7 @@ describe("StepSessionExecutor", () => {
         const executionEvents: string[] = [];
 
         mockedCreateFnAgent.mockImplementation(({ cwd }: any) => {
-          if (cwd === "/project/.worktrees/wt-step-0") {
+          if (cwd === join("/project", ".fusion", "worktrees", "fn-001-step-0")) {
             return Promise.resolve({
               session: makeMockSession(async () => {
                 executionEvents.push("step-0-start");
@@ -2594,8 +2584,6 @@ describe("StepSessionExecutor", () => {
         });
         const settings = makeSettings({ maxParallelSteps: 3 });
 
-        let nameCounter = 0;
-        mockedGenerateWorktreeName.mockImplementation(() => `wt-fail-${nameCounter++}`);
         mockedExecSync.mockImplementation((cmd: string) => {
           if (cmd.includes("git worktree add")) {
             throw new Error("worktree creation failed");
@@ -2653,11 +2641,6 @@ describe("StepSessionExecutor", () => {
         });
         const settings = makeSettings({ maxParallelSteps: 3 });
 
-        mockedGenerateWorktreeName
-          .mockImplementationOnce(() => "wt-mixed-0")
-          .mockImplementationOnce(() => "wt-mixed-1")
-          .mockImplementationOnce(() => "wt-mixed-2");
-
         let worktreeAddCount = 0;
         mockedExecSync.mockImplementation((cmd: string) => {
           if (cmd.includes("git worktree add")) {
@@ -2698,7 +2681,7 @@ describe("StepSessionExecutor", () => {
             } as any);
           }
 
-          const label = cwd.endsWith("wt-mixed-0") ? "parallel-0" : "parallel-1";
+          const label = cwd.endsWith("fn-001-step-0") ? "parallel-0" : "parallel-1";
           return Promise.resolve({
             session: makeMockSession(async () => {
               events.push(`${label}-start`);
@@ -2759,9 +2742,6 @@ describe("StepSessionExecutor", () => {
         });
         const settings = makeSettings({ maxParallelSteps: 2 });
 
-        mockedGenerateWorktreeName
-          .mockImplementationOnce(() => "wt-success-0")
-          .mockImplementationOnce(() => "wt-success-1");
         mockedExecSync.mockReturnValue("");
         mockedCreateFnAgent.mockImplementation(({ cwd }: any) => {
           return Promise.resolve({
@@ -2808,11 +2788,6 @@ describe("StepSessionExecutor", () => {
         });
         const settings = makeSettings({ maxParallelSteps: 3 });
 
-        mockedGenerateWorktreeName
-          .mockImplementationOnce(() => "wt-clean-0")
-          .mockImplementationOnce(() => "wt-clean-1")
-          .mockImplementationOnce(() => "wt-clean-2");
-
         let worktreeAddCount = 0;
         mockedExecSync.mockImplementation((cmd: string) => {
           if (cmd.includes("git worktree add")) {
@@ -2840,9 +2815,9 @@ describe("StepSessionExecutor", () => {
           .filter((cmd): cmd is string => typeof cmd === "string" && cmd.includes("git worktree remove"));
 
         expect(removeCalls).toHaveLength(2);
-        expect(removeCalls.some((cmd) => cmd.includes("wt-clean-0"))).toBe(true);
-        expect(removeCalls.some((cmd) => cmd.includes("wt-clean-1"))).toBe(true);
-        expect(removeCalls.some((cmd) => cmd.includes("wt-clean-2"))).toBe(false);
+        expect(removeCalls.some((cmd) => cmd.includes("fn-001-step-0"))).toBe(true);
+        expect(removeCalls.some((cmd) => cmd.includes("fn-001-step-1"))).toBe(true);
+        expect(removeCalls.some((cmd) => cmd.includes("fn-001-step-2"))).toBe(false);
         expect(removeCalls.some((cmd) => cmd.includes("/project/.worktrees/main"))).toBe(false);
       });
     });
@@ -2991,7 +2966,7 @@ describe("StepSessionExecutor", () => {
           rootDir: "/project",
           taskId: "FN-001",
           settings,
-          worktreePath: expect.stringContaining("/project/.worktrees/"),
+          worktreePath: join("/project", ".fusion", "worktrees", "fn-001-step-0"),
         }),
       );
     });
@@ -3309,7 +3284,6 @@ describe("StepSessionExecutor skillSelection regression (FN-1511)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.useFakeTimers({ shouldAdvanceTime: true });
-    mockedGenerateWorktreeName.mockReturnValue("test-worktree");
   });
 
   afterEach(() => {

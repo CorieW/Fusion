@@ -1160,6 +1160,7 @@ export interface AgentOptions {
   taskId?: string;
   /** True only for sessions actively executing a board task (FN-125). */
   taskExecutionSession?: boolean;
+  problemReportingSessionId?: string;
   taskTitle?: string;
   actionGateContext?: AgentActionGateContext;
   /** Permanent-agent action gating context forwarded by runtime/session helpers. */
@@ -3359,6 +3360,7 @@ export async function createPiAgentSessionRaw(options: AgentOptions): Promise<Ag
       ...(options.taskId ? { taskId: options.taskId } : {}),
       ...(options.sessionPurpose ? { purpose: options.sessionPurpose } : {}),
       ...(options.taskExecutionSession ? { taskExecutionSession: true } : {}),
+      ...(options.problemReportingSessionId ? { problemReportingSessionId: options.problemReportingSessionId } : {}),
     };
   })();
   const sessionIdentityKeys = [...new Set([options.cwd, resolvedProjectRoot].filter((key): key is string => Boolean(key)))];

@@ -1,3 +1,4 @@
+import { assertProblemReportingComplete } from "@fusion/core";
 /**
  * FNXC:CodeOrganization 2026-08-03-13:10:
  * createTaskDoneTool peeled from TaskExecutor (U4).
@@ -92,6 +93,7 @@ export function createTaskDoneTool(
   codeReviewVerdicts: Map<number, ReviewVerdict>,
   onDone: () => void,
   audit?: RunAuditor,
+  problemReportingSessionId?: string,
 ): ToolDefinition {
     const store = deps.store;
     return {
@@ -353,6 +355,12 @@ export function createTaskDoneTool(
           };
         }
 
+        try {
+          await assertProblemReportingComplete(store, taskId, problemReportingSessionId);
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          return { content: [{ type: "text" as const, text: message }], details: { error: message }, isError: true };
+        }
         const task = await store.getTask(taskId);
         const completionBlocker = await deps.getTaskCompletionBlocker(task);
         if (completionBlocker) {

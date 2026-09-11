@@ -1,5 +1,6 @@
 import type { ToolDefinition } from "@earendil-works/pi-coding-agent";
 import { TASK_AGENT_MUTATION_TOOLS } from "../execution/gating-classifications.js";
+import { isProblemReportTool } from "../problem-reporting-tool.js";
 
 export const READONLY_ALLOWLIST = [
   "read",
@@ -65,7 +66,8 @@ export function filterCustomToolsForReadonly(
   for (const tool of tools) {
     const name = tool.name?.trim() ?? "";
     if (!name) continue;
-    if (isReadonlyAllowed(name) || options.allowTool?.(tool) === true) {
+    // FNXC:ProblemReporting 2026-09-11-11:22: Preserve the scoped reporting factory across both readonly filters; a matching name alone grants nothing.
+    if (isReadonlyAllowed(name) || isProblemReportTool(tool) || options.allowTool?.(tool) === true) {
       allowed.push(tool);
       continue;
     }

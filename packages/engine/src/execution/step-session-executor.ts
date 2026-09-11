@@ -19,7 +19,7 @@ import { existsSync } from "node:fs";
 import { rm } from "node:fs/promises";
 import type { AgentSession } from "@earendil-works/pi-coding-agent";
 import type { AgentHeartbeatRun, AgentStore, MessageStore, PermanentAgentGatingContext, ProviderInstanceRef, ResolvedMcpServerDefinition, TaskDetail, Settings, SteeringComment, TaskStore, TaskStep } from "@fusion/core";
-import { isFastExecutionMode, isValidProviderInstanceId, resolvePersistAgentThinkingLog, resolveExecutorFallbackModel, resolveTrailingVerificationStepIndex, resolveAuthoredStepHeadingOffset, matchStepHeadings } from "@fusion/core";
+import { beginProblemReportingSession, assertProblemReportingComplete, isFastExecutionMode, isValidProviderInstanceId, resolvePersistAgentThinkingLog, resolveExecutorFallbackModel, resolveTrailingVerificationStepIndex, resolveAuthoredStepHeadingOffset, matchStepHeadings } from "@fusion/core";
 
 export { resolveAuthoredStepHeadingOffset };
 
@@ -59,6 +59,7 @@ import {
 } from "../agent-tools.js";
 import { RemovalReason, removeWorktree } from "../worktree/worktree-backend.js";
 import { resolveWorkflowStepRunAgentId } from "./resolve-activity-run-agent-id.js";
+import { createProblemReportTool } from "../problem-reporting-tool.js";
 import { pruneWorktreeAdminEntries } from "../worktree/worktree-prune.js";
 import { activeSessionRegistry } from "../agents/active-session-registry.js";
 
@@ -1511,6 +1512,7 @@ export class StepSessionExecutor {
         });
     { attachAgentUsageTelemetry(agentLogger, { store: this.store, agentId: taskDetail.assignedAgentId ?? null, taskId: taskDetail.id, nodeId: taskDetail.effectiveNodeId ?? taskDetail.nodeId ?? null, lane: "workflow-step" }); }
 
+        let problemReportingSessionId: string | undefined;
         let session: AgentSession | null = null;
         const localTelemetry = { agentLogger, trackingKey };
 
@@ -1586,7 +1588,9 @@ export class StepSessionExecutor {
                 ]
               : [];
 
+          problemReportingSessionId = await beginProblemReportingSession(this.store, taskDetail.id, `step:${stepIndex}`);
           const fusionTools = [
+            createProblemReportTool(this.store, taskDetail.id, problemReportingSessionId),
             ...documentTools,
             webFetchTool,
             ...memoryTools,
@@ -1620,6 +1624,7 @@ export class StepSessionExecutor {
             const createResult = await createResolvedAgentSession({
               sessionPurpose: "executor",
             taskExecutionSession: true,
+            problemReportingSessionId,
               runtimeHint: this.options.runtimeHint,
               pluginRunner: this.options.pluginRunner,
               cwd: worktreePath,
@@ -1758,6 +1763,7 @@ Follow instructions precisely and avoid unrelated changes.`,
           // session.prompt() resolves normally even when retries are exhausted —
           // the error is stored on session.state.error instead of being thrown.
           checkSessionError(session);
+          await assertProblemReportingComplete(this.store, taskDetail.id, problemReportingSessionId);
 
           const result: StepResult = {
             stepIndex,
@@ -1794,6 +1800,7 @@ Follow instructions precisely and avoid unrelated changes.`,
               stuckTaskDetector?.recordActivity(trackingKey);
               await promptWithAutoRetry(session, reducedStepPrompt);
               checkSessionError(session);
+              await assertProblemReportingComplete(this.store, taskDetail.id, problemReportingSessionId);
               stepExecLog.log(`Step ${stepIndex} reduced-prompt recovery succeeded`);
               await this.store.appendAgentLog(
                 taskDetail.id,

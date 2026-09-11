@@ -39,6 +39,8 @@ export interface FusionSessionIdentity {
   so this must be an explicit session-lane signal rather than a policy inference.
   */
   taskExecutionSession?: boolean;
+  /** Engine-owned reporting generation; stale sessions cannot write a replacement ledger. */
+  problemReportingSessionId?: string;
   /** Epoch ms at registration; diagnostic only (no TTL semantics). */
   registeredAt: number;
 }

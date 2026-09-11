@@ -256,7 +256,11 @@ export const READONLY_FN_TOOLS: ReadonlySet<string> = new Set([
   "fn_agent_read_evaluations",
 ]);
 
+// FNXC:ProblemReporting 2026-09-11-12:09: These tools enforce explicit workflow grants and live session generations internally; generic creation permission is not their authority.
+export const WORKFLOW_AUTHORIZED_TOOLS: ReadonlySet<string> = new Set(["fn_problem_report"]);
+
 export const COORDINATION_EXEMPT_TOOLS = [
+  ...WORKFLOW_AUTHORIZED_TOOLS,
   "read",
   "find",
   "grep",

@@ -122,7 +122,11 @@ export const chatTaskLogsReadParams = Type.Object({
   detail: Type.Optional(agentLogDetailModeParams),
 });
 
-export const taskListParams = Type.Object({});
+export const taskListParams = Type.Object({
+  column: Type.Optional(Type.String({ description: "Exact workflow column ID, including custom and completed columns" })),
+  after: Type.Optional(Type.String({ description: "Continue after nextCursor from the previous page" })),
+  limit: Type.Optional(Type.Integer({ minimum: 1, maximum: 50 })),
+});
 
 export const taskShowParams = Type.Object({
   id: Type.String({ description: "Task ID (e.g. FN-001)" }),
@@ -1793,14 +1797,27 @@ export function createTaskListTool(store: TaskStore): ToolDefinition {
       "List active tasks that have not reached their workflow's Complete column. Returns ID, description, column, " +
       "and dependencies for each. Use to discover work and check for duplicates.",
     parameters: taskListParams,
-    execute: async () => {
+    execute: async (_id: string, params: Static<typeof taskListParams>) => {
       const tasks = await store.listTasks({ slim: true, includeArchived: false });
       const isTerminal = await resolveTerminalColumnsForTasks(store, tasks);
-      const active = tasks.filter((task) => !isTerminal(task));
-      const lines = active.map(formatTaskSummaryLine);
+      const active = tasks.filter((task) => params.column ? task.column === params.column : !isTerminal(task));
+      const remaining = active.sort((a, b) => a.id.localeCompare(b.id)).filter((task) => !params.after || task.id.localeCompare(params.after) > 0);
+      const page: typeof tasks = [];
+      const lines: string[] = [];
+      // FNXC:ProblemReporting 2026-09-11-11:22: Advance only past IDs actually rendered; output clamping must never skip unseen records.
+      let chars = 0;
+      for (const task of remaining.slice(0, params.limit ?? 25)) {
+        const line = formatTaskSummaryLine(task).slice(0, MAX_TASK_LIST_TEXT_CHARS - 400);
+        if (page.length && chars + line.length + 1 > MAX_TASK_LIST_TEXT_CHARS - 250) break;
+        page.push(task);
+        lines.push(line);
+        chars += line.length + 1;
+      }
+      const nextCursor = remaining.length > page.length ? page.at(-1)!.id : null;
+      if (nextCursor) lines.push(`Next page: after=${nextCursor}`);
       return {
         content: [{ type: "text" as const, text: formatTaskReadLines(lines, "No active tasks.") }],
-        details: { count: active.length },
+        details: { count: active.length, nextCursor, taskIds: page.map((task) => task.id) },
       };
     },
   };

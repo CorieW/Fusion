@@ -11,6 +11,7 @@ import {
 import type { AgentPermissionPolicy } from "@fusion/core";
 
 const FN_3548_COORDINATION_TOOLS = [
+  "fn_problem_report",
   "fn_heartbeat_done",
   "fn_task_log",
   "fn_task_document_write",

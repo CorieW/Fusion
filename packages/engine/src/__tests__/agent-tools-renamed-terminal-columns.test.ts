@@ -136,4 +136,19 @@ describe("agent task-discovery tools resolve the terminal lane by ROLE, not by i
     expect(result.content[0].text).not.toContain("FN-9102");
     expect(result.content[0].text).toContain("FN-9101");
   });
+
+  it("enumerates every custom-column ID even when large summaries shorten pages", async () => {
+    const rows = Array.from({ length: 7 }, (_, index) => ({ ...tasksFor(RENAMED_VOCAB)[0]!, id: `FN-${index}`, column: "resolved-problems", title: "long title ".repeat(400) }));
+    const store = { ...fixture(RENAMED_VOCAB).store, listTasks: async () => rows } as TaskStore;
+    let after: string | undefined;
+    const seen: string[] = [];
+    do {
+      const result = await createTaskListTool(store).execute("page", { column: "resolved-problems", after } as never);
+      const details = result.details as { taskIds: string[]; nextCursor: string | null };
+      for (const id of details.taskIds) expect(result.content[0].text).toContain(id);
+      seen.push(...details.taskIds);
+      after = details.nextCursor ?? undefined;
+    } while (after);
+    expect(seen).toEqual(rows.map((row) => row.id));
+  });
 });

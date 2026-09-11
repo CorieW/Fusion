@@ -1,3 +1,4 @@
+import { createProblemReportTool, problemReportParameters } from "@fusion/engine";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { randomUUID } from "node:crypto";
 import { Type, type TSchema } from "typebox";
@@ -2165,16 +2166,28 @@ export default function kbExtension(pi: ExtensionAPI) {
   // ── fn_task_list ─────────────────────────────────────────────────
 
   pi.registerTool({
+    name: "fn_problem_report",
+    label: "fn: Report Workflow Problems",
+    description: "Structured workflow-authorized problem reporting. Preflight before testing; report demonstrated findings; finish with every requestId (or explicit []). Supports paginated list/read of both problem columns.",
+    parameters: problemReportParameters,
+    async execute(toolCallId, params, signal, onUpdate, ctx) {
+      const registry = resolveFusionSessionPrincipal(ctx.cwd);
+      const principal = isTaskExecutionSessionPrincipal(registry) ? registry : resolveExtensionCallerPrincipal(ctx);
+      const sourceTaskId = principal.kind === "agent" && isTaskExecutionSessionPrincipal(principal) ? principal.identity.taskId : undefined;
+      if (!sourceTaskId) return { content: [{ type: "text", text: "Problem reporting requires an authorized board-task session" }], details: {}, isError: true };
+      const tool = createProblemReportTool(await getStore(ctx.cwd), sourceTaskId, principal.kind === "agent" ? principal.identity.problemReportingSessionId : undefined);
+      return tool.execute(toolCallId, params, signal, onUpdate, ctx);
+    },
+  });
+
+  pi.registerTool({
     name: "fn_task_list",
     label: "fn: List Tasks",
     description: "List all tasks on the Fusion board, grouped by column.",
     promptSnippet: "List all tasks on the Fusion board grouped by column",
     parameters: Type.Object({
-      column: Type.Optional(
-        StringEnum([...COLUMNS] as unknown as string[], {
-          description: "Filter to a specific column",
-        }) as unknown as TSchema,
-      ),
+      column: Type.Optional(Type.String({ description: "Exact workflow column ID, including custom columns" })),
+      after: Type.Optional(Type.String({ description: "Continue a specific column after nextCursorByColumn[column]" })),
       limit: Type.Optional(
         Type.Number({
           description: "Max tasks to show per column (default: 10)",
@@ -2193,23 +2206,31 @@ export default function kbExtension(pi: ExtensionAPI) {
         };
       }
 
-      const perColumn = params.limit ?? 10;
+      const perColumn = Math.min(25, Math.max(1, Math.floor(params.limit ?? 10)));
+      const nextCursorByColumn: Record<string, string | null> = {};
       const requestedColumn = params.column as ColumnId | undefined;
       const lines: string[] = [];
-      for (const col of COLUMNS) {
+      for (const col of new Set([...COLUMNS, ...tasks.map((task) => task.column)])) {
         if (requestedColumn && requestedColumn !== col) continue;
 
-        const colTasks = tasks.filter((t) => t.column === col);
+        const colTasks = tasks.filter((t) => t.column === col).sort((a, b) => a.id.localeCompare(b.id)).filter((task) => !params.after || task.id.localeCompare(params.after) > 0);
         if (colTasks.length === 0) continue;
 
-        lines.push(`${COLUMN_LABELS[col]} (${colTasks.length}):`);
-        const shown = colTasks.slice(0, perColumn);
-        for (const t of shown) {
-          lines.push(`  ${formatTaskLine(t)}`);
+        lines.push(`${columnLabel(col)} (${colTasks.length}):`);
+        const shown: Task[] = [];
+        // FNXC:ProblemReporting 2026-09-11-11:22: Named-column pages honor the text budget before choosing their continuation cursor.
+        let columnChars = 0;
+        for (const t of colTasks.slice(0, perColumn)) {
+          const line = `  ${formatTaskLine(t)}`.slice(0, MAX_TASK_LIST_TEXT_CHARS - 600);
+          if (requestedColumn && shown.length && columnChars + line.length + 1 > MAX_TASK_LIST_TEXT_CHARS - 500) break;
+          shown.push(t);
+          lines.push(line);
+          columnChars += line.length + 1;
         }
         const hidden = colTasks.length - shown.length;
+        nextCursorByColumn[col] = hidden > 0 ? shown.at(-1)!.id : null;
         if (hidden > 0) {
-          lines.push(`  ... and ${hidden} more`);
+          lines.push(`  ... and ${hidden} more; next page: column=${col}, after=${nextCursorByColumn[col]}`);
         }
         lines.push("");
       }
@@ -2237,7 +2258,7 @@ export default function kbExtension(pi: ExtensionAPI) {
         : formatter(lines, { clamp: fusionCore.clampTaskListText }).trimEnd();
       return {
         content: [{ type: "text", text: text.trim().length > 0 ? text : emptyStateText }],
-        details: { count: tasks.length },
+        details: { count: tasks.length, nextCursorByColumn },
       };
     },
   });

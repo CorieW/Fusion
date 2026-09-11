@@ -21,7 +21,8 @@ vi.mock("../commands/task.js", () => ({
   runTaskPlan: vi.fn(),
 }));
 
-import { __setCachedStoreForTesting, closeCachedStores, resolveTaskListFormatter } from "../extension.js";
+import { __setCachedStoreForTesting, closeCachedStores, resolveTaskListFormatter, setHostTaskStore } from "../extension.js";
+import { installTestWorkflow } from "../../../core/src/__test-utils__/custom-workflow.js";
 import { TaskStore, AgentStore, MANUAL_RETRY_RESET_COUNTER_KEYS, MAX_TASK_LIST_TEXT_CHARS, MAX_TASK_MESSAGE_LENGTH, MissionBlockedClearConflictError, formatTaskListText, COLUMN_LABELS, drizzleSql } from "@fusion/core";
 import type { WorkflowIr } from "@fusion/core";
 import { isGhAvailable, isGhAuthenticated, runGhJsonAsync } from "@fusion/core/gh-cli";
@@ -3110,6 +3111,11 @@ pgTest("fn pi extension (runnable structured-output regression slice)", () => {
   describe("fn_task_list", () => {
     const HOST_SAFE_TASK_LIST_TEXT_CEILING = 3_000;
 
+    beforeEach(async () => {
+      await installTestWorkflow(h.store());
+      setHostTaskStore(h.rootDir(), h.store());
+    });
+
     function expectSingleBoundedTextBlock(result: ToolResult) {
       expect(result.content).toHaveLength(1);
       expect(result.content[0].type).toBe("text");
@@ -3297,7 +3303,8 @@ pgTest("fn pi extension (runnable structured-output regression slice)", () => {
         for (const id of ids) {
           expect(text).toContain(id);
         }
-        expect(text).toContain("truncated to fit; narrow with column/limit");
+        expect(text).toContain("next page:");
+        expect(result.details.nextCursorByColumn[params.column]).toBeTruthy();
         expect(result.details.count).toBe(26);
       }
     });
@@ -3383,7 +3390,8 @@ pgTest("fn pi extension (runnable structured-output regression slice)", () => {
       expect(text).toContain("FN-001");
       expect(text).toContain("FN-002");
       expect(text).toContain("[deps: FN-001]");
-      expect(text).toContain("truncated to fit; narrow with column/limit");
+      expect(text).toContain("next page:");
+      expect(result.details.nextCursorByColumn.todo).toBeTruthy();
       expect(result.details.count).toBe(20);
     });
 

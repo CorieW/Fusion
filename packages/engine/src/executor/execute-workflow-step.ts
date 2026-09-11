@@ -1,3 +1,5 @@
+import { beginProblemReportingSession, assertProblemReportingComplete } from "@fusion/core";
+import { createProblemReportTool } from "../problem-reporting-tool.js";
 /**
  * FNXC:CodeOrganization 2026-08-03-15:20:
  * executeWorkflowStep peeled from TaskExecutor (U4).
@@ -1005,10 +1007,12 @@ CRITICAL SCOPING RULES — read before doing anything else:
       const codingCustomTools: ToolDefinition[] = toolMode === "coding"
         ? [deps.createSpawnAgentTool(task.id, worktreePath, settings, stepEnv)]
         : [];
-      const workflowCustomTools = [...planReviewPromptTools, ...codingCustomTools];
+      const problemReportingSessionId = await beginProblemReportingSession(deps.store, task.id, workflowStep.id);
+      const problemTools = problemReportingSessionId ? [createProblemReportTool(deps.store, task.id, problemReportingSessionId)] : [];
+      const workflowCustomTools = [...planReviewPromptTools, ...codingCustomTools, ...problemTools];
       const readonlyCustomTools = toolMode === "readonly"
         ? filterCustomToolsForReadonly(workflowCustomTools, {
-            allowTool: (tool) => allowPlanReviewPromptWrite && tool.name === "fn_task_prompt_write",
+            allowTool: (tool) => (allowPlanReviewPromptWrite && tool.name === "fn_task_prompt_write") || (Boolean(problemReportingSessionId) && tool.name === "fn_problem_report"),
           })
         : { allowed: workflowCustomTools, denied: [] as string[] };
       if (toolMode === "readonly" && readonlyCustomTools.denied.length > 0) {
@@ -1046,6 +1050,7 @@ CRITICAL SCOPING RULES — read before doing anything else:
       const { session } = await createResolvedAgentSession({
         sessionPurpose: "executor",
         taskExecutionSession: true,
+        problemReportingSessionId,
         runtimeHint: workflowRuntimeHint,
         pluginRunner: deps.options.pluginRunner,
         cwd: worktreePath,
@@ -1224,6 +1229,7 @@ CRITICAL SCOPING RULES — read before doing anything else:
 
         // Completed within the timeout — let any post-completion errors surface.
         checkSessionError(session);
+        await assertProblemReportingComplete(deps.store, task.id, problemReportingSessionId);
 
         /*
         FNXC:PlanReviewNoOp 2026-08-09-22:10:

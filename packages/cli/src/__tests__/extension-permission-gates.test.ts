@@ -40,6 +40,8 @@ import {
 import { registerApprovalRoutes } from "../../../dashboard/src/routes/register-approval-routes.js";
 import { request as requestRoute } from "../../../dashboard/src/test-request.js";
 import { ChatManager, __resetChatState, __setCreateResolvedAgentSession } from "../../../dashboard/src/chat.js";
+import { installTestWorkflow } from "../../../core/src/__test-utils__/custom-workflow.js";
+import { setHostTaskStore } from "../extension.js";
 
 const { createPiAgentSessionMock, piFindModelMock } = vi.hoisted(() => ({
   createPiAgentSessionMock: vi.fn(),
@@ -160,6 +162,9 @@ pgDescribe("extension tool permission gates", () => {
   beforeAll(h.beforeAll);
   beforeEach(async () => {
     await h.beforeEach();
+    // FNXC:ProblemReporting 2026-09-11-14:11: Permission tests need an explicit intake workflow and the canonical host cache, just like a running project.
+    await installTestWorkflow(h.store());
+    setHostTaskStore(h.rootDir(), h.store());
     __clearFusionSessionIdentityRegistryForTests();
   });
   afterEach(async () => {

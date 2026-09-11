@@ -16,6 +16,7 @@ import type {
   WorkflowSettingType,
 } from "./workflow-ir-types.js";
 import { classifyWorkflowAgentNode } from "./workflow-ir-types.js";
+import { validateProblemReportingPolicy } from "./problem-reporting-policy.js";
 import { MERGE_REGION_ENTRY_NODE_KINDS } from "./workflow-merge-region.js";
 import { getWorkflowExtensionRegistry } from "./workflow-extension-registry.js";
 import type { WorkflowExtensionConfigField } from "./workflow-extension-types.js";
@@ -1782,6 +1783,7 @@ function validateV2(ir: WorkflowIrV2): void {
   validateNotifyNodes(ir.nodes);
   validateAskUserAndExitGateNodes(ir.nodes, outgoing);
   validateFields(ir.fields);
+  validateProblemReportingPolicy(ir);
   validateSettings(ir.settings);
   // FNXC:WorkflowOptionalGroup 2026-06-21-18:00:
   // The legacy `optionalSteps` declaration field is retired (optional steps are
@@ -1907,6 +1909,7 @@ export function downgradeIrToV1IfPure(ir: WorkflowIr): WorkflowIr {
   // v1 would still mutate its persisted shape. (Code review: CodeRabbit.)
   const legacyOptionalSteps = (ir as { optionalSteps?: unknown }).optionalSteps;
   if (
+    ir.problemReporting !== undefined ||
     (ir.artifacts && ir.artifacts.length > 0) ||
     (ir.fields && ir.fields.length > 0) ||
     (ir.settings && ir.settings.length > 0) ||

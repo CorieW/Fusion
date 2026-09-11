@@ -61,6 +61,7 @@ const FN_7111_GOVERNED_TOOLS = [
 ] as const;
 
 const FN_3548_COORDINATION_TOOLS = [
+  "fn_problem_report",
   "fn_heartbeat_done",
   "fn_task_log",
   "fn_task_document_write",

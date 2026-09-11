@@ -74,8 +74,10 @@ async function captureExecutorSession(
     updatedAt: new Date().toISOString(),
   });
   const implementation = selectImplementationSessionCall(
-    mockedCreateFnAgent.mock.calls.map(([options]) => options as { customTools?: Array<{ name: string }>; systemPrompt?: string }),
+    mockedCreateFnAgent.mock.calls.map(([options]) => options as { customTools?: Array<{ name: string }>; fusionTools?: Array<{ name: string }>; systemPrompt?: string }),
   );
+  expect(implementation.fusionTools?.map((tool) => tool.name)).toContain("fn_problem_report");
+  expect(implementation.customTools).toEqual(expect.arrayContaining(implementation.fusionTools ?? []));
   return {
     toolNames: (implementation.customTools ?? []).map((tool) => tool.name),
     systemPrompt: implementation.systemPrompt ?? "",

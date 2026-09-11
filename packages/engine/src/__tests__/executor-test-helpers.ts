@@ -1,6 +1,7 @@
 import { vi } from "vitest";
 import type { Mock } from "vitest";
 import type { Task } from "@fusion/core";
+import { getBuiltinWorkflow } from "../../../core/src/__test-utils__/legacy-workflows/builtin-workflows.js";
 import { installTaskWorktreeIdentityGuard } from "../worktree/worktree-hooks.js";
 import type * as ReviewerModule from "../execution/reviewer.js";
 
@@ -887,6 +888,8 @@ FNXC:TaskVerificationRequest 2026-07-19-04:30 (merged with U5f 2026-07-19-06:00)
       .fn()
       .mockResolvedValue({ workflowId: "builtin:coding", stepIds: [] }),
     getTaskWorkflowSelection: vi.fn().mockReturnValue({ workflowId: "builtin:coding", stepIds: [] }),
+    // FNXC:ProblemReporting 2026-09-11-11:22: Explicitly seed the retired workflow fixture; fresh production stores no longer install builtins.
+    getWorkflowDefinition: vi.fn(async (id: string) => getBuiltinWorkflow(id)),
   };
   return store as any;
 }

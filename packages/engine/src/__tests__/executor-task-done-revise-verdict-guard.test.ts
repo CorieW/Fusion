@@ -49,8 +49,9 @@ describe("FN-4851 REVISE verdict task-done guard", () => {
   beforeEach(() => {
     resetExecutorMocks();
     vi.spyOn(worktreePool, "isUsableTaskWorktree").mockResolvedValue(true);
-    mockedExecSync.mockImplementation((cmd: string) => {
-      if (cmd.includes("rev-parse --show-toplevel")) return Buffer.from("/repo/.worktrees/swift-falcon\n");
+    mockedExecSync.mockImplementation((cmd: string, options?: { cwd?: string }) => {
+      // FNXC:ProblemReporting 2026-09-11-14:11: Model the worktree actually queried so this completion regression reaches its verdict assertion after worktree recovery.
+      if (cmd.includes("rev-parse --show-toplevel")) return Buffer.from(`${options?.cwd ?? "/repo/.worktrees/swift-falcon"}\n`);
       if (cmd.includes("rev-parse --abbrev-ref HEAD")) return Buffer.from("fusion/fn-4851\n");
       if (cmd.includes("rev-list --count")) return Buffer.from("1\n");
       if (cmd.includes("rev-parse HEAD")) return Buffer.from("def456\n");

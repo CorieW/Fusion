@@ -12,6 +12,8 @@ extension.ts also named-imports defaultGitOps, ExperimentFinalize* error classes
 const emptyParams = {} as const;
 
 export const workflowAuthoringEngineMock = {
+  problemReportParameters: emptyParams,
+  createProblemReportTool: vi.fn(),
   workflowListParams: emptyParams,
   workflowGetParams: emptyParams,
   workflowSelectParams: emptyParams,

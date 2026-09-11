@@ -3150,3 +3150,5 @@ export * from "./config/mcp-builtin-descriptor.js";
 export { resolveJiraConfig, resolveJiraEnabled, DEFAULT_JIRA_TOKEN_SECRET_KEY, DEFAULT_JIRA_BRANCH_NAME_TEMPLATE } from "./jira/jira-config.js";
 export type { JiraConfigSettingsSource, ResolvedJiraConfig, ResolveJiraConfigInput, JiraTokenSecretScope } from "./jira/jira-config.js";
 export * from "./cloud-link/index.js";
+export { problemReportingPreflight, beginProblemReportingSession, assertProblemReportingComplete, reportProblem, readProblemReports, updateProblemReportingLedger } from "./tasks/problem-reporting.js";
+export type { ProblemReportInput, ProblemReportReceipt } from "./tasks/problem-reporting.js";

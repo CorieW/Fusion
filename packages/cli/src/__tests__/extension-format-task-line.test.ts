@@ -27,9 +27,11 @@ describe("formatTaskLine", () => {
     { paused: true, column: "in-progress", expectPaused: true },
     { paused: true, column: "in-review", expectPaused: true },
     { paused: true, column: "done", expectPaused: false },
-    { paused: true, column: "archived", expectPaused: false },
+    // FNXC:ProblemReporting 2026-09-11-14:11: Archive is a deleted-row storage marker, removed from live listings. Custom problem columns must retain their human-hold marker.
+    { paused: true, column: "problems", expectPaused: true },
+    { paused: true, column: "resolved-problems", expectPaused: true },
     { paused: false, column: "done", expectPaused: false },
-  ] as const)("suppresses paused marker for terminal columns (%o)", ({ paused, column, expectPaused }) => {
+  ] as const)("preserves holds except for the built-in Complete fallback (%o)", ({ paused, column, expectPaused }) => {
     const line = formatTaskLine(makeTask({ paused, column }));
     if (expectPaused) {
       expect(line).toContain("(paused)");

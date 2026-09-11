@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import * as core from "@fusion/core";
 import "./executor-test-helpers.js";
 import { TaskExecutor } from "../executor.js";
 import {
@@ -9,6 +10,7 @@ import {
 } from "./executor-test-helpers.js";
 
 type CapturedSession = {
+  customTools?: Array<{ name: string }>;
   sessionPurpose?: string;
   defaultProvider?: string;
   defaultModelId?: string;
@@ -24,6 +26,7 @@ function captureSession(output: string | string[] = '{"verdict":"APPROVE","notes
   mockedCreateFnAgent.mockImplementation(async (opts: any) => {
     const response = Array.isArray(output) ? output[Math.min(sessionCount++, output.length - 1)]! : output;
     holder.last = {
+      customTools: opts.customTools,
       sessionPurpose: opts.sessionPurpose,
       defaultProvider: opts.defaultProvider,
       defaultModelId: opts.defaultModelId,
@@ -120,7 +123,7 @@ async function runStepWithSettings(
   const executor = makeExecutor(store);
   const captured = captureSession(options.output);
 
-  await (executor as any).executeWorkflowStep(
+  const stepResult = await (executor as any).executeWorkflowStep(
     baseTask(options.task),
     workflowStep(options.step),
     "/tmp/wt",
@@ -129,13 +132,58 @@ async function runStepWithSettings(
     options.stepOptions,
   );
 
-  return { ...captured.last, logCalls: store.logEntry.mock.calls };
+  return { ...captured.last, stepResult, logCalls: store.logEntry.mock.calls };
 }
 
 describe("executor workflow-step model resolution", () => {
   beforeEach(() => {
     resetExecutorMocks();
     quietGit();
+  });
+
+  it("exposes authorized reporting to readonly stages and rejects success with missing records", async () => {
+    const begin = vi.spyOn(core, "beginProblemReportingSession").mockResolvedValue("reporting-session");
+    const complete = vi.spyOn(core, "assertProblemReportingComplete").mockRejectedValue(new Error("Missing mandatory problem report: demonstrated-finding"));
+    try {
+      const result = await runStepWithSettings({});
+      expect(result.customTools?.map((tool) => tool.name)).toContain("fn_problem_report");
+      expect(mockedCreateFnAgent.mock.calls[0]?.[0]).toMatchObject({ problemReportingSessionId: "reporting-session", taskExecutionSession: true });
+      expect(result.stepResult).toMatchObject({ success: false });
+      expect(complete).toHaveBeenCalledWith(expect.anything(), "FN-MODEL-1", "reporting-session");
+    } finally {
+      begin.mockRestore();
+      complete.mockRestore();
+    }
+  });
+  it("refuses explicit completion before any mutation when its reporting generation cannot finish", async () => {
+    const { createTaskDoneTool } = await import("../executor/create-task-done-tool.js");
+    const getTask = vi.fn();
+    const onDone = vi.fn();
+    const complete = vi.spyOn(core, "assertProblemReportingComplete");
+    try {
+      const store = { getTask };
+      const tool = createTaskDoneTool({ store } as never, "FN-MODEL-1", "/tmp/worktree", "", new Map(), onDone, undefined, "owned-generation");
+      for (const message of ["Missing mandatory problem report", "No active problem-reporting session", "Workflow authorization revoked"]) {
+        complete.mockRejectedValue(new Error(message));
+        const result = await tool.execute("done", { outcome: "completed" }, undefined, undefined, {} as never);
+        expect(result).toMatchObject({ isError: true, details: { error: message } });
+        expect(complete).toHaveBeenLastCalledWith(store, "FN-MODEL-1", "owned-generation");
+      }
+      expect(onDone).not.toHaveBeenCalled();
+      expect(getTask).not.toHaveBeenCalled();
+    } finally {
+      complete.mockRestore();
+    }
+  });
+
+  it("fails capability preflight before opening the testing model", async () => {
+    const begin = vi.spyOn(core, "beginProblemReportingSession").mockRejectedValue(new Error("Missing declared problem fields"));
+    try {
+      await expect(runStepWithSettings({})).rejects.toThrow("Missing declared problem fields");
+      expect(mockedCreateFnAgent).not.toHaveBeenCalled();
+    } finally {
+      begin.mockRestore();
+    }
   });
 
   it("uses the project execution lane instead of the global default when the step has no override", async () => {

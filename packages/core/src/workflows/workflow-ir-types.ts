@@ -496,9 +496,17 @@ export interface WorkflowIrV2 {
   edges: WorkflowIrEdge[];
   artifacts?: WorkflowIrArtifact[];
   fields?: WorkflowFieldDefinition[];
+  /** Explicit authority for structured reports; ordinary task creation stays forbidden. */
+  problemReporting?: WorkflowProblemReporting;
   /** Workflow-settings (U1, R1): typed setting declarations. Additive; absent on
    *  legacy graphs. Values persist per-`(workflowId, projectId)` (U2), not here. */
   settings?: WorkflowSettingDefinition[];
+}
+
+export interface WorkflowProblemReporting {
+  sourceColumns: string[];
+  openColumn: string;
+  resolvedColumn: string;
 }
 
 /** Either IR version. v1 graphs upgrade to v2 on parse (see parseWorkflowIr). */

@@ -1,3 +1,5 @@
+import { beginProblemReportingSession, assertProblemReportingComplete } from "@fusion/core";
+import { createProblemReportTool } from "../problem-reporting-tool.js";
 /**
  * FNXC:CodeOrganization 2026-08-03-16:10:
  * runImplementation peeled from TaskExecutor (U4).
@@ -676,6 +678,7 @@ export async function runImplementation(
     let stuckRequeue: boolean | null = null;
     let staleAssistantContinuationRequeue = false;
     let taskDone = false;
+    let problemReportingSessionId: string | undefined;
     let reviewAddressingActivated = false;
     let taskEnv: NodeJS.ProcessEnv | undefined;
 
@@ -2045,13 +2048,16 @@ export async function runImplementation(
         ...(provisioningApprovalLayer ? { approvalRequestStore: deps.approvalRequestStore } : {}),
       };
       const tools = deps.sharedWorkerTools;
+      problemReportingSessionId = await beginProblemReportingSession(deps.store, task.id);
+      const problemReportTool = createProblemReportTool(deps.store, task.id, problemReportingSessionId);
       const customTools = [
+        problemReportTool,
         deps.createTaskUpdateTool(task.id, codeReviewVerdicts, sessionRef, stuckDetector),
         createTaskLogTool(tools, task.id),
         createTaskLogsReadTool(tools, task.id),
         // FN-125: execution sessions never receive task creation tools.
         deps.createTaskAddDepTool(task.id),
-        deps.createTaskDoneTool(task.id, worktreePath, detail.prompt ?? "", codeReviewVerdicts, () => { taskDone = true; }, audit),
+        deps.createTaskDoneTool(task.id, worktreePath, detail.prompt ?? "", codeReviewVerdicts, () => { taskDone = true; }, audit, problemReportingSessionId),
         deps.createReviewDisputeTool(task.id),
         createRunVerificationTool({
           worktreePath,
@@ -2370,6 +2376,7 @@ export async function runImplementation(
           const createdSession = await createResolvedAgentSession({
             sessionPurpose: "executor",
         taskExecutionSession: true,
+        problemReportingSessionId,
             runtimeHint: executorRuntimeHint,
             pluginRunner: deps.options.pluginRunner,
             cwd: worktreePath,
@@ -2378,6 +2385,7 @@ export async function runImplementation(
             systemPromptLayers: executorLayers,
             tools: "coding",
             customTools,
+            fusionTools: [problemReportTool],
             onText: agentLogger.onText,
             onThinking: agentLogger.onThinking,
             onToolStart: agentLogger.onToolStart,
@@ -2642,6 +2650,7 @@ export async function runImplementation(
             wasPaused = true;
             const finalizationDecision = await deps.getCompletedTaskFinalizationDecision(task.id, taskDone);
             if (finalizationDecision === "finalize") {
+              await assertProblemReportingComplete(deps.store, task.id, problemReportingSessionId);
               if (await deps.shouldDeferCompletionForGlobalPause(task.id, "paused after completion")) {
                 return;
               }
@@ -2711,6 +2720,7 @@ export async function runImplementation(
           }
 
           if (taskDone) {
+            await assertProblemReportingComplete(deps.store, task.id, problemReportingSessionId);
             // Capture modified files before running workflow steps
             const updatedTask = await deps.store.getTask(task.id);
             const modifiedFiles = await deps.captureModifiedFiles(worktreePath, updatedTask.baseCommitSha, task.id, audit, "workflow-fanout");
@@ -2853,6 +2863,7 @@ export async function runImplementation(
                 const createdRetrySession = await createResolvedAgentSession({
                   sessionPurpose: "executor",
             taskExecutionSession: true,
+                  problemReportingSessionId,
                   runtimeHint: executorRuntimeHint,
                   pluginRunner: deps.options.pluginRunner,
                   cwd: worktreePath,
@@ -2861,6 +2872,7 @@ export async function runImplementation(
                   systemPromptLayers: executorLayers,
                   tools: "coding",
                   customTools,
+                  fusionTools: [problemReportTool],
                   onText: agentLogger.onText,
                   onThinking: agentLogger.onThinking,
                   onToolStart: agentLogger.onToolStart,
@@ -3011,6 +3023,7 @@ export async function runImplementation(
             }
 
             if (taskDone) {
+              await assertProblemReportingComplete(deps.store, task.id, problemReportingSessionId);
               const updatedTask = await deps.store.getTask(task.id);
               const modifiedFiles = await deps.captureModifiedFiles(worktreePath, updatedTask.baseCommitSha, task.id, audit, "no-task-done-retry");
               if (modifiedFiles.length > 0) {
@@ -3341,6 +3354,7 @@ export async function runImplementation(
         }
         const finalizationDecision = await deps.getCompletedTaskFinalizationDecision(task.id, taskDone);
         if (finalizationDecision === "finalize") {
+          await assertProblemReportingComplete(deps.store, task.id, problemReportingSessionId);
           if (await deps.shouldDeferCompletionForGlobalPause(task.id, "paused after completion")) {
             return;
           }

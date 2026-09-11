@@ -1290,3 +1290,4 @@ export {
   type ResolvedCliExecutorConfig,
   type LaunchCliTaskSessionOptions,
 } from "./cli-agent/task-session.js";
+export { createProblemReportTool, problemReportParameters } from "./problem-reporting-tool.js";
