@@ -1446,7 +1446,18 @@
     "snippetSuggestion": "Inserir prompt salvo",
     "snippetSuggestions": "Sugestões de snippets",
     "conversationIdCopied": "",
-    "copyConversationId": ""
+    "copyConversationId": "",
+    "contextCoverage": "Contexto da conversa",
+    "contextIncluded": "Mensagens anteriores completas incluídas: {{count}}.",
+    "contextOmitted": "Mensagens anteriores omitidas: {{count}}. O agente pode recuperá-las.",
+    "contextOlder": "O histórico mais antigo está disponível pela busca na conversa.",
+    "contextRequiredDeferred": "Mensagens necessárias que precisam ser recuperadas: {{count}}.",
+    "contextMissing": "Mensagens citadas indisponíveis: {{count}}.",
+    "contextNotes": "Notas de trabalho com fontes mantidas: {{count}}.",
+    "contextNotesDeferred": "As notas eram grandes demais para serem incluídas e podem ser recuperadas.",
+    "contextSavedNotes": "Notas de trabalho salvas para respostas posteriores",
+    "contextSource": "Fonte {{count}}",
+    "referenceUnavailable": "Não foi possível carregar a mensagem citada."
   },
   "chatRooms": {
     "error": {

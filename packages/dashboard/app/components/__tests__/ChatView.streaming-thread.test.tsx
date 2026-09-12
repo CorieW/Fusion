@@ -727,6 +727,47 @@ describe("FN-6599 ChatView streaming prior thread", () => {
     globalThis.ResizeObserver = originalResizeObserver;
   });
 
+  it.each([[390, "source"], [1440, "source"], [390, "message-top"], [1440, "message-top"]] as const)("keeps explicit navigation ahead of queued bottom-follow frames at width %s via %s", async (width, surface) => {
+    Object.defineProperty(window, "innerWidth", { configurable: true, value: width });
+    const frames: FrameRequestCallback[] = [];
+    const frameSpy = vi.spyOn(window, "requestAnimationFrame").mockImplementation(callback => { frames.push(callback); return frames.length; });
+    try {
+      const session = makeSession({ id: "session-source-navigation", agentId: "agent-001" });
+      const prior = makeMessage({ id: "source-prior", sessionId: session.id, role: "assistant", content: "Review findings" });
+      mockGetScopedItem.mockImplementation(key => key === "kb-chat-active-session" ? session.id : undefined);
+      mockFetchChatSessions.mockResolvedValue({ sessions: [session] });
+      mockFetchChatSession.mockResolvedValue({ session });
+      mockFetchChatMessages.mockResolvedValue({ messages: [prior] });
+      render(<ChatView projectId="proj-123" addToast={vi.fn()} />);
+      await openRestoredConversation();
+      await screen.findByText("Review findings");
+      const container = document.querySelector(".chat-messages") as HTMLDivElement;
+      let scrollTop = 900;
+      Object.defineProperties(container, {
+        scrollTop: { configurable: true, get: () => scrollTop, set: (value: number) => { scrollTop = value; } },
+        clientHeight: { configurable: true, value: 300 },
+        scrollHeight: { configurable: true, value: 1200 },
+      });
+      const scroll = vi.fn((options: ScrollToOptions) => {
+        if (options.behavior === "smooth") frames.push(() => { scrollTop = 280; });
+        else scrollTop = 280;
+      });
+      Object.defineProperty(container, "scrollTo", { configurable: true, value: scroll });
+      fireEvent.change(screen.getByTestId("chat-input"), { target: { value: "[Quoted message](#chat-message-source-prior)" } });
+      fireEvent.click(screen.getByTestId("chat-send-btn"));
+      expect(frames.length).toBeGreaterThan(0);
+      fireEvent.click(surface === "source"
+        ? await screen.findByRole("link", { name: "Quoted message" })
+        : screen.getByTestId("chat-message-scroll-to-top-source-prior"));
+      expect(scroll).toHaveBeenCalled();
+      // A queued scroll event can arrive before the first smooth-animation frame.
+      // It must observe the destination, not reclaim ownership at the old bottom.
+      fireEvent.scroll(container);
+      act(() => { for (let count = 0; count < 30 && frames.length; count++) frames.shift()?.(count); });
+      expect(scrollTop).toBe(280);
+    } finally { frameSpy.mockRestore(); }
+  });
+
   it("FN-302 ancre le premier envoi d’une conversation vide", async () => {
     const session = makeSession({ id: "session-empty-send", agentId: "agent-001" });
     mockGetScopedItem.mockImplementation((key) => key === "kb-chat-active-session" ? session.id : undefined);

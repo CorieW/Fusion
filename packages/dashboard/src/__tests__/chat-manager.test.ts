@@ -564,7 +564,7 @@ describe("ChatManager.sendMessage", () => {
 
     await createChatManager().sendMessage("chat-001", "Hello");
 
-    expect(mockChatStore.addMessage).toHaveBeenLastCalledWith("chat-001", expect.objectContaining({ metadata: undefined }));
+    expect(mockChatStore.addMessage).toHaveBeenLastCalledWith("chat-001", expect.objectContaining({ metadata: { workingNotes: [] } }));
     expect(mockChatStore.recordTokenUsage).toHaveBeenCalledWith(expect.objectContaining({
       inputTokens: 7,
       outputTokens: 3,
@@ -585,7 +585,7 @@ describe("ChatManager.sendMessage", () => {
 
     await createChatManager().sendMessage("chat-001", "Hello");
 
-    expect(mockChatStore.addMessage).toHaveBeenLastCalledWith("chat-001", expect.objectContaining({ metadata: undefined }));
+    expect(mockChatStore.addMessage).toHaveBeenLastCalledWith("chat-001", expect.objectContaining({ metadata: { workingNotes: [] } }));
     expect(mockChatStore.recordTokenUsage).toHaveBeenCalledWith(expect.objectContaining({
       inputTokens: 7,
       outputTokens: 3,
@@ -996,6 +996,7 @@ describe("ChatManager.sendMessage", () => {
           content: "hello @Avery",
           metadata: {
             mentions: [{ agentId: "agent-001", agentName: "Avery" }],
+            handoffPlan: { version: 1, ordered: false, agentIds: ["agent-001"] },
           },
         }),
       );
@@ -1629,6 +1630,7 @@ describe("ChatManager.sendMessage", () => {
     expect(assistantCall?.[1]).toEqual(
       expect.objectContaining({
         metadata: {
+          workingNotes: [],
           toolCalls: [
             {
               toolName: "read",
@@ -2978,6 +2980,7 @@ describe("ChatManager.sendMessage", () => {
     const assistantCall = mockChatStore.addMessage.mock.calls.find((call) => call[1].role === "assistant");
     expect(assistantCall?.[1]).toEqual(expect.objectContaining({
       metadata: {
+          workingNotes: [],
         fallback: {
           primaryModel: "openai-codex/gpt-5.3-codex",
           fallbackModel: "zai/glm-5.1",
@@ -3037,6 +3040,7 @@ describe("ChatManager.sendMessage", () => {
     expect(assistantCall?.[1]).toEqual(expect.objectContaining({
       content: "Fallback reply",
       metadata: {
+          workingNotes: [],
         fallback: {
           primaryModel: "anthropic/claude-sonnet-5",
           fallbackModel: "zai/glm-5.1",
@@ -3462,19 +3466,9 @@ describe("ChatManager.sendMessage", () => {
       .mockResolvedValueOnce(undefined)
       .mockResolvedValueOnce(undefined);
 
-    mockChatStore.getSession
-      .mockReturnValueOnce({
-        id: "chat-001",
-        agentId: "agent-001",
-        status: "active",
-        cliSessionFile: null,
-      })
-      .mockReturnValueOnce({
-        id: "chat-001",
-        agentId: "agent-001",
-        status: "active",
-        cliSessionFile: __dirname + "/chat-manager.test.ts",
-      });
+    const persistedSession = { id: "chat-001", agentId: "agent-001", status: "active", cliSessionFile: null as string | null };
+    mockChatStore.getSession.mockImplementation(() => ({ ...persistedSession }));
+    mockChatStore.setCliSessionFile.mockImplementation(async () => { persistedSession.cliSessionFile = __dirname + "/chat-manager.test.ts"; });
 
     __setCreateFnAgent(async () => ({
       session: { prompt: promptSpy, dispose: vi.fn(), state: { messages: [{ role: "assistant", content: "Done" }] } },

@@ -17,6 +17,15 @@ import {
 import { classifyPermanentAgentToolCall, resolvePermanentAgentToolDecision } from "../agents/permanent-agent-gating.js";
 import type { AgentPermissionPolicy } from "@fusion/core";
 
+describe("scoped chat context and handoff tools", () => {
+  it.each(["fn_chat_thread_read", "fn_chat_thread_search", "fn_chat_context_update", "fn_chat_handoff"])("recognizes %s as conversation coordination in both gates", toolName => {
+    expect(classifyPermanentAgentToolCall(toolName, {})).toEqual({ category: "none", recognized: true });
+    const decision = evaluateAgentActionGate({ agentId: "chat-agent", toolName, args: {}, permissionPolicy: { presetId: "locked-down", rules: { command_execution: "block" } } as AgentPermissionPolicy });
+    expect(decision.disposition).toBe("allow");
+    expect(decision.category).toBe("exempt");
+  });
+});
+
 const unrestrictedPolicy: AgentPermissionPolicy = {
   presetId: "unrestricted",
   rules: {
@@ -136,6 +145,10 @@ describe("gating-classifications parity", () => {
         "fn_artifact_register",
         "fn_artifact_view",
         "fn_ask_question",
+        "fn_chat_context_update",
+        "fn_chat_handoff",
+        "fn_chat_thread_read",
+        "fn_chat_thread_search",
         "fn_goal_list",
         "fn_goal_show",
         "fn_heartbeat_done",
@@ -148,6 +161,7 @@ describe("gating-classifications parity", () => {
         "fn_mission_list",
         "fn_mission_show",
         "fn_post_room_message",
+        "fn_problem_report",
         "fn_read_evaluations",
         "fn_read_messages",
         "fn_reflect_on_performance",

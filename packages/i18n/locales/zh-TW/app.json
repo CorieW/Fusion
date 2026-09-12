@@ -1436,7 +1436,18 @@
     "snippetSuggestion": "插入已儲存的提示詞",
     "snippetSuggestions": "片段建議",
     "conversationIdCopied": "",
-    "copyConversationId": ""
+    "copyConversationId": "",
+    "contextCoverage": "對話上下文",
+    "contextIncluded": "已完整包含的歷史訊息：{{count}} 則。",
+    "contextOmitted": "提示中省略的歷史訊息：{{count}} 則。代理可以讀取這些訊息。",
+    "contextOlder": "可以透過對話搜尋讀取更早的歷史記錄。",
+    "contextRequiredDeferred": "需要讀取的必要訊息：{{count}} 則。",
+    "contextMissing": "無法取得的引用訊息：{{count}} 則。",
+    "contextNotes": "保留的附來源工作筆記：{{count}} 則。",
+    "contextNotesDeferred": "工作筆記過長，未包含在提示中，可另行讀取。",
+    "contextSavedNotes": "為後續回覆儲存的工作筆記",
+    "contextSource": "來源 {{count}}",
+    "referenceUnavailable": "無法載入引用的訊息。"
   },
   "chatRooms": {
     "error": {

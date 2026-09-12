@@ -60,6 +60,11 @@ export interface FusionToolBridgeOptions {
  */
 const FUSION_TOOL_CATEGORY: FusionCategory = "task_agent_mutation";
 
+// FNXC:ChatContext 2026-09-11-18:42: These server-bound conversation tools carry no board/file mutation authority. Keep the capability-token and policy-presence checks for every request.
+export function fusionToolCategory(name: string): FusionCategory | "exempt" {
+  return ["fn_chat_thread_read", "fn_chat_thread_search", "fn_chat_context_update", "fn_chat_handoff"].includes(name) ? "exempt" : FUSION_TOOL_CATEGORY;
+}
+
 export function toolsToMcpToolDefs(tools: ReadonlyArray<ToolLike> | undefined): McpToolDef[] {
   if (!Array.isArray(tools)) return [];
   return tools
@@ -198,7 +203,7 @@ export async function startFusionToolBridge(
       reject(403, "Fusion action policy is unavailable for this tool call");
       return;
     }
-    const disposition = effectiveDisposition(FUSION_TOOL_CATEGORY, gate, {
+    const disposition = effectiveDisposition(fusionToolCategory(name), gate, {
       allowUnrestricted: options.allowUnrestricted === true,
     });
     const allowed =

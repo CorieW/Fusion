@@ -20,6 +20,18 @@ function message(overrides: Partial<ChatMessageInfo> = {}): ChatMessageInfo {
 }
 
 describe("StandardChatMessageItem quote action", () => {
+  it.each([390, 1440])("renders local source links without changing plain-text messages at width %s", width => {
+    Object.defineProperty(window, "innerWidth", { value: width, configurable: true });
+    const content = '**Keep plain text** @Coder [Quoted message](#chat-message-source-1) [unsafe](javascript:alert(1))';
+    const { container, rerender } = render(<StandardChatMessageItem {...shared} message={message({ role: "user", content })} />);
+    expect(screen.getByRole("link", { name: "Quoted message" })).toHaveAttribute("href", "#chat-message-source-1");
+    expect(container).toHaveTextContent('**Keep plain text** @Coder');
+    expect(container).toHaveTextContent('[unsafe](javascript:alert(1))');
+    expect(container.querySelector('strong')).toBeNull();
+    expect(screen.getAllByRole("link")).toHaveLength(1);
+    rerender(<StandardChatMessageItem {...shared} message={message({ role: "system", content })} />);
+    expect(screen.getByRole("link", { name: "Quoted message" })).toHaveAttribute("href", "#chat-message-source-1");
+  });
   it("renders for populated assistant and user messages and invokes the owner", () => {
     const onQuoteMessage = vi.fn();
     const { rerender } = render(<StandardChatMessageItem {...shared} message={message()} onQuoteMessage={onQuoteMessage} />);

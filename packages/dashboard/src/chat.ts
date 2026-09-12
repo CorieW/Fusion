@@ -20,7 +20,6 @@ import type {
   ChatInFlightGenerationState,
   ChatMessage,
   ChatStore,
-  ChatRoomMessage,
   ChatSession,
   ChatSessionCreateInput,
   ChatTokenUsageCreateInput,
@@ -44,6 +43,9 @@ import {
   isExperimentalFeatureEnabled,
   CHAT_FOCUS_FLAG,
 } from "@fusion/core";
+import { buildThreadContext, contextTokenBudget, createThreadAccess, loadThreadContext, type ContextReport, type WorkingNote } from "./chat-thread-context.js";
+import { createThreadTools } from "./chat-thread-tools.js";
+import { createHandoffReporter, handoffSequence, isOrderedHandoff, unresolvedHandoffNames, type HandoffOutcome } from "./chat-handoff.js";
 import { EventEmitter } from "node:events";
 import { randomUUID } from "node:crypto";
 import { existsSync } from "node:fs";
@@ -321,6 +323,8 @@ async function ensureEngineReady(): Promise<void> {
  * PR #2416 review: room responders and agentless direct chat do not register `fn_send_message`. Long-form guidance must be conditional on tool availability so those sessions put detail in the chat reply instead of calling a missing mailbox tool.
  */
 export const CHAT_SYSTEM_PROMPT = `${FUSION_RUNTIME_SELF_AWARENESS}
+
+The stored conversation is shared between participants. Use fn_chat_thread_read/search to recover omitted history, complete messages, tool evidence, and attachments. Use fn_chat_context_update to retain objectives, accepted decisions, constraints, and unresolved findings with source message IDs; keep proposals distinct from user decisions.
 
 You are a helpful AI assistant integrated into the fn task board system. You help users with questions about their project, code, architecture, and tasks. You have coding workspace tools on the project checkout: \`read\`, \`write\`, \`edit\`, \`bash\`, \`grep\`, \`find\`, and \`ls\`. Use \`write\`, \`edit\`, and \`bash\` for user-requested code changes, file edits, or shell investigation; prefer minimal, user-directed mutations and respect any pending-approval or blocked tool result. Do not claim that you only have read access. Do not change the branch the working directory is checked out on: do not run \`git checkout <branch>\` or \`git switch <branch>\` to a different branch unless the user explicitly asks. Read-only Git and branch inspection, such as \`git status\`, \`git branch\`, and \`git log\`, is allowed. Response length policy: default to a short, crisp reply (a few sentences or a short bulleted list) that directly answers the user; avoid preamble, restating the question, and filler. For questions about this repository's code or architecture, prioritize correctness and cite real paths/symbols over maximum brevity — still lead short, but do not omit the evidence needed to be accurate. If a thorough answer genuinely needs long-form content (for example multi-step plans, design proposals, deep multi-file traces, deep analyses, or long file excerpts), keep the chat reply brief with a one- or two-sentence summary plus key citations. When \`fn_send_message\` is available in this session, send the full write-up via \`fn_send_message\` using \`type: "agent-to-user"\` and \`to_id: "dashboard"\` (additive detail that must not duplicate the chat reply). When that tool is not available, put the necessary detail in the chat reply itself rather than inventing a mailbox path.`;
 
@@ -697,7 +701,7 @@ export async function createChatFusionToolset(options: ChatFusionToolsetOptions)
 
   /*
   FNXC:ChatConversationReferences 2026-09-04-09:58:
-  Cross-conversation read tools require a current Direct chat identity and its store. Room responders and explicitly mentioned-agent responders deliberately omit both, matching the existing Direct-only file-reference context path.
+  Cross-conversation read tools require a current Direct chat identity and its store. Cross-conversation tools remain Direct-only. Every responder separately receives current-conversation read/search tools through a server-bound thread scope.
   */
   if (chatStore && currentChatSessionId) {
     tools.push(...createChatConversationTools(chatStore, {
@@ -947,131 +951,8 @@ export const ROOM_SKIP_SENTINEL = "__SKIP__";
 export function isRoomSkipSentinel(content: string): boolean {
   return content.trim() === ROOM_SKIP_SENTINEL;
 }
-const DEFAULT_ROOM_THREAD_RECENT_VERBATIM_MESSAGES = 25;
 const DEFAULT_ROOM_THREAD_COMPACTION_FETCH_LIMIT = 200;
-const ROOM_THREAD_CONTEXT_MAX_CHARS = 20_000;
-const ROOM_THREAD_MESSAGE_CONTENT_MAX_CHARS = 1_200;
-const DEFAULT_ROOM_THREAD_SUMMARY_MAX_CHARS = 3_000;
 const IN_FLIGHT_PERSIST_DEBOUNCE_MS = 200;
-
-type RoomTranscriptMessage = Pick<ChatRoomMessage, "id" | "role" | "content" | "createdAt" | "senderAgentId">;
-
-function getRoomSenderLabel(message: Pick<RoomTranscriptMessage, "role" | "senderAgentId">): string {
-  return message.role === "user"
-    ? "User"
-    : message.role === "system"
-      ? "System"
-      : (message.senderAgentId ? `Agent ${message.senderAgentId}` : "Assistant");
-}
-
-function truncateWithEllipsis(content: string, maxChars: number): string {
-  return content.length > maxChars
-    ? `${content.slice(0, maxChars - 1)}…`
-    : content;
-}
-
-function formatRoomThreadLine(message: RoomTranscriptMessage, latestUserMessageId: string): string {
-  const marker = message.id === latestUserMessageId ? " [LATEST USER MESSAGE — ANSWER THIS]" : "";
-  return `- [${message.createdAt}] (${message.role}) ${getRoomSenderLabel(message)}: ${truncateWithEllipsis(message.content, ROOM_THREAD_MESSAGE_CONTENT_MAX_CHARS)}${marker}`;
-}
-
-function formatRoomThreadContext(messages: RoomTranscriptMessage[], latestUserMessageId: string): string {
-  return messages.map((message) => formatRoomThreadLine(message, latestUserMessageId)).join("\n");
-}
-
-function buildRoomSummaryBlock(
-  olderMessages: RoomTranscriptMessage[],
-  opts?: { summaryMaxChars?: number },
-): string {
-  if (olderMessages.length === 0) {
-    return "";
-  }
-
-  const participants = Array.from(new Set(olderMessages.map((message) => getRoomSenderLabel(message))));
-  const rankedHighlights = olderMessages
-    .map((message, index) => ({
-      message,
-      index,
-      score: (message.role === "user" ? 2 : message.role === "assistant" ? 1 : 0) * 1000 + message.content.length,
-    }))
-    .sort((left, right) => right.score - left.score || left.index - right.index)
-    .slice(0, 5)
-    .sort((left, right) => left.index - right.index)
-    .map(({ message }) => `  - [${message.createdAt}] ${getRoomSenderLabel(message)}: ${truncateWithEllipsis(message.content, 240)}`);
-
-  const summaryLines = [
-    "## Earlier room context (compacted)",
-    `- Span: ${olderMessages.length} messages from ${olderMessages[0]?.createdAt ?? ""} to ${olderMessages.at(-1)?.createdAt ?? ""}`,
-    `- Participants: ${participants.join(", ")}`,
-    "- Highlights:",
-  ];
-
-  const baseSummary = summaryLines.join("\n");
-  if (rankedHighlights.length === 0) {
-    return baseSummary;
-  }
-
-  const highlights = [...rankedHighlights];
-  const summaryMaxChars = opts?.summaryMaxChars ?? DEFAULT_ROOM_THREAD_SUMMARY_MAX_CHARS;
-  while (`${baseSummary}\n${highlights.join("\n")}`.length > summaryMaxChars && highlights.length > 0) {
-    highlights.pop();
-  }
-
-  return highlights.length > 0
-    ? `${baseSummary}\n${highlights.join("\n")}`
-    : baseSummary;
-}
-
-export function buildCompactedRoomTranscript(
-  messages: RoomTranscriptMessage[],
-  latestUserMessageId: string,
-  opts?: { recentVerbatim?: number; summaryMaxChars?: number },
-): string {
-  if (messages.length === 0) {
-    return "";
-  }
-
-  const messageIndexes = new Map(messages.map((message, index) => [message.id, index]));
-  const latestUserMessage = messages.find((message) => message.id === latestUserMessageId);
-  const recentVerbatim = Math.max(1, Math.floor(opts?.recentVerbatim ?? DEFAULT_ROOM_THREAD_RECENT_VERBATIM_MESSAGES));
-  const splitIndex = Math.max(0, messages.length - recentVerbatim);
-  let olderMessages = messages.slice(0, splitIndex);
-  let recentMessages = messages.slice(splitIndex);
-
-  if (latestUserMessage && !recentMessages.some((message) => message.id === latestUserMessageId)) {
-    olderMessages = olderMessages.filter((message) => message.id !== latestUserMessageId);
-    recentMessages = [...recentMessages, latestUserMessage]
-      .sort((left, right) => (messageIndexes.get(left.id) ?? 0) - (messageIndexes.get(right.id) ?? 0));
-  }
-
-  const summaryLines = buildRoomSummaryBlock(olderMessages, opts).split("\n").filter((line) => line.length > 0);
-
-  const renderTranscript = () => {
-    const summary = summaryLines.length > 0 ? summaryLines.join("\n") : "";
-    const recent = formatRoomThreadContext(recentMessages, latestUserMessageId);
-    if (summary && recent) {
-      return `${summary}\n\n${recent}`;
-    }
-    return summary || recent;
-  };
-
-  let transcript = renderTranscript();
-  while (transcript.length > ROOM_THREAD_CONTEXT_MAX_CHARS && summaryLines.at(-1)?.startsWith("  - ")) {
-    summaryLines.pop();
-    transcript = renderTranscript();
-  }
-
-  while (transcript.length > ROOM_THREAD_CONTEXT_MAX_CHARS && recentMessages.length > 1) {
-    const removableIndex = recentMessages.findIndex((message) => message.id !== latestUserMessageId);
-    if (removableIndex === -1) {
-      break;
-    }
-    recentMessages.splice(removableIndex, 1);
-    transcript = renderTranscript();
-  }
-
-  return transcript;
-}
 
 function formatAttachmentSize(size: number): string {
   if (size < 1024) return `${size}B`;
@@ -1218,7 +1099,7 @@ export type ChatStreamEvent =
         message: {
           id: string;
           sessionId: string;
-          role: "assistant";
+          role: "assistant" | "system";
           content: string;
           thinkingOutput: string | null;
           metadata: Record<string, unknown> | null;
@@ -1843,39 +1724,11 @@ export class ChatManager {
     }
   }
 
-  private async getRoomCompactionSettings(): Promise<{
-    recentVerbatim: number;
-    fetchLimit: number;
-    summaryMaxChars: number;
-  }> {
-    const defaults = {
-      recentVerbatim: DEFAULT_ROOM_THREAD_RECENT_VERBATIM_MESSAGES,
-      fetchLimit: DEFAULT_ROOM_THREAD_COMPACTION_FETCH_LIMIT,
-      summaryMaxChars: DEFAULT_ROOM_THREAD_SUMMARY_MAX_CHARS,
-    };
-    if (!this.getSettings) {
-      return defaults;
-    }
-
-    const sanitize = (value: unknown, fallback: number, min = 1): number => {
-      if (typeof value !== "number" || !Number.isFinite(value) || Number.isNaN(value) || value <= 0) {
-        return fallback;
-      }
-      return Math.max(min, Math.floor(value));
-    };
-
+  private async getThreadFetchLimit(): Promise<number> {
     try {
-      const settings = await this.getSettings();
-      return {
-        recentVerbatim: sanitize(settings?.chatRoomRecentVerbatimMessages, defaults.recentVerbatim),
-        fetchLimit: sanitize(settings?.chatRoomCompactionFetchLimit, defaults.fetchLimit),
-        summaryMaxChars: sanitize(settings?.chatRoomSummaryMaxChars, defaults.summaryMaxChars, 200),
-      };
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      diagnostics.warn(`Failed to load room compaction settings: ${message}`);
-      return defaults;
-    }
+      const limit = (await this.getSettings?.())?.chatRoomCompactionFetchLimit;
+      return typeof limit === "number" && Number.isFinite(limit) && limit > 0 ? Math.max(2, Math.min(1000, Math.floor(limit))) : DEFAULT_ROOM_THREAD_COMPACTION_FETCH_LIMIT;
+    } catch { return DEFAULT_ROOM_THREAD_COMPACTION_FETCH_LIMIT; }
   }
 
   private handleFallbackModelUsed(
@@ -2221,7 +2074,14 @@ export class ChatManager {
     });
 
     const roomMembers = await this.chatStore.listRoomMembers(roomId);
-    const responders = [...responderPlan.direct, ...responderPlan.ambient];
+    const orderedHandoff = isOrderedHandoff(trimmedContent, mentions);
+    const responders = orderedHandoff
+      ? handoffSequence(trimmedContent, mentions).flatMap(mention => responderPlan.direct.filter(agent => agent.id === mention.agentId))
+      : [...responderPlan.direct, ...responderPlan.ambient];
+    if (orderedHandoff && (unresolvedHandoffNames(trimmedContent, mentions).length > 0 || mentions.some(mention => !responders.some(agent => agent.id === mention.agentId)))) {
+      await this.chatStore.addRoomMessage(roomId, { role: "system", content: "Handoff stopped: every named participant must be an available room member. No agents were started." });
+      return { userMessage, responders: [] };
+    }
     if (responders.length === 0) {
       if (responderPlan.nonMemberMentions.length > 0) {
         const labels = responderPlan.nonMemberMentions
@@ -2245,10 +2105,12 @@ export class ChatManager {
     const skippedResponderIds: string[] = [];
     const responderFailures: string[] = [];
 
-    for (const responder of responders) {
+    for (const [stepIndex, responder] of responders.entries()) {
       try {
         const response = await this.generateRoomResponderReply({
           roomId,
+          orderedHandoff,
+          handoffStep: orderedHandoff ? { index: stepIndex + 1, total: responders.length } : undefined,
           roomName: room.name,
           roomProjectId: room.projectId ?? null,
           roomThinkingLevel: room.thinkingLevel ?? null,
@@ -2263,6 +2125,7 @@ export class ChatManager {
 
         if (isRoomSkipSentinel(response.content)) {
           skippedResponderIds.push(responder.id);
+          if (orderedHandoff) { await this.chatStore.addRoomMessage(roomId, { role: "system", content: `Handoff stopped: ${responder.name} skipped the assigned step.` }); break; }
           continue;
         }
 
@@ -2286,10 +2149,15 @@ export class ChatManager {
           });
         }
         successfulResponderIds.push(responder.id);
+        if (orderedHandoff && (response.metadata?.handoff as HandoffOutcome | undefined)?.status !== "completed") {
+          await this.chatStore.addRoomMessage(roomId, { role: "system", content: `Handoff stopped after ${responder.name}: ${(response.metadata?.handoff as HandoffOutcome | undefined)?.summary ?? "completion was not reported"}. Remaining agents were not started.` });
+          break;
+        }
       } catch (error) {
         const reason = error instanceof Error ? error.message : String(error);
         diagnostics.error(`Room responder ${responder.id} failed in room ${roomId}: ${reason}`);
         responderFailures.push(`${responder.id}: ${reason}`);
+        if (orderedHandoff) { await this.chatStore.addRoomMessage(roomId, { role: "system", content: `Handoff stopped: ${responder.name} failed. Remaining agents were not started.` }); break; }
       }
     }
 
@@ -2327,6 +2195,8 @@ export class ChatManager {
     attachments?: ChatAttachment[];
     mentions: ChatMention[];
     responder: Agent;
+    orderedHandoff?: boolean;
+    handoffStep?: { index: number; total: number };
     modelProvider?: string;
     modelId?: string;
   }): Promise<{ content: string; thinkingOutput: string | null; metadata?: Record<string, unknown>; tokenUsage?: ChatTokenDelta & { modelProvider: string | null; modelId: string | null } }> {
@@ -2358,8 +2228,17 @@ export class ChatManager {
     */
     systemPrompt = `${systemPrompt}\n\n${CHAT_CODEBASE_ACCURACY_GUIDANCE}`;
 
-    const roomCompactionSettings = await this.getRoomCompactionSettings();
-    const roomMessages = await this.chatStore.getRoomMessages(input.roomId, { limit: roomCompactionSettings.fetchLimit });
+    const fetchLimit = await this.getThreadFetchLimit();
+    const access = createThreadAccess(this.chatStore, { kind: "room", id: input.roomId, projectId: input.roomProjectId ?? null });
+    const thread = await loadThreadContext(access, input.content, fetchLimit);
+    let active = true;
+    let roomStreamingText = "";
+    let roomThinking = "";
+    const roomToolCalls: ChatInFlightGenerationState["toolCalls"] = [];
+    const threadTools = createThreadTools(access, thread.notes, this.rootDir, () => active);
+    const handoff = createHandoffReporter(Boolean(input.orderedHandoff), () => active);
+    if (input.handoffStep) systemPrompt += `\n\nOrdered handoff step ${input.handoffStep.index} of ${input.handoffStep.total}: perform the assignment at this occurrence of your mention. Earlier occurrences belong to completed steps.`;
+    systemPrompt += `\n\n${handoff.guidance}\nUse fn_chat_context_update to retain source-linked decisions, constraints, and unresolved findings.`;
     const { attachmentContents, imageContents } = await readChatAttachmentContents(
       this.rootDir,
       { kind: "room", roomId: input.roomId },
@@ -2372,11 +2251,6 @@ export class ChatManager {
     const roomPromptParts = [
       `You are replying as ${input.responder.name} in room #${input.roomName}.`,
       "Reply to the latest user room message in the context of this shared room thread.",
-      "Room transcript (oldest to newest, bounded):",
-      this.compactRoomThreadContext(roomMessages, input.latestUserMessageId, {
-        recentVerbatim: roomCompactionSettings.recentVerbatim,
-        summaryMaxChars: roomCompactionSettings.summaryMaxChars,
-      }),
       "Latest user message to answer:",
       parsedSkillCommands.strippedContent,
     ];
@@ -2429,17 +2303,27 @@ export class ChatManager {
 
     const workflowTools = createChatWorkflowAuthoringTools(this.taskStore, input.roomProjectId);
     const missionGateContexts = await createChatMissionGateContexts(this.taskStore, this.agentStore, input.responder);
-    const chatFusionTools = await createChatFusionToolset({
+    const chatFusionTools = [...threadTools.tools, handoff.tool, ...await createChatFusionToolset({
       taskStore: this.taskStore,
       agentStore: this.agentStore,
       rootDir: this.rootDir,
       agentId: input.responder.id,
       missionMutationGated: missionGateContexts.missionMutationGated,
       actionGateContext: missionGateContexts.actionGateContext,
-    });
+    })];
 
     const resolvedSession = await createResolvedAgentSession({
       sessionPurpose: "heartbeat",
+      onText: (delta: string) => { if (active) roomStreamingText += delta; },
+      onThinking: (delta: string) => { if (active) roomThinking += delta; },
+      onToolStart: (toolName: string, args?: Record<string, unknown>) => { if (active) { handoff.onToolStart(toolName); roomToolCalls.push({ toolName, args, status: "running", isError: false }); } },
+      onToolEnd: (toolName: string, isError: boolean, result?: unknown) => {
+        if (!active) return;
+        handoff.onToolEnd(toolName, isError, result);
+        const pending = roomToolCalls.findLast(call => call.toolName === toolName && call.status === "running");
+        if (pending) Object.assign(pending, { status: "completed", isError, result });
+        else roomToolCalls.push({ toolName, status: "completed", isError, result });
+      },
       pluginRunner: this.pluginRunner,
       runtimeHint: extractRuntimeHint(input.responder.runtimeConfig),
       /*
@@ -2482,9 +2366,10 @@ export class ChatManager {
     });
 
     try {
+      const context = buildThreadContext({ ...thread, latestUserMessageId: input.latestUserMessageId, tokenBudget: contextTokenBudget(resolvedSession.session.model, systemPrompt + roomPrompt + JSON.stringify(chatFusionTools.map(tool => ({ name: tool.name, description: tool.description, parameters: tool.parameters })))) });
       await enginePromptWithFallback(
         resolvedSession.session,
-        roomPrompt,
+        `${context.text}\n\n${roomPrompt}`,
         imageContents.length > 0 ? { images: imageContents } : undefined,
       );
 
@@ -2511,7 +2396,7 @@ export class ChatManager {
         throw new Error(stateError.trim());
       }
 
-      const finalContent = content.trim();
+      const finalContent = content.trim() || roomStreamingText.trim();
       if (!finalContent) {
         throw new Error("Room responder returned an empty reply");
       }
@@ -2520,14 +2405,21 @@ export class ChatManager {
       const model = modelSnapshotForTokenUsage(resolvedSession.session, roomFallbackInfo);
       return {
         content: finalContent,
-        thinkingOutput: null,
+        thinkingOutput: roomThinking || null,
         metadata: {
-          roomId: input.roomId,
+          toolCalls: roomToolCalls,
+          roomId: input.roomId, handoffRequestId: input.latestUserMessageId, contextReport: context.report, workingNotes: threadTools.getNotes(), handoff: handoff.getOutcome(),
           ...(roomFallbackInfo ? { fallback: roomFallbackInfo } : {}),
         },
         ...(tokenDelta ? { tokenUsage: { ...tokenDelta, modelProvider: model.provider, modelId: model.modelId } } : {}),
       };
+    } catch (error) {
+      if (roomStreamingText || roomThinking || roomToolCalls.length) {
+        await this.chatStore.addRoomMessage(input.roomId, { role: "assistant", senderAgentId: input.responder.id, content: roomStreamingText, thinkingOutput: roomThinking || null, metadata: { interrupted: true, handoffRequestId: input.latestUserMessageId, toolCalls: roomToolCalls } });
+      }
+      throw error;
     } finally {
+      active = false;
       resolvedSession.session.dispose?.();
     }
   }
@@ -2549,15 +2441,20 @@ export class ChatManager {
   }): Promise<void> {
     const failedAgentNames: string[] = [];
     let replies = 0;
+    const orderedHandoff = isOrderedHandoff(input.content, input.mentions);
+    const unavailableNames = unresolvedHandoffNames(input.content, input.mentions);
+    let haltedReason: string | undefined = unavailableNames.length ? `Handoff stopped: ${unavailableNames.join(", ")} could not be resolved. No agents were started.` : undefined;
     const isCurrent = (): boolean => {
       const entry = this.activeGenerations.get(input.sessionId);
       return entry?.generationId === input.generationId && !entry.abortController.signal.aborted;
     };
-    for (const mention of input.mentions) {
+    const sequence = handoffSequence(input.content, input.mentions);
+    for (const [stepIndex, mention] of sequence.entries()) {
+      if (haltedReason) break;
       if (!isCurrent()) throw new Error("Generation cancelled");
       const responder = await this.getAgentById(mention.agentId);
       if (!isCurrent()) throw new Error("Generation cancelled");
-      if (!responder) continue;
+      if (!responder) { if (orderedHandoff) { haltedReason = `Handoff stopped: ${mention.agentName} is unavailable.`; break; } continue; }
       // FNXC:ChatMentionProgress 2026-09-08-12:40: A failed responder must leave its visible text and tool evidence in history before its checkpoint is cleared or another responder begins.
       let partial = { streamingText: "", streamingThinking: "", toolCalls: [] as ChatInFlightGenerationState["toolCalls"] };
       let persisted = false;
@@ -2566,15 +2463,15 @@ export class ChatManager {
         chatStreamManager.broadcast(input.sessionId, { type: "agent_message", data: { message: { id: message.id, sessionId: message.sessionId, role: "assistant", content: message.content, thinkingOutput: message.thinkingOutput ?? null, metadata: message.metadata ?? null, attachments: message.attachments, createdAt: message.createdAt }, senderAgentId: responder.id, senderAgentName: responder.name } }, { generationId: input.generationId });
       };
       try {
-        const response = await this.generateMentionedAgentReply({ ...input, responder, onProgress: (state, sender) => {
+        const response = await this.generateMentionedAgentReply({ ...input, responder, orderedHandoff, handoffStep: orderedHandoff ? { index: stepIndex + 1, total: sequence.length } : undefined, onProgress: (state, sender) => {
           partial = { ...state, toolCalls: state.toolCalls.map(call => ({ ...call })) };
           input.onProgress(state, sender);
         } });
         if (!isCurrent()) throw new Error("Generation cancelled");
-        if (isRoomSkipSentinel(response.content)) continue;
+        if (isRoomSkipSentinel(response.content)) { if (orderedHandoff) { haltedReason = `Handoff stopped: ${responder.name} skipped the assigned step.`; break; } continue; }
         const message = await this.chatStore.addMessage(input.sessionId, {
           role: "assistant", content: response.content, thinkingOutput: response.thinkingOutput ?? undefined,
-          metadata: { senderAgentId: responder.id, senderAgentName: responder.name, toolCalls: response.toolCalls, ...(response.fallback ? { fallback: response.fallback } : {}) },
+          metadata: { handoffRequestId: input.latestUserMessageId, contextReport: response.contextReport, workingNotes: response.workingNotes, handoff: response.handoff, senderAgentId: responder.id, senderAgentName: responder.name, toolCalls: response.toolCalls, ...(response.fallback ? { fallback: response.fallback } : {}) },
         });
         persisted = true;
         replies++;
@@ -2582,6 +2479,11 @@ export class ChatManager {
         if (response.tokenUsage) {
           await this.chatStore.recordTokenUsage({ sourceKind: "chat", chatSessionId: input.sessionId, messageId: message.id, projectId: input.session.projectId ?? null, agentId: responder.id, createdAt: message.createdAt, ...response.tokenUsage });
         }
+        if (orderedHandoff && response.handoff?.status !== "completed") {
+          haltedReason = `Handoff stopped after ${responder.name}: ${response.handoff?.status === "blocked" ? response.handoff.summary : "completion was not reported"}. Remaining agents were not started.`;
+          break;
+        }
+
       } catch (error) {
         if (!isCurrent()) throw new Error("Generation cancelled");
         diagnostics.error(`Mentioned chat responder ${responder.id} failed in ${input.sessionId}: ${error instanceof Error ? error.message : String(error)}`);
@@ -2599,7 +2501,12 @@ export class ChatManager {
             return;
           }
         }
+        if (orderedHandoff) { haltedReason = `Handoff stopped: ${responder.name} failed. Remaining agents were not started.`; break; }
       }
+    }
+    if (haltedReason && isCurrent()) {
+      const message = await this.chatStore.addMessage(input.sessionId, { role: "system", content: haltedReason, metadata: { handoff: { status: "blocked", summary: haltedReason } } });
+      chatStreamManager.broadcast(input.sessionId, { type: "agent_message", data: { message: { ...message, role: "system", thinkingOutput: null, metadata: message.metadata ?? null }, senderAgentId: "", senderAgentName: "Fusion" } }, { generationId: input.generationId });
     }
     await this.flushInFlightGenerationPersist(input.sessionId, null, input.generationId);
     if (replies === 0 && failedAgentNames.length > 0) {
@@ -2619,7 +2526,9 @@ export class ChatManager {
     generationId: number;
     onProgress: (state: Pick<ChatInFlightGenerationState, "streamingText" | "streamingThinking" | "toolCalls">, responder?: Agent) => void;
     responder: Agent;
-  }): Promise<{ content: string; thinkingOutput: string | null; toolCalls: ChatInFlightGenerationState["toolCalls"]; fallback?: { primaryModel: string; fallbackModel: string; triggerPoint: "session-creation" | "prompt-time" }; tokenUsage?: ChatTokenDelta & { modelProvider: string | null; modelId: string | null } }> {
+    orderedHandoff?: boolean;
+    handoffStep?: { index: number; total: number };
+  }): Promise<{ contextReport: ContextReport; workingNotes: WorkingNote[]; handoff?: HandoffOutcome; content: string; thinkingOutput: string | null; toolCalls: ChatInFlightGenerationState["toolCalls"]; fallback?: { primaryModel: string; fallbackModel: string; triggerPoint: "session-creation" | "prompt-time" }; tokenUsage?: ChatTokenDelta & { modelProvider: string | null; modelId: string | null } }> {
     /*
     FNXC:ChatMentionProgress 2026-09-07-15:31:
     Mentioned agents must expose live text and tool activity through the same
@@ -2661,12 +2570,16 @@ export class ChatManager {
       }
       const mentionContext = await this.buildMentionContext(input.mentions);
       systemPrompt = `${systemPrompt}${mentionContext ? `\n\n${mentionContext}` : ""}\n\n${CHAT_AGENT_MESSAGE_ROUTING_GUIDANCE}\n\n${CHAT_CODEBASE_ACCURACY_GUIDANCE}`;
-      const limits = await this.getRoomCompactionSettings();
-      const history = await this.chatStore.getMessages(input.sessionId, { limit: limits.fetchLimit, order: "desc" });
-      const transcript = buildCompactedRoomTranscript([...history].reverse().map((message) => ({ id: message.id, role: message.role, content: message.content, createdAt: message.createdAt, senderAgentId: typeof message.metadata?.senderAgentId === "string" ? message.metadata.senderAgentId : null })), input.latestUserMessageId, limits);
+      const fetchLimit = await this.getThreadFetchLimit();
+      const access = createThreadAccess(this.chatStore, { kind: "session", id: input.sessionId, projectId: input.session.projectId ?? null });
+      const thread = await loadThreadContext(access, input.content, fetchLimit);
+      const threadTools = createThreadTools(access, thread.notes, this.rootDir, isCurrent);
+      const handoff = createHandoffReporter(Boolean(input.orderedHandoff), isCurrent);
+      if (input.handoffStep) systemPrompt += `\n\nOrdered handoff step ${input.handoffStep.index} of ${input.handoffStep.total}: perform the assignment at this occurrence of your mention. Earlier occurrences belong to completed steps.`;
+      systemPrompt += `\n\n${handoff.guidance}\nUse fn_chat_context_update to retain source-linked decisions, constraints, and unresolved findings for subsequent participants.`;
       const { attachmentContents, imageContents } = await readChatAttachmentContents(this.rootDir, { kind: "session", sessionId: input.sessionId }, input.attachments, diagnostics);
       const skills = parseSkillCommands(input.content);
-      const prompt = [`You are replying as ${input.responder.name} in direct chat after being explicitly mentioned.`, "Direct-chat transcript (oldest to newest, bounded):", transcript, "Latest user message to answer:", skills.strippedContent, formatChatAttachmentContents(attachmentContents), formatChatImageAttachmentHints(imageContents)].filter(Boolean).join("\n\n");
+      const latestPrompt = ["Latest user message to answer:", skills.strippedContent, formatChatAttachmentContents(attachmentContents), formatChatImageAttachmentHints(imageContents)].filter(Boolean).join("\n\n");
       const settings = await this.getChatModelSettings();
       const runtimeModel = extractRuntimeModel(input.responder.runtimeConfig);
       const inheritedModel = resolvePermanentAgentEffectiveModel(input.responder, settings);
@@ -2675,7 +2588,7 @@ export class ChatManager {
       const skillSelection = mergeTypedSkillCommands(skillContext.skillSelectionContext, skills.requestedSkillNames, this.rootDir, "heartbeat");
       const workflowTools = createChatWorkflowAuthoringTools(this.taskStore, input.session.projectId ?? null);
       const gates = await createChatMissionGateContexts(this.taskStore, this.agentStore, input.responder);
-      const fusionTools = await createChatFusionToolset({ taskStore: this.taskStore, agentStore: this.agentStore, rootDir: this.rootDir, agentId: input.responder.id, missionMutationGated: gates.missionMutationGated, actionGateContext: gates.actionGateContext });
+      const fusionTools = [...threadTools.tools, handoff.tool, ...await createChatFusionToolset({ taskStore: this.taskStore, agentStore: this.agentStore, rootDir: this.rootDir, agentId: input.responder.id, missionMutationGated: gates.missionMutationGated, actionGateContext: gates.actionGateContext })];
       let fallback: { primaryModel: string; fallbackModel: string; triggerPoint: "session-creation" | "prompt-time" } | undefined;
       if (!isCurrent()) throw new Error("Generation cancelled");
       const resolved = await createResolvedAgentSession({
@@ -2699,11 +2612,13 @@ export class ChatManager {
         },
         onToolStart: (toolName: string, args?: Record<string, unknown>) => {
           if (!isCurrent()) return;
+          handoff.onToolStart(toolName);
           toolCalls.push({ toolName, args, isError: false, status: "running" });
           emit({ type: "tool_start", data: { toolName, args } });
         },
         onToolEnd: (toolName: string, isError: boolean, result?: unknown) => {
           if (!isCurrent()) return;
+          handoff.onToolEnd(toolName, isError, result);
           const pending = toolCalls.findLast((call) => call.toolName === toolName && call.status === "running");
           if (pending) Object.assign(pending, { isError, result, status: "completed" });
           else toolCalls.push({ toolName, isError, result, status: "completed" });
@@ -2727,6 +2642,8 @@ export class ChatManager {
         throw new Error("Generation cancelled");
       }
       try {
+        const context = buildThreadContext({ ...thread, latestUserMessageId: input.latestUserMessageId, tokenBudget: contextTokenBudget(resolved.session.model, systemPrompt + latestPrompt + JSON.stringify(fusionTools.map(tool => ({ name: tool.name, description: tool.description, parameters: tool.parameters })))) });
+        const prompt = [`You are replying as ${input.responder.name} in direct chat after being explicitly mentioned.`, context.text, latestPrompt].join("\n\n");
         await enginePromptWithFallback(resolved.session, prompt, imageContents.length > 0 ? { images: imageContents } : undefined);
         if (!isCurrent()) throw new Error("Generation cancelled");
         type AgentMessage = { role?: string; type?: string; content?: string | Array<{ type?: string; text?: string }> };
@@ -2739,21 +2656,9 @@ export class ChatManager {
         if (!content.trim()) throw new Error("Mentioned responder returned an empty reply");
         const { tokens } = await readChatSessionUsageSnapshot(resolved.session);
         const model = modelSnapshotForTokenUsage(resolved.session, fallback);
-        return { content: content.trim(), thinkingOutput: streamingThinking || null, toolCalls, ...(fallback ? { fallback } : {}), ...(tokens ? { tokenUsage: { ...tokens, modelProvider: model.provider, modelId: model.modelId } } : {}) };
+        return { contextReport: context.report, workingNotes: threadTools.getNotes(), handoff: handoff.getOutcome(), content: content.trim(), thinkingOutput: streamingThinking || null, toolCalls, ...(fallback ? { fallback } : {}), ...(tokens ? { tokenUsage: { ...tokens, modelProvider: model.provider, modelId: model.modelId } } : {}) };
       } finally { open = false; resolved.session.dispose?.(); }
     } finally { open = false; }
-  }
-
-  /**
-   * Preserve the newest room turns verbatim while compacting older history into
-   * a deterministic summary block so long-running rooms keep continuity.
-   */
-  private compactRoomThreadContext(
-    messages: RoomTranscriptMessage[],
-    latestUserMessageId: string,
-    opts?: { recentVerbatim?: number; summaryMaxChars?: number },
-  ): string {
-    return buildCompactedRoomTranscript(messages, latestUserMessageId, opts);
   }
 
   /**
@@ -2942,7 +2847,7 @@ export class ChatManager {
         const persistedUserMessage = await this.chatStore.addMessage(sessionId, {
           role: "user",
           content,
-          metadata: mentions.length > 0 ? { mentions } : undefined,
+          metadata: mentions.length > 0 ? { mentions, handoffPlan: { version: 1, ordered: isOrderedHandoff(content, mentions), agentIds: handoffSequence(content, mentions).map(mention => mention.agentId) } } : undefined,
           attachments,
         });
         persistedUserMessageId = persistedUserMessage.id;
@@ -3292,6 +3197,9 @@ export class ChatManager {
         ? [createTaskPlannerRefinementTool(this.taskStore, taskPlannerChatTaskId)]
         : [];
 
+      const directAccess = createThreadAccess(this.chatStore, { kind: "session", id: sessionId, projectId: session.projectId ?? null });
+      const directThread = await loadThreadContext(directAccess, content);
+      const directThreadTools = createThreadTools(directAccess, directThread.notes, this.rootDir, () => !abortController.signal.aborted && this.activeGenerations.get(sessionId)?.generationId === generationId);
       const missionGateContexts = await createChatMissionGateContexts(this.taskStore, this.agentStore, agent);
       const chatFusionTools = await createChatFusionToolset({
         taskStore: this.taskStore,
@@ -3312,6 +3220,7 @@ export class ChatManager {
         currentProjectId: session?.projectId ?? null,
       });
       const customTools = dedupeChatTools([
+        ...directThreadTools.tools,
         createAskQuestionTool(),
         ...taskPlannerSteeringTools,
         ...taskPlannerMetricsTools,
@@ -3450,9 +3359,28 @@ export class ChatManager {
       }
 
       // Send user message and get response
+      // FNXC:ChatContext 2026-09-11-15:57: The resumed model session must also see replies written by mentioned agents, which live outside its provider session file.
+      const lastModelReply = directThread.messages.findLastIndex(message => message.role === "assistant" && !message.metadata?.senderAgentId && !message.metadata?.interrupted && !message.metadata?.failureInfo);
+      const unsharedMessages = directThread.messages.slice(lastModelReply + 1).filter(message => message.metadata?.senderAgentId || message.metadata?.handoff || (message.role === "user" && Array.isArray(message.metadata?.mentions) && message.metadata.mentions.length > 0));
+      const requiredSharedIds = new Set([...directThread.requiredMessageIds, ...unsharedMessages.map(message => message.id)]);
+      for (const message of unsharedMessages) {
+        const requestId = message.metadata?.handoffRequestId;
+        if (typeof requestId !== "string") continue;
+        requiredSharedIds.add(requestId);
+        if (!directThread.messages.some(row => row.id === requestId)) {
+          const request = await directAccess.read(requestId);
+          if (request) directThread.messages.push(request); else directThread.missingReferenceIds.push(requestId);
+        }
+      }
+      const needsSharedContext = directThread.notes.length > 0 || directThread.requiredMessageIds.length > 1 || unsharedMessages.length > 0;
+      const directContext = needsSharedContext ? buildThreadContext({ ...directThread,
+        messages: directThread.messages.filter(message => requiredSharedIds.has(message.id) || message.id === persistedUserMessageId).sort((a, b) => a.createdAt.localeCompare(b.createdAt)),
+        requiredMessageIds: [...requiredSharedIds], latestUserMessageId: persistedUserMessageId!,
+        tokenBudget: contextTokenBudget(agentResult.session.model, systemPrompt + promptContent + JSON.stringify(customTools.map(tool => ({ name: tool.name, description: tool.description, parameters: tool.parameters })))),
+      }) : undefined;
       await enginePromptWithFallback(
         agentResult.session,
-        promptContent,
+        directContext ? `${directContext.text}\n\n${promptContent}` : promptContent,
         imageContents.length > 0 ? { images: imageContents } : undefined,
       );
 
@@ -3512,7 +3440,7 @@ export class ChatManager {
       const finalResponseText = accumulatedText || responseText;
 
       // Persist assistant message
-      const assistantMetadata: Record<string, unknown> = {};
+      const assistantMetadata: Record<string, unknown> = { workingNotes: directThreadTools.getNotes(), ...(directContext ? { contextReport: directContext.report } : {}) };
       if (toolCallsAccum.length > 0) {
         assistantMetadata.toolCalls = toolCallsAccum;
       }

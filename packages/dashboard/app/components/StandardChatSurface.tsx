@@ -9,6 +9,7 @@ import type { ChatMessageInfo, FailureInfo, ToolCallInfo } from "../hooks/chatTy
 import { MarkdownFileAnchor, linkifyFilePaths, linkifyReactChildren } from "../utils/filePathLinkify";
 import { parseQuestionToolCall } from "../utils/parseQuestionToolCall";
 import { ChatQuestionResponse } from "./ChatQuestionResponse";
+import { ChatContextDisclosure } from "./ChatContextDisclosure";
 import { ProviderIcon } from "./ProviderIcon";
 import { NativeStructurePreview } from "./NativeStructurePreview";
 import { openNativeStructure } from "./nativeStructureNavigation";
@@ -708,6 +709,7 @@ export const StandardChatMessageItem = memo(function StandardChatMessageItem({
     const mentionRegex = /@([\w-]+)/g;
     const tokens = [
       ...Array.from(content.matchAll(mentionRegex)).map((match) => ({ type: "mention" as const, match })),
+      ...Array.from(content.matchAll(/\[([^\]\n]+)\]\(#chat-message-([\w-]+)\)/g)).map((match) => ({ type: "chat-source" as const, match })),
       ...Array.from(content.matchAll(nativeStructureChatRefMatcher)).map((match) => ({ type: "native-structure" as const, match })),
     ].sort((left, right) => (left.match.index ?? 0) - (right.match.index ?? 0));
     const parts: ReactNode[] = [];
@@ -723,7 +725,9 @@ export const StandardChatMessageItem = memo(function StandardChatMessageItem({
       const start = token.match.index ?? 0;
       if (start < lastIndex) continue;
       if (start > lastIndex) parts.push(content.slice(lastIndex, start));
-      if (token.type === "native-structure") {
+      if (token.type === "chat-source") {
+        parts.push(<a key={`chat-source-${start}`} href={`#chat-message-${token.match[2]}`}>{rawName}</a>);
+      } else if (token.type === "native-structure") {
         const { token: referenceToken, trailingPunctuation } = splitNativeStructureChatRefMatch(token.match);
         const structureRef = parseNativeStructureChatRef(referenceToken);
         parts.push(structureRef ? <React.Fragment key={`native-structure-user-${start}`}><NativeStructurePreview ref={structureRef} onOpen={openNativeStructure} />{trailingPunctuation}</React.Fragment> : fullMatch);
@@ -772,7 +776,7 @@ export const StandardChatMessageItem = memo(function StandardChatMessageItem({
   const hasVisibleAssistantFooterContent = Boolean(message.thinkingOutput || copyAction || showQuoteAction || (onScrollToTop && isTopClipped));
   const messageTime = <div className="chat-message-time">{formatRelativeTime(message.createdAt, t)}</div>;
   return (
-    <div className={`chat-message chat-message--${message.role}${failureInfo ? " chat-message--failure" : ""}${isEditing ? " chat-message--editing" : ""}${isSearchMatch ? " chat-message--search-match" : ""}${isSearchActive ? " chat-message--search-active" : ""}`} data-testid={`chat-message-${message.id}`} data-message-id={message.id}>
+    <div className={`chat-message chat-message--${message.role}${failureInfo ? " chat-message--failure" : ""}${isEditing ? " chat-message--editing" : ""}${isSearchMatch ? " chat-message--search-match" : ""}${isSearchActive ? " chat-message--search-active" : ""}`} data-testid={`chat-message-${message.id}`} data-message-id={message.id} id={`chat-message-${message.id}`}>
       {showAssistantIdentity && <div className="chat-message-avatar">{activeModelProvider ? <ProviderIcon provider={activeModelProvider} size="sm" /> : <Bot size={14} />}<span>{agentName}</span>{showAssistantModelTag && activeModelTag && <span className="chat-model-tag">{activeModelTag}</span>}</div>}
       {isEditing ? (
         <StandardChatMessageEditComposer
@@ -802,6 +806,7 @@ export const StandardChatMessageItem = memo(function StandardChatMessageItem({
       )}
       {renderStandardToolCalls(message.toolCalls, t, { isAwaitingAnswer: isAwaitingQuestionAnswer, submittedAnswer: submittedQuestionAnswer, onQuestionSubmit, toolCallRenderer })}
       {renderedAttachments}
+      <ChatContextDisclosure metadata={message.metadata} />
       {isUserMessage ? (
         <div className="chat-message-time-row">
           {messageTime}

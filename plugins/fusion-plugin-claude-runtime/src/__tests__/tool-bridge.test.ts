@@ -4,7 +4,8 @@ import { request } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
-import { fusionToolsMcpServerPath, startFusionToolBridge } from "../tool-bridge.js";
+import { fusionToolCategory, fusionToolsMcpServerPath, startFusionToolBridge } from "../tool-bridge.js";
+import { effectiveDisposition } from "../acp/control-handler.js";
 
 function bridgeEnv(bridge: NonNullable<Awaited<ReturnType<typeof startFusionToolBridge>>>, name: string): string {
   if (!("env" in bridge.mcpServer)) throw new Error("custom tool bridge must use stdio MCP");
@@ -41,6 +42,12 @@ async function post(url: string, body: string, token?: string): Promise<{ status
 }
 
 describe("startFusionToolBridge", () => {
+  it.each(["fn_chat_thread_read", "fn_chat_thread_search", "fn_chat_context_update", "fn_chat_handoff"])("permits scoped coordination %s when board mutations are denied", name => {
+    const gate = { permissionPolicy: { rules: { task_agent_mutation: "block" as const } } };
+    expect(effectiveDisposition(fusionToolCategory(name), gate)).toBe("allow");
+    expect(effectiveDisposition(fusionToolCategory("fn_task_update"), gate)).toBe("block");
+    expect(effectiveDisposition(fusionToolCategory(`${name}_untrusted`), gate)).toBe("block");
+  });
   it("serves MCP initialize from the co-located schema server", async () => {
     const directory = await mkdtemp(join(tmpdir(), "fusion-mcp-smoke-"));
     const schemaPath = join(directory, "schemas.json");

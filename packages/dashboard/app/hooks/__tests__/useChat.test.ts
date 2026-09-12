@@ -4227,6 +4227,24 @@ describe("useChat", () => {
     });
   });
 
+  it("skips inclusive timestamp boundaries and merges overlapping history pages once", async () => {
+    const session = makeSession({ id: "session-001", agentId: "agent-001" });
+    const timestamp = "2026-09-11T00:00:00.000Z";
+    const recent = Array.from({ length: 50 }, (_, i) => makeMessage({ id: `msg-${String(i).padStart(2, "0")}`, sessionId: session.id, createdAt: timestamp }));
+    const older = makeMessage({ id: "older", sessionId: session.id, createdAt: "2026-09-10T00:00:00.000Z" });
+    mockFetchChatSessions.mockResolvedValueOnce({ sessions: [session] });
+    mockFetchChatMessages.mockResolvedValueOnce({ messages: recent }).mockResolvedValue({ messages: [recent[0], older] });
+    const { result } = renderHook(() => useChat());
+    await waitFor(() => expect(result.current.sessions).toHaveLength(1));
+    act(() => { result.current.selectSession(session.id); });
+    await waitFor(() => expect(result.current.messages).toHaveLength(50));
+    await act(async () => { await Promise.all([result.current.loadMoreMessages(), result.current.loadMoreMessages()]); });
+    expect(mockFetchChatMessages).toHaveBeenLastCalledWith(session.id, expect.objectContaining({ before: timestamp, offset: 50 }), undefined);
+    expect(result.current.messages).toHaveLength(51);
+    expect(new Set(result.current.messages.map(message => message.id)).size).toBe(51);
+    expect(result.current.messages[0].id).toBe("older");
+  });
+
   it("sets hasMoreMessages to false when fewer messages returned", async () => {
     const session = makeSession({ id: "session-001", agentId: "agent-001" });
     mockFetchChatSessions.mockResolvedValueOnce({ sessions: [session] });

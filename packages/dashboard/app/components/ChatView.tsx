@@ -1,6 +1,7 @@
 // ChatView.css is imported eagerly from App.tsx to avoid a flash of
 // unstyled content when the lazy chunk loads. Do not re-import here.
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useChatReferenceNavigation } from "../hooks/useChatReferenceNavigation";
 import {
   MessageSquare,
   Plus,
@@ -2815,7 +2816,7 @@ export function ChatView({ projectId, addToast, floating = false, compactLayout 
     const agentName = senderId
       ? (agentsMap.get(senderId)?.name ?? (typeof message.metadata?.senderAgentName === "string" ? message.metadata.senderAgentName : undefined))
       : message.role === "assistant" ? sessionAgent?.name : undefined;
-    setMessageInput((draft) => buildChatQuotePrefill({ quotedText: message.content, agentName, existingDraft: draft }));
+    setMessageInput((draft) => buildChatQuotePrefill({ quotedText: message.content, agentName, existingDraft: draft, messageId: message.id }));
     requestAnimationFrame(() => { inputRef.current?.focus(); resizeComposer(); });
   }, [activeSession?.agentId, agentsMap, resizeComposer]);
 
@@ -2840,9 +2841,13 @@ export function ChatView({ projectId, addToast, floating = false, compactLayout 
     const targetEl = containerEl.querySelector<HTMLElement>(selector);
     if (!targetEl) return;
 
+    // Move ownership and position together. A delayed event at the old bottom can
+    // otherwise re-enable following before a smooth animation starts.
+    scrollRestoreSnapshotRef.current = null;
+    isUserScrollingRef.current = true;
+    setIsUserScrolling(true);
     const top = targetEl.getBoundingClientRect().top - containerEl.getBoundingClientRect().top + containerEl.scrollTop;
-    const prefersReducedMotion = typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
-    containerEl.scrollTo({ top, behavior: prefersReducedMotion ? "auto" : "smooth" });
+    containerEl.scrollTo({ top, behavior: "instant" });
   }, []);
 
   /*
@@ -2851,12 +2856,14 @@ export function ChatView({ projectId, addToast, floating = false, compactLayout 
    * (a live PTY owns the transcript), and never while a generation is streaming.
    */
   const canEditChatMessages = !cliChatActive && !isStreaming;
+  const onReferenceUnavailable = useCallback(() => addToast(t("chat.referenceUnavailable", "The referenced message could not be loaded."), "warning"), [addToast, t]);
+  const handleReferenceClick = useChatReferenceNavigation({ sessionId: activeSession?.id ?? null, container: messagesContainerRef, messages, loading: messagesLoading, hasMore: hasMoreMessages, loadMore: loadMoreMessages, scrollTo: handleScrollMessageToTop, onUnavailable: onReferenceUnavailable });
 
   // The session message pane and composer, captured once so both the normal
   // provider path and the CLI-backed path (CliChatSurface thunks) render the
   // exact same JSX — no parallel message/composer UI.
   const renderSessionMessagesPane = () => (
-    <div className="chat-messages" ref={messagesContainerRef} onScroll={updateScrollState}>
+    <div className="chat-messages" ref={messagesContainerRef} onScroll={updateScrollState} onClick={handleReferenceClick}>
       <div ref={loadMoreSentinelRef} className="chat-load-more-sentinel">
         {hasMoreMessages && messagesLoading && (
           <div className="chat-loading-older">{t("chat.loadingOlderMessages", "Loading older messages…")}</div>

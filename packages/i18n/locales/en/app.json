@@ -1446,7 +1446,18 @@
     "slashSuggestions": "Slash suggestions",
     "loadingSlashSuggestions": "Loading suggestions…",
     "snippetSuggestion": "Insert saved prompt",
-    "snippetSuggestions": "Snippet suggestions"
+    "snippetSuggestions": "Snippet suggestions",
+    "contextCoverage": "Conversation context",
+    "contextIncluded": "Complete earlier messages included: {{count}}.",
+    "contextOmitted": "Earlier messages omitted from the prompt: {{count}}. The agent can retrieve them.",
+    "contextOlder": "Additional older history is available through conversation search.",
+    "contextRequiredDeferred": "Required messages needing retrieval: {{count}}.",
+    "contextMissing": "Unavailable referenced messages: {{count}}.",
+    "contextNotes": "Source-linked working notes carried forward: {{count}}.",
+    "contextNotesDeferred": "Working notes were too large to include and are available for retrieval.",
+    "contextSavedNotes": "Working notes saved for later replies",
+    "contextSource": "Source {{count}}",
+    "referenceUnavailable": "The referenced message could not be loaded."
   },
   "chatRooms": {
     "error": {

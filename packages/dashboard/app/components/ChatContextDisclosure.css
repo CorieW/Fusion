@@ -1,0 +1,19 @@
+.chat-context-disclosure {
+  margin-block: var(--space-sm);
+  color: var(--text-muted);
+  font-size: var(--font-size-sm);
+  overflow-wrap: anywhere;
+}
+
+.chat-context-disclosure > summary {
+  cursor: pointer;
+}
+
+.chat-context-disclosure > summary:focus-visible {
+  box-shadow: var(--focus-ring);
+  border-radius: var(--radius-sm);
+}
+
+.chat-context-disclosure p {
+  margin-block: var(--space-xs);
+}

@@ -54,6 +54,14 @@ const TEXT_MIME_TYPES = new Set(
 export const CHAT_TEXT_INLINE_LIMIT = 50 * 1024;
 const TRUNCATION_SUFFIX = "\n... (truncated at 50KB)";
 
+/** FNXC:ChatContext 2026-09-11-15:57: Retrieval pages the original attachment, including text beyond the initial prompt's inline limit. */
+export async function readChatAttachmentTextPage(rootDir: string, scope: ChatAttachmentScope, attachment: ChatAttachment, offset: number, limit: number) {
+  if (!TEXT_MIME_TYPES.has(attachment.mimeType)) throw new Error("Attachment is not readable text.");
+  const text = await readFile(resolve(getAttachmentDirectory(rootDir, scope), basename(attachment.filename)), "utf8");
+  const end = Math.min(text.length, offset + limit);
+  return { text: text.slice(offset, end), totalCharacters: text.length, nextCharOffset: end < text.length ? end : null };
+}
+
 function getAttachmentDirectory(rootDir: string, scope: ChatAttachmentScope): string {
   if (scope.kind === "session") {
     return resolve(rootDir, ".fusion", "chat-attachments", scope.sessionId);

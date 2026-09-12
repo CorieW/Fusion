@@ -1436,7 +1436,18 @@
     "snippetSuggestion": "Insérer le prompt enregistré",
     "snippetSuggestions": "Suggestions d’extraits",
     "conversationIdCopied": "ID de la conversation copié",
-    "copyConversationId": "Copier l’ID de la conversation"
+    "copyConversationId": "Copier l’ID de la conversation",
+    "contextCoverage": "Contexte de la conversation",
+    "contextIncluded": "Messages précédents complets inclus : {{count}}.",
+    "contextOmitted": "Messages précédents omis : {{count}}. L’agent peut les récupérer.",
+    "contextOlder": "L’historique plus ancien est accessible via la recherche dans la conversation.",
+    "contextRequiredDeferred": "Messages nécessaires à récupérer : {{count}}.",
+    "contextMissing": "Messages cités indisponibles : {{count}}.",
+    "contextNotes": "Notes de travail avec sources conservées : {{count}}.",
+    "contextNotesDeferred": "Les notes étaient trop volumineuses pour être incluses et peuvent être récupérées.",
+    "contextSavedNotes": "Notes de travail enregistrées pour les réponses suivantes",
+    "contextSource": "Source {{count}}",
+    "referenceUnavailable": "Le message cité n’a pas pu être chargé."
   },
   "chatRooms": {
     "error": {

@@ -1436,7 +1436,18 @@
     "snippetSuggestion": "插入已保存的提示词",
     "snippetSuggestions": "片段建议",
     "conversationIdCopied": "",
-    "copyConversationId": ""
+    "copyConversationId": "",
+    "contextCoverage": "对话上下文",
+    "contextIncluded": "已完整包含的历史消息：{{count}} 条。",
+    "contextOmitted": "提示中省略的历史消息：{{count}} 条。智能体可以读取这些消息。",
+    "contextOlder": "可以通过对话搜索读取更早的历史记录。",
+    "contextRequiredDeferred": "需要读取的必要消息：{{count}} 条。",
+    "contextMissing": "无法获取的引用消息：{{count}} 条。",
+    "contextNotes": "保留的带来源工作笔记：{{count}} 条。",
+    "contextNotesDeferred": "工作笔记过长，未包含在提示中，可另行读取。",
+    "contextSavedNotes": "为后续回复保存的工作笔记",
+    "contextSource": "来源 {{count}}",
+    "referenceUnavailable": "无法加载引用的消息。"
   },
   "chatRooms": {
     "error": {

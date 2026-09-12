@@ -1436,7 +1436,18 @@
     "snippetSuggestion": "저장된 프롬프트 삽입",
     "snippetSuggestions": "스니펫 제안",
     "conversationIdCopied": "",
-    "copyConversationId": ""
+    "copyConversationId": "",
+    "contextCoverage": "대화 맥락",
+    "contextIncluded": "전체 내용이 포함된 이전 메시지: {{count}}개.",
+    "contextOmitted": "프롬프트에서 생략된 이전 메시지: {{count}}개. 에이전트가 조회할 수 있습니다.",
+    "contextOlder": "대화 검색으로 더 오래된 기록을 조회할 수 있습니다.",
+    "contextRequiredDeferred": "조회가 필요한 필수 메시지: {{count}}개.",
+    "contextMissing": "사용할 수 없는 참조 메시지: {{count}}개.",
+    "contextNotes": "출처가 연결된 작업 노트: {{count}}개.",
+    "contextNotesDeferred": "작업 노트가 너무 길어 포함되지 않았으며 별도로 조회할 수 있습니다.",
+    "contextSavedNotes": "다음 응답을 위해 저장된 작업 노트",
+    "contextSource": "출처 {{count}}",
+    "referenceUnavailable": "참조한 메시지를 불러올 수 없습니다."
   },
   "chatRooms": {
     "error": {

@@ -765,7 +765,7 @@ export function useChat(
           || (opts?.commitForStreamingAttach === true && lastAttachedGenerationRef.current?.sessionId === sessionId);
         if (isPaginationRequest) {
           if (shouldCommitMessages) {
-            setMessages((prev) => sortChatMessagesChronologically([...mappedMessages, ...prev]));
+            setMessages((prev) => sortChatMessagesChronologically([...new Map([...mappedMessages, ...prev].map(message => [message.id, message])).values()]));
             setHasMoreMessages(data.messages.length >= 50);
           }
         } else {
@@ -1554,7 +1554,10 @@ export function useChat(
     // messagesRef.current[0] is the oldest visible message; fetch older ones using its createdAt
     const cursor = messagesRef.current[0]?.createdAt;
     if (!cursor) return;
-    await loadMessages(activeSession.id, { before: cursor });
+    // The API's before cursor is inclusive. Skip the boundary rows already displayed,
+    // including multiple messages with the same timestamp, so every page advances.
+    const offset = messagesRef.current.filter(message => message.createdAt === cursor).length;
+    await loadMessages(activeSession.id, { before: cursor, offset });
   }, [activeSession, hasMoreMessages, loadMessages]);
 
   /*

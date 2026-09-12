@@ -182,7 +182,11 @@ export const ACTION_GATE_NETWORK_API_TOOLS: ReadonlySet<string> = new Set([
   "worktrunk_install", // FN-4624: gate binary auto-install under network_api policy.
 ]);
 
+/* FNXC:ChatContext 2026-09-11-15:57: Current-thread reads, source-linked notes and outcome reports are scoped conversation coordination. They grant no shell, board mutation or cross-project authority, and must remain usable under restricted agent policies. */
+const CHAT_COORDINATION_TOOLS = ["fn_chat_thread_read", "fn_chat_thread_search", "fn_chat_context_update", "fn_chat_handoff"] as const;
+
 export const READONLY_FN_TOOLS: ReadonlySet<string> = new Set([
+  ...CHAT_COORDINATION_TOOLS,
   "fn_artifact_register",
   "fn_artifact_list",
   "fn_artifact_view",
@@ -260,6 +264,7 @@ export const READONLY_FN_TOOLS: ReadonlySet<string> = new Set([
 export const WORKFLOW_AUTHORIZED_TOOLS: ReadonlySet<string> = new Set(["fn_problem_report"]);
 
 export const COORDINATION_EXEMPT_TOOLS = [
+  ...CHAT_COORDINATION_TOOLS,
   ...WORKFLOW_AUTHORIZED_TOOLS,
   "read",
   "find",
