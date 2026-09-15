@@ -31,8 +31,13 @@ describe("problem reporting import capability validation", () => {
   });
   it("rejects incompatible field schemas", () => {
     const ir = workflow();
-    ir.fields![1] = { id: "problem_type", name: "Type", type: "enum", options: [{ value: "general", label: "General" }] };
+    ir.fields![0] = { id: "record_type", name: "Record type", type: "enum", options: [{ value: "other", label: "Other" }] };
     expect(() => parseWorkflowIr(ir)).toThrow("required values");
+  });
+  it.each([["general"], ["parity"], ["security", "accessibility"], ["general", "parity"]])("accepts user-defined problem-type options %j", (...values) => {
+    const ir = workflow();
+    ir.fields![1] = { id: "problem_type", name: "Type", type: "enum", options: values.map((value) => ({ value, label: value })) };
+    expect(parseWorkflowIr(ir)).toEqual(ir);
   });
   it.each([
     { id: "__proto__", type: "text" as const },

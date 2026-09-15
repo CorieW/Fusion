@@ -58,6 +58,45 @@ pgDescribe("structured problem reporting", () => {
     await expect(assertProblemReportingComplete(h.store(), "FN-1", session)).rejects.toThrow("no live survivor");
   });
 
+  it("persists arbitrary categories unchanged and deduplicates only within the same category", async () => {
+    const session = await seed();
+    const requestIds: string[] = [];
+    for (const [index, problemType] of ["general", "security", "Accessibility / keyboard", "性能", " custom "].entries()) {
+      const report = input(`custom-${index}`, { problemType, extensionObservation: undefined, kitObservation: undefined });
+      const first = await reportProblem(h.store(), "FN-1", report, session);
+      expect(first.deletedTaskIds).toEqual([]);
+      expect(await reportProblem(h.store(), "FN-1", report, session)).toEqual(first);
+      const duplicate = await reportProblem(h.store(), "FN-1", { ...report, requestId: `${report.requestId}-duplicate` }, session);
+      expect(duplicate.deletedTaskIds).toEqual([first.createdTaskId]);
+      expect(await readProblemReports(h.store(), "FN-1", { id: first.createdTaskId }, session)).toMatchObject({
+        id: duplicate.createdTaskId, customFields: { problem_type: problemType }, observations: [{ input: { problemType } }],
+      });
+      requestIds.push(report.requestId, `${report.requestId}-duplicate`);
+    }
+    const listed = await readProblemReports(h.store(), "FN-1", {}, session);
+    expect("tasks" in listed && listed.tasks).toHaveLength(5);
+    await updateProblemReportingLedger(h.store(), "FN-1", requestIds, true, session);
+    await expect(assertProblemReportingComplete(h.store(), "FN-1", session)).resolves.toBeUndefined();
+  });
+
+  it("enforces user-defined enum options without requiring general or parity", async () => {
+    await seed();
+    const customIr: WorkflowIrV2 = { ...ir, fields: ir.fields!.map((field) => field.id === "problem_type"
+      ? { ...field, type: "enum", options: [{ value: "security", label: "Security" }] } : field) };
+    await h.layer().db.update(workflows).set({ ir: customIr }).where(eq(workflows.id, "WF-TEST"));
+    expect(await problemReportingPreflight(h.store(), "FN-1")).toMatchObject({ available: true });
+    const receipt = await reportProblem(h.store(), "FN-1", input("custom-enum", { problemType: "security" }));
+    expect((await row(receipt.createdTaskId)).customFields).toMatchObject({ problem_type: "security" });
+    await expect(reportProblem(h.store(), "FN-1", input("outside-enum", { problemType: "general" }))).rejects.toThrow();
+  });
+
+  it("rejects invalid types and missing evidence before touching storage", async () => {
+    for (const problemType of [undefined, null, "", " \t\n", 42, false, [], {}]) {
+      await expect(reportProblem(h.store(), "FN-1", input("invalid-type", { problemType: problemType as string }))).rejects.toThrow("type and demonstrated evidence");
+    }
+    await expect(reportProblem(h.store(), "FN-1", input("missing-evidence", { problemType: "security", evidence: [] }))).rejects.toThrow("type and demonstrated evidence");
+  });
+
   it("retains newest open evidence, separates types/paths/identities, and follows deleted receipts", async () => {
     await seed();
     const old = await reportProblem(h.store(), "FN-1", input("old", { customFields: { older_note: "unique configuration note" } }));

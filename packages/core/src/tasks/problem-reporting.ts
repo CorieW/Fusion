@@ -12,7 +12,8 @@ import { appendTaskLifecycleEventInTransaction } from "../task-store/lifecycle-o
 export interface ProblemReportInput {
   requestId: string;
   problemKey: string;
-  problemType: "general" | "parity";
+  /** FNXC:ProblemReporting 2026-09-15-11:05: Users define problem categories; only the workflow's field schema may restrict their values. */
+  problemType: string;
   title: string;
   kitPath: string;
   extensionPath: string;
@@ -204,7 +205,7 @@ export async function reportProblem(store: TaskStore, sourceTaskId: string, inpu
     if (typeof input[key] !== "string" || !input[key].trim()) throw new Error(`Problem report requires ${key}`);
   }
   if (["__proto__", "constructor", "prototype"].includes(input.requestId)) throw new Error("Unsafe requestId");
-  if (!["general", "parity"].includes(input.problemType) || !Array.isArray(input.evidence) || !input.evidence.length || input.evidence.some((value) => typeof value !== "string" || !value.trim())) throw new Error("Problem report requires type and demonstrated evidence");
+  if (typeof input.problemType !== "string" || !input.problemType.trim() || !Array.isArray(input.evidence) || !input.evidence.length || input.evidence.some((value) => typeof value !== "string" || !value.trim())) throw new Error("Problem report requires type and demonstrated evidence");
   if (input.problemType === "parity" && (!input.extensionObservation?.trim() || !input.kitObservation?.trim())) throw new Error("Parity reports require paired extension and kit observations");
   let created = false;
   const receipt = await authorized(store, sourceTaskId, async ({ tx, parent, projectId, workflowId, ir }) => {

@@ -23,6 +23,8 @@ Add this declaration to the workflow's v2 IR, using your actual column IDs:
 
 All referenced columns must exist. Reporting columns cannot also be source columns. Import rejects missing or incompatible field declarations. String, text and compatible enum fields are supported. Additional declared custom fields can be supplied in `report.customFields`; unknown fields are rejected. Evidence, reproduction, configuration and paired observations are persisted with each report and available through the tool's `read` action. The source task ID is filled from trusted session context.
 
+`report.problemType` accepts any nonblank string, such as `security`, `accessibility`, or `performance`. Values are preserved exactly, including case and surrounding whitespace. Declare `problem_type` as `string` or `text` to allow any category, or as an `enum` to restrict reports to your own options. Enums do not need to include `general` or `parity`. The `parity` category still requires both `extensionObservation` and `kitObservation`; every category requires demonstrated evidence.
+
 Each authorized implementation or workflow-step session starts a fresh results ledger before its model runs. The same tool is exposed through the engine's provider bridges and CLI extension, including explicitly authorized read-only testing steps. Unconfigured sessions can inspect capability availability; writes remain refused.
 
 The workflow grant is the reporting authority; general task-creation permission does not enable or disable it. The engine passes a reporting generation through both tool paths. Expired generations and sessions whose source moves to another column or workflow cannot use a replacement ledger. Switching workflows starts a separate ledger.
@@ -59,7 +61,7 @@ The ledger verifies the findings the workflow declares. It cannot infer undisclo
 
 ## Deduplication and retries
 
-`problemKey` is an explicit identity for the underlying defect, not a fuzzy title match. Use the same key for the same cause and different keys for different causes. Identity also includes `problemType`, `kitPath` and `extensionPath`, so general and parity reports never merge. Existing records must carry the reporting tool's identity metadata to participate in automatic deduplication; records without that identity still appear in column enumeration for inspection.
+`problemKey` is an explicit identity for the underlying defect, not a fuzzy title match. Use the same key for the same cause and different keys for different causes. Identity also includes `problemType`, `kitPath` and `extensionPath`, so reports with different categories never merge. Existing records must carry the reporting tool's identity metadata to participate in automatic deduplication; records without that identity still appear in column enumeration for inspection.
 
 Resolved matches take precedence. The incoming task is created and soft-deleted atomically; the resolved record and any existing open duplicates remain unchanged. Otherwise the newly accepted report survives, older open duplicates are soft-deleted, and their observations and missing custom fields are copied into the survivor. Conflicting older values, descriptions, comments and attachment references remain available in retained observations. Soft-deletion preserves forensic rows and emits the normal durable deletion event.
 
@@ -83,7 +85,8 @@ Reads include `currentRecord` with human-added description, comments and attachm
 
 - Engine implementation sessions, workflow prompt/skill sessions (including read-only testing), step sessions and CLI extension share the reporting service/schema.
 - Import validation and session preflight reject unavailable capabilities before testing. Completion and session exits verify the results ledger.
-- Tests cover empty/populated/multiple pages, both problem types, both columns, distinct causes and paths, project/workflow isolation, source provenance, missing/unknown fields, missing parity pairs, stale sessions, retries, concurrent reports, rollback, retained evidence and resolved precedence.
+- Tests cover empty/populated/multiple pages, built-in and custom categories, blank/non-string types, user-defined enum options, both columns, distinct causes and paths, project/workflow isolation, source provenance, missing/unknown fields, missing parity pairs, stale sessions, retries, concurrent reports, rollback, retained evidence and resolved precedence.
+- Custom-category regression: submit `problemType: "accessibility"` through the shared tool schema and registered CLI tool, persist and read it back unchanged, and verify retries and duplicates preserve the category while different categories remain separate.
 - Original symptom: demonstrated findings could not be persisted during board execution. The PostgreSQL regression creates a declared testing workflow and parent task, reports a finding, reads all fields/evidence back, and proves incomplete ledgers cannot succeed.
 
 No dashboard affordance changes are needed: records use existing task cards and declared-field rendering at every breakpoint.

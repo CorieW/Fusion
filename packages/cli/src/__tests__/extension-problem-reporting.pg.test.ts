@@ -45,8 +45,8 @@ pgDescribe("registered problem reporting with PostgreSQL", () => {
     await call({ action: "expect", requestIds: ["one", "two"] });
     expect(await call({ action: "finish", requestIds: ["one", "two"] })).toMatchObject({ isError: true });
     const reports = await Promise.all(["one", "two"].map((requestId) => call({ action: "report", report: {
-      requestId, problemKey: "same-defect", problemType: "parity", title: "Parity defect", kitPath: "kit", extensionPath: "extension",
-      reproduction: "Run paired fixtures", configuration: "Emulators", evidence: [requestId], extensionObservation: "Retains value", kitObservation: "Drops value",
+      requestId, problemKey: "same-defect", problemType: "accessibility", title: "Keyboard focus defect", kitPath: "kit", extensionPath: "extension",
+      reproduction: "Navigate using the keyboard", configuration: "Emulators", evidence: [requestId],
     } })));
     expect(reports.every((result) => !result.isError)).toBe(true);
     const list = await call({ action: "list" });
@@ -55,7 +55,7 @@ pgDescribe("registered problem reporting with PostgreSQL", () => {
     const observed: string[] = [];
     for (const observationOffset of [0, 1]) {
       const read = await call({ action: "read", id: survivor, observationOffset });
-      expect(read).toMatchObject({ details: { customFields: { record_type: "problem", problem_type: "parity", originating_task_id: "FN-ORIGIN" } } });
+      expect(read).toMatchObject({ details: { customFields: { record_type: "problem", problem_type: "accessibility", originating_task_id: "FN-ORIGIN" } } });
       const observations = read.details!.observations as Array<{ input: { evidence: string[] } }>;
       observed.push(...observations[0]!.input.evidence);
     }

@@ -8,7 +8,7 @@ export const problemReportParameters = Type.Object({
   report: Type.Optional(Type.Object({
     requestId: Type.String({ minLength: 1 }),
     problemKey: Type.String({ minLength: 1, description: "Stable identity of the underlying demonstrated defect. Reuse for duplicates; never use a generic category or title." }),
-    problemType: Type.Union([Type.Literal("general"), Type.Literal("parity")]),
+    problemType: Type.String({ minLength: 1, pattern: "\\S", description: "User-defined problem category accepted by the workflow's problem_type field. The parity category requires paired extension and kit observations." }),
     title: Type.String({ minLength: 1 }),
     kitPath: Type.String({ minLength: 1 }),
     extensionPath: Type.String({ minLength: 1 }),
