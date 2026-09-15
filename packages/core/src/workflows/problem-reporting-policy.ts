@@ -35,7 +35,9 @@ export function validateProblemReportingPolicy(ir: WorkflowIrV2): void {
     if (!field || !["string", "text", "enum"].includes(field.type)) {
       throw new Error(`problemReporting requires a declared string/text/enum field: ${id}`);
     }
-    const values = id === "record_type" ? ["problem"] : id === "problem_type" ? ["general", "parity"] : [];
+    // FNXC:ProblemReporting 2026-09-15-11:05: Problem-type enums use the user's options without requiring built-in categories.
+    if (id === "problem_type") continue;
+    const values = id === "record_type" ? ["problem"] : [];
     if (field.type === "enum" && (values.length === 0 || values.some((value) => !field.options?.some((option) => option.value === value)))) {
       throw new Error(`problemReporting field ${id} does not accept required values`);
     }

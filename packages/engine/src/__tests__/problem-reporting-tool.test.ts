@@ -29,6 +29,17 @@ describe("shared engine and extension problem reporting tool", () => {
     expect(seams.report).toHaveBeenCalledWith(store, "FN-SOURCE", { requestId: "r" }, "trusted-session");
     expect(seams.ledger).toHaveBeenCalledWith(store, "FN-SOURCE", ["r"], false, "trusted-session");
   });
+  it.each(["general", "parity", "security", "Accessibility / keyboard", "性能", " custom "])("accepts and forwards problem type %j unchanged", async (problemType) => {
+    const report = { requestId: "r", problemKey: "k", problemType, title: "t", kitPath: "k", extensionPath: "e", reproduction: "steps", configuration: "config", evidence: ["proof"] };
+    expect(Compile(problemReportParameters).Check({ action: "report", report })).toBe(true);
+    seams.report.mockResolvedValue({ createdTaskId: "PRB-1" });
+    expect(await execute({ action: "report", report })).toMatchObject({ details: { createdTaskId: "PRB-1" } });
+    expect(seams.report).toHaveBeenCalledWith(store, "FN-SOURCE", report, "trusted-session");
+  });
+  it.each([undefined, null, "", " \t\n", 42, false, [], {}])("rejects invalid problem type %j in the schema", (problemType) => {
+    const report = { requestId: "r", problemKey: "k", problemType, title: "t", kitPath: "k", extensionPath: "e", reproduction: "steps", configuration: "config", evidence: ["proof"] };
+    expect(Compile(problemReportParameters).Check({ action: "report", report })).toBe(false);
+  });
   it("makes missing capabilities detectable before reports", async () => {
     seams.preflight.mockResolvedValue({ available: false, reason: "not enabled" });
     expect(await execute({ action: "preflight" })).toMatchObject({ details: { available: false } });
